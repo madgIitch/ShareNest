@@ -1,23 +1,42 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import { useAuthStore } from '../store/authStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { signIn, signUp, loading } = useAuthStore();
 
-  const handleLogin = () => {
-    // Aquí irá la lógica de autenticación con Firebase
-    navigation.replace('Home');
+  const handleAuth = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Por favor completa todos los campos');
+      return;
+    }
+
+    try {
+      if (isSignUp) {
+        await signUp(email, password);
+        Alert.alert('Éxito', 'Cuenta creada correctamente');
+      } else {
+        await signIn(email, password);
+      }
+      navigation.replace('Onboarding');
+    } catch (error: any) {
+      Alert.alert('Error', error.message);
+    }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>ShareNest</Text>
-      <Text style={styles.subtitle}>Iniciar Sesión</Text>
+      <Text style={styles.subtitle}>
+        {isSignUp ? 'Crear Cuenta' : 'Iniciar Sesión'}
+      </Text>
 
       <TextInput
         style={styles.input}
@@ -26,6 +45,7 @@ export default function LoginScreen({ navigation }: Props) {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
+        editable={!loading}
       />
 
       <TextInput
@@ -34,14 +54,33 @@ export default function LoginScreen({ navigation }: Props) {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        editable={!loading}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Entrar</Text>
+      <TouchableOpacity
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleAuth}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>
+            {isSignUp ? 'Registrarse' : 'Entrar'}
+          </Text>
+        )}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.linkButton}>
-        <Text style={styles.linkText}>¿No tienes cuenta? Regístrate</Text>
+      <TouchableOpacity
+        style={styles.linkButton}
+        onPress={() => setIsSignUp(!isSignUp)}
+        disabled={loading}
+      >
+        <Text style={styles.linkText}>
+          {isSignUp
+            ? '¿Ya tienes cuenta? Inicia sesión'
+            : '¿No tienes cuenta? Regístrate'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -84,6 +123,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
