@@ -41,29 +41,40 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
 
-  signIn: async (email, password) => {
-    set({ loading: true });
-    try {
-      const userCredential = await auth().signInWithEmailAndPassword(email, password);
-      const uid = userCredential.user.uid;
-
-      // Obtener datos del usuario desde Firestore
-      const userDoc = await firestore().collection('users').doc(uid).get();
-      const userData = userDoc.data();
-
-      set({
-        user: {
-          uid,
-          email,
-          flatId: userData?.flatId,
-          isAdmin: userData?.isAdmin
-        },
-        loading: false
-      });
-    } catch (error) {
-      set({ loading: false });
-      throw error;
-    }
+  signIn: async (email, password) => {  
+  set({ loading: true });  
+  try {  
+    const userCredential = await auth().signInWithEmailAndPassword(email, password);  
+    const uid = userCredential.user.uid;  
+  
+    // Obtener datos del usuario desde Firestore  
+    const userDoc = await firestore().collection('users').doc(uid).get();  
+    const userData = userDoc.data();  
+  
+    // Obtener y guardar FCM token  
+    try {  
+      const fcmToken = await messaging().getToken();  
+      await firestore().collection('users').doc(uid).update({  
+        fcmToken,  
+        fcmTokenUpdatedAt: firestore.FieldValue.serverTimestamp(),  
+      });  
+    } catch (error) {  
+      console.error('Error guardando FCM token:', error);  
+    }  
+  
+    set({  
+      user: {  
+        uid,  
+        email,  
+        flatId: userData?.flatId,  
+        isAdmin: userData?.isAdmin  
+      },  
+      loading: false  
+    });  
+  } catch (error) {  
+    set({ loading: false });  
+    throw error;  
+    }  
   },
 
   signOut: async () => {

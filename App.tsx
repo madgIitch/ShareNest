@@ -1,54 +1,138 @@
-import React from 'react';  
-import { StatusBar, useColorScheme } from 'react-native';  
-import { SafeAreaProvider } from 'react-native-safe-area-context';  
-import { NavigationContainer } from '@react-navigation/native';  
-import { createNativeStackNavigator } from '@react-navigation/native-stack';  
+import React, { useEffect } from 'react';    
+import { StatusBar, useColorScheme, Alert, Platform } from 'react-native';    
+import { SafeAreaProvider } from 'react-native-safe-area-context';    
+import { NavigationContainer } from '@react-navigation/native';    
+import { createNativeStackNavigator } from '@react-navigation/native-stack';    
+import messaging from '@react-native-firebase/messaging';  
+import { PermissionsAndroid } from 'react-native';  
   
-import HomeScreen from './src/screens/HomeScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import OnboardingScreen from './src/screens/OnboardingScreen';
-import CreateFlatScreen from './src/screens/CreateFlatScreen';
-import JoinFlatScreen from './src/screens/JoinFlatScreen';
-
-export type RootStackParamList = {
-  Login: undefined;
-  Onboarding: undefined;
-  CreateFlat: undefined;
-  JoinFlat: undefined;
-  Home: undefined;
-  Profile: undefined;
-};
-
-const Stack = createNativeStackNavigator<RootStackParamList>();
-
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName="Login">
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Onboarding"
-            component={OnboardingScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="CreateFlat"
-            component={CreateFlatScreen}
-            options={{ title: 'Crear Piso' }}
-          />
-          <Stack.Screen
-            name="JoinFlat"
-            component={JoinFlatScreen}
-            options={{ title: 'Unirse a Piso' }}
+import HomeScreen from './src/screens/HomeScreen';  
+import ProfileScreen from './src/screens/ProfileScreen';  
+import LoginScreen from './src/screens/LoginScreen';  
+import OnboardingScreen from './src/screens/OnboardingScreen';  
+import CreateFlatScreen from './src/screens/CreateFlatScreen';  
+import JoinFlatScreen from './src/screens/JoinFlatScreen';  
+import { useAuthStore } from './src/store/authStore';  
+import firestore from '@react-native-firebase/firestore';  
+  
+export type RootStackParamList = {  
+  Login: undefined;  
+  Onboarding: undefined;  
+  CreateFlat: undefined;  
+  JoinFlat: undefined;  
+  Home: undefined;  
+  Profile: undefined;  
+};  
+  
+const Stack = createNativeStackNavigator<RootStackParamList>();  
+  
+function App() {  
+  const isDarkMode = useColorScheme() === 'dark';  
+  const { user } = useAuthStore();  
+  
+  useEffect(() => {  
+    // Solicitar permisos de notificaciones  
+    const requestNotificationPermission = async () => {  
+      if (Platform.OS === 'android' && Platform.Version >= 33) {  
+        const granted = await PermissionsAndroid.request(  
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS  
+        );  
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {  
+          console.log('Permiso de notificaciones denegado');  
+          return;  
+        }  
+      }  
+  
+      const authStatus = await messaging().requestPermission();  
+      const enabled =  
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||  
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;  
+  
+      if (enabled) {  
+        console.log('Permisos de notificaciones concedidos');  
+        await getFCMToken();  
+      }  
+    };  
+  
+    // Obtener y guardar el FCM token  
+    const getFCMToken = async () => {  
+      try {  
+        const token = await messaging().getToken();  
+        console.log('FCM Token:', token);  
+          
+        // Guardar token en Firestore si hay usuario autenticado  
+        if (user?.uid && token) {  
+          await firestore()  
+            .collection('users')  
+            .doc(user.uid)  
+            .update({  
+              fcmToken: token,  
+              fcmTokenUpdatedAt: firestore.FieldValue.serverTimestamp(),  
+            });  
+          console.log('Token FCM guardado en Firestore');  
+        }  
+      } catch (error) {  
+        console.error('Error obteniendo FCM token:', error);  
+      }  
+    };  
+  
+    // Listener para cuando el token se actualiza  
+    const unsubscribeTokenRefresh = messaging().onTokenRefresh(async (token) => {  
+      console.log('Token FCM actualizado:', token);  
+      if (user?.uid) {  
+        await firestore()  
+          .collection('users')  
+          .doc(user.uid)  
+          .update({  
+            fcmToken: token,  
+            fcmTokenUpdatedAt: firestore.FieldValue.serverTimestamp(),  
+          });  
+      }  
+    });  
+  
+    // Listener para notificaciones en primer plano  
+    const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {  
+      console.log('Notificación recibida en primer plano:', remoteMessage);  
+      Alert.alert(  
+        remoteMessage.notification?.title || 'Notificación',  
+        remoteMessage.notification?.body || ''  
+      );  
+    });  
+  
+    // Inicializar permisos y token  
+    requestNotificationPermission();  
+  
+    // Cleanup  
+    return () => {  
+      unsubscribeTokenRefresh();  
+      unsubscribeForeground();  
+    };  
+  }, [user?.uid]);  
+  
+  return (  
+    <SafeAreaProvider>  
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />  
+      <NavigationContainer>  
+        <Stack.Navigator initialRouteName="Login">  
+          <Stack.Screen  
+            name="Login"  
+            component={LoginScreen}  
+            options={{ headerShown: false }}  
+          />  
+          <Stack.Screen  
+            name="Onboarding"  
+            component={OnboardingScreen}  
+            options={{ headerShown: false }}  
+          />  
+          <Stack.Screen  
+            name="CreateFlat"  
+            component={CreateFlatScreen}  
+            options={{ title: 'Crear Piso' }}  
+          />  
+          <Stack.Screen  
+            name="JoinFlat"  
+            component={JoinFlatScreen}  
+            options={{ title: 'Unirse a Piso' }}  
           />  
           <Stack.Screen   
             name="Home"   
