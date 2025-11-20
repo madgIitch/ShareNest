@@ -12,6 +12,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';    
 import CreateFlatScreen from './src/screens/CreateFlatScreen';    
 import JoinFlatScreen from './src/screens/JoinFlatScreen';    
+import TasksScreen from './src/screens/TasksScreen';  // NUEVO  
+import CreateTaskScreen from './src/screens/CreateTaskScreen';  // NUEVO  
 import { useAuthStore } from './src/store/authStore';    
 import firestore from '@react-native-firebase/firestore';    
     
@@ -22,6 +24,8 @@ export type RootStackParamList = {
   JoinFlat: undefined;    
   Home: undefined;    
   Profile: undefined;    
+  Tasks: undefined;  // NUEVO  
+  CreateTask: undefined;  // NUEVO  
 };    
     
 const Stack = createNativeStackNavigator<RootStackParamList>();    
@@ -62,7 +66,6 @@ function App() {
             
         // Guardar token en Firestore si hay usuario autenticado    
         if (user?.uid && token) {    
-          // CAMBIO: Usar .set() con merge: true en lugar de .update()  
           await firestore()    
             .collection('users')    
             .doc(user.uid)    
@@ -81,7 +84,6 @@ function App() {
     const unsubscribeTokenRefresh = messaging().onTokenRefresh(async (token) => {    
       console.log('Token FCM actualizado:', token);    
       if (user?.uid) {    
-        // CAMBIO: Usar .set() con merge: true en lugar de .update()  
         await firestore()    
           .collection('users')    
           .doc(user.uid)    
@@ -145,6 +147,16 @@ function App() {
             name="Profile"     
             component={ProfileScreen}    
             options={{ title: 'Perfil' }}    
+          />    
+          <Stack.Screen     
+            name="Tasks"     
+            component={TasksScreen}    
+            options={{ title: 'Tareas' }}    
+          />    
+          <Stack.Screen     
+            name="CreateTask"     
+            component={CreateTaskScreen}    
+            options={{ title: 'Crear Tarea' }}    
           />    
         </Stack.Navigator>    
       </NavigationContainer>    
