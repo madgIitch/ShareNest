@@ -1,80 +1,76 @@
 // src/theme/index.ts    
     
 export const colors = {    
-  // Colores primarios - Azul petróleo oscuro  
-  primary: '#2D5A88',      // Azul petróleo oscuro, clean y profesional  
-  primaryDark: '#1E3F5E',  // Fondo o botones presionados  
-  primaryLight: '#4C7CA8', // Para estados hover o acentos  
+  // Colores primarios - Teal desaturado  
+  primary: '#80CBC4',      // Teal 200 - Acento principal neutro y suave  
+  primaryDark: '#00796B',  // Teal 700 - Variante oscura para estados activos  
+  primaryLight: '#B2DFDB', // Teal 100 - Variante clara para hover/selecciones  
       
-  // Colores de estado - Tonos oscuros moderados  
-  success: '#2F8F52',      // Verde oscuro, sin neón  
-  warning: '#D98A1F',      // Mostaza oscuro, cálido  
-  error: '#C4463A',        // Rojo quemado, ideal para dark UI  
-  info: '#3A8CA8',         // Cyan oscuro suave  
+  // Colores de estado    
+  success: '#4CAF50',      // Verde 500 - Éxito/confirmación estándar  
+  warning: '#FFC107',      // Ámbar 500 - Advertencia brillante  
+  error: '#CF6679',        // Rojo rosado desaturado - Mensajes de error  
+  info: '#2196F3',         // Azul 500 - Información general  
       
-  // Fondos - Neutros profundos pero no totalmente negros  
-  background: '#1A1C1E',      // Ideal para contenido  
-  backgroundCard: '#242629',  // Sutil contraste con fondo  
+  // Colores de fondo    
+  background: '#121212',     // Gris carbón - Fondo principal muy oscuro  
+  backgroundCard: '#1E1E1E', // Gris oscuro - Superficies elevadas (+8% luminosidad)  
       
-  // Texto - Material dark mode con 100% / 70% / 50%  
-  textPrimary: '#F2F2F2',     // Texto principal  
-  textSecondary: '#C4C4C4',   // Texto secundario  
-  textTertiary: '#8E8E8E',    // Texto terciario  
-  textInverse: '#000000',     // Usado en botones o chips claros  
+  // Colores de texto    
+  textPrimary: '#E0E0E0',   // Gris claro 87% - Texto principal sin deslumbrar  
+  textSecondary: '#B0B0B0', // Gris 70% - Texto secundario menos prominente  
+  textTertiary: '#888888',  // Gris 53% - Texto terciario/hint/disabled  
+  textInverse: '#121212',   // Negro puro - Texto sobre fondos claros  
       
-  // Bordes - Líneas discretas pero visibles en modo oscuro  
-  border: '#3A3D40',       // Bordes principales  
-  borderLight: '#2C2E31',  // Bordes sutiles  
+  // Colores de borde    
+  border: '#444444',      // Gris oscuro 26% - Bordes estándar  
+  borderLight: '#333333', // Gris casi negro - Separadores sutiles  
       
-  // Categorías - Tonos oscuros armónicos  
-  categoryBlue: '#2D5A88',    // Sync con primary  
-  categoryGreen: '#2F8F52',   // Igual que success  
-  categoryOrange: '#D98A1F',  // Cálido sin saturar  
-  categoryRed: '#C4463A',     // Coherente con error  
-  categoryPurple: '#6A4FA3',  // Morado profundo elegante  
+  // Colores de categorías (para tareas)    
+  categoryBlue: '#42A5F5',   // Azul 400 - Tonalidad viva y fría moderada  
+  categoryGreen: '#66BB6A',  // Verde 400 - Verde equilibrado positivo  
+  categoryOrange: '#FFA726', // Naranja 400 - Naranja cálido tono medio  
+  categoryRed: '#EF5350',    // Rojo 400 - Rojo intenso para urgencia  
+  categoryPurple: '#9575CD', // Púrpura 300 - Violeta suavizado  
 };    
     
 export const typography = {    
+  // Familias de fuentes    
+  fontFamily: {    
+    regular: 'System',    
+    medium: 'System',    
+    bold: 'System',    
+    // Si quieres usar fuentes personalizadas:    
+    // regular: 'Roboto-Regular',    
+    // medium: 'Roboto-Medium',    
+    // bold: 'Roboto-Bold',    
+  },    
+      
+  // Tamaños de fuente    
   fontSize: {    
-    xs: 10,    
-    sm: 12,    
-    base: 14,    
-    md: 16,    
+    xs: 12,    
+    sm: 14,    
+    base: 16,    
     lg: 18,    
     xl: 20,    
     xxl: 24,    
-    xxxl: 32,    
+    xxxl: 28,    
+    display: 32,    
   },    
+      
+  // Pesos de fuente    
   fontWeight: {    
     regular: '400' as const,    
     medium: '500' as const,    
     semibold: '600' as const,    
     bold: '700' as const,    
   },    
-  h1: {    
-    fontSize: 32,    
-    fontWeight: '700' as const,    
-    color: colors.textPrimary,    
-  },    
-  h2: {    
-    fontSize: 24,    
-    fontWeight: '700' as const,    
-    color: colors.textPrimary,    
-  },    
-  h3: {    
-    fontSize: 20,    
-    fontWeight: '600' as const,    
-    color: colors.textPrimary,    
-  },    
-  body: {    
-    fontSize: 14,    
-    fontWeight: '400' as const,    
-    color: colors.textPrimary,    
-  },    
-  caption: {    
-    fontSize: 12,    
-    fontWeight: '400' as const,    
-    color: colors.textSecondary,    
+      
+  // Alturas de línea    
+  lineHeight: {    
+    tight: 1.2,    
+    normal: 1.5,    
+    relaxed: 1.75,    
   },    
 };    
     
@@ -82,14 +78,16 @@ export const spacing = {
   xs: 4,    
   sm: 8,    
   md: 12,    
-  lg: 16,    
+  base: 16,    
+  lg: 20,    
   xl: 24,    
   xxl: 32,    
+  xxxl: 40,    
 };    
     
 export const borderRadius = {    
   sm: 4,    
-  md: 8,    
+  base: 8,    
   lg: 12,    
   xl: 16,    
   full: 9999,    
@@ -99,57 +97,61 @@ export const shadows = {
   sm: {    
     shadowColor: '#000',    
     shadowOffset: { width: 0, height: 1 },    
-    shadowOpacity: 0.18,    
-    shadowRadius: 1.0,    
+    shadowOpacity: 0.05,    
+    shadowRadius: 2,    
     elevation: 1,    
   },    
-  md: {    
+  base: {    
     shadowColor: '#000',    
     shadowOffset: { width: 0, height: 2 },    
-    shadowOpacity: 0.23,    
-    shadowRadius: 2.62,    
-    elevation: 4,    
+    shadowOpacity: 0.1,    
+    shadowRadius: 4,    
+    elevation: 3,    
   },    
   lg: {    
     shadowColor: '#000',    
     shadowOffset: { width: 0, height: 4 },    
-    shadowOpacity: 0.30,    
-    shadowRadius: 4.65,    
-    elevation: 8,    
+    shadowOpacity: 0.15,    
+    shadowRadius: 8,    
+    elevation: 5,    
   },    
 };    
     
+// Estilos comunes reutilizables    
 export const commonStyles = {    
+  container: {    
+    flex: 1,    
+    backgroundColor: colors.background,    
+  },    
+      
   card: {    
     backgroundColor: colors.backgroundCard,    
     borderRadius: borderRadius.lg,    
-    padding: spacing.lg,    
-    ...shadows.md,    
+    padding: spacing.base,    
+    ...shadows.base,    
   },    
       
   input: {    
-    width: '100%' as const,    
     height: 50,    
     borderWidth: 1,    
     borderColor: colors.border,    
-    borderRadius: borderRadius.md,    
-    paddingHorizontal: spacing.md,    
+    borderRadius: borderRadius.base,    
+    paddingHorizontal: spacing.base,    
     fontSize: typography.fontSize.base,    
     backgroundColor: colors.backgroundCard,    
     color: colors.textPrimary,    
   },    
       
   button: {    
-    width: '100%' as const,    
     height: 50,    
     backgroundColor: colors.primary,    
-    borderRadius: borderRadius.md,    
+    borderRadius: borderRadius.base,    
     justifyContent: 'center' as const,    
     alignItems: 'center' as const,    
   },    
       
   buttonText: {    
-    color: colors.textPrimary,    
+    color: colors.textInverse,    
     fontSize: typography.fontSize.base,    
     fontWeight: typography.fontWeight.semibold,    
   },    
