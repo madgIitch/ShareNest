@@ -1,185 +1,183 @@
-// src/theme/index.ts  
-  
-export const colors = {  
-  // Colores primarios  
-  primary: '#007AFF',  
-  primaryDark: '#0051D5',  
-  primaryLight: '#4DA2FF',  
+// src/theme/index.ts    
     
-  // Colores de estado  
-  success: '#34C759',  
-  warning: '#FF9500',  
-  error: '#FF3B30',  
-  info: '#5AC8FA',  
+export const colors = {    
+  // Colores primarios - Azul petróleo oscuro  
+  primary: '#2D5A88',      // Azul petróleo oscuro, clean y profesional  
+  primaryDark: '#1E3F5E',  // Fondo o botones presionados  
+  primaryLight: '#4C7CA8', // Para estados hover o acentos  
+      
+  // Colores de estado - Tonos oscuros moderados  
+  success: '#2F8F52',      // Verde oscuro, sin neón  
+  warning: '#D98A1F',      // Mostaza oscuro, cálido  
+  error: '#C4463A',        // Rojo quemado, ideal para dark UI  
+  info: '#3A8CA8',         // Cyan oscuro suave  
+      
+  // Fondos - Neutros profundos pero no totalmente negros  
+  background: '#1A1C1E',      // Ideal para contenido  
+  backgroundCard: '#242629',  // Sutil contraste con fondo  
+      
+  // Texto - Material dark mode con 100% / 70% / 50%  
+  textPrimary: '#F2F2F2',     // Texto principal  
+  textSecondary: '#C4C4C4',   // Texto secundario  
+  textTertiary: '#8E8E8E',    // Texto terciario  
+  textInverse: '#000000',     // Usado en botones o chips claros  
+      
+  // Bordes - Líneas discretas pero visibles en modo oscuro  
+  border: '#3A3D40',       // Bordes principales  
+  borderLight: '#2C2E31',  // Bordes sutiles  
+      
+  // Categorías - Tonos oscuros armónicos  
+  categoryBlue: '#2D5A88',    // Sync con primary  
+  categoryGreen: '#2F8F52',   // Igual que success  
+  categoryOrange: '#D98A1F',  // Cálido sin saturar  
+  categoryRed: '#C4463A',     // Coherente con error  
+  categoryPurple: '#6A4FA3',  // Morado profundo elegante  
+};    
     
-  // Colores de fondo  
-  background: '#F5F5F5',  
-  backgroundCard: '#FFFFFF',  
+export const typography = {    
+  fontSize: {    
+    xs: 10,    
+    sm: 12,    
+    base: 14,    
+    md: 16,    
+    lg: 18,    
+    xl: 20,    
+    xxl: 24,    
+    xxxl: 32,    
+  },    
+  fontWeight: {    
+    regular: '400' as const,    
+    medium: '500' as const,    
+    semibold: '600' as const,    
+    bold: '700' as const,    
+  },    
+  h1: {    
+    fontSize: 32,    
+    fontWeight: '700' as const,    
+    color: colors.textPrimary,    
+  },    
+  h2: {    
+    fontSize: 24,    
+    fontWeight: '700' as const,    
+    color: colors.textPrimary,    
+  },    
+  h3: {    
+    fontSize: 20,    
+    fontWeight: '600' as const,    
+    color: colors.textPrimary,    
+  },    
+  body: {    
+    fontSize: 14,    
+    fontWeight: '400' as const,    
+    color: colors.textPrimary,    
+  },    
+  caption: {    
+    fontSize: 12,    
+    fontWeight: '400' as const,    
+    color: colors.textSecondary,    
+  },    
+};    
     
-  // Colores de texto  
-  textPrimary: '#333333',  
-  textSecondary: '#666666',  
-  textTertiary: '#999999',  
-  textInverse: '#FFFFFF',  
+export const spacing = {    
+  xs: 4,    
+  sm: 8,    
+  md: 12,    
+  lg: 16,    
+  xl: 24,    
+  xxl: 32,    
+};    
     
-  // Colores de borde  
-  border: '#DDDDDD',  
-  borderLight: '#EEEEEE',  
+export const borderRadius = {    
+  sm: 4,    
+  md: 8,    
+  lg: 12,    
+  xl: 16,    
+  full: 9999,    
+};    
     
-  // Colores de categorías (para tareas)  
-  categoryBlue: '#007AFF',  
-  categoryGreen: '#34C759',  
-  categoryOrange: '#FF9500',  
-  categoryRed: '#FF3B30',  
-  categoryPurple: '#AF52DE',  
-};  
-  
-export const typography = {  
-  // Familias de fuentes  
-  fontFamily: {  
-    regular: 'System',  
-    medium: 'System',  
-    bold: 'System',  
-    // Si quieres usar fuentes personalizadas:  
-    // regular: 'Roboto-Regular',  
-    // medium: 'Roboto-Medium',  
-    // bold: 'Roboto-Bold',  
-  },  
+export const shadows = {    
+  sm: {    
+    shadowColor: '#000',    
+    shadowOffset: { width: 0, height: 1 },    
+    shadowOpacity: 0.18,    
+    shadowRadius: 1.0,    
+    elevation: 1,    
+  },    
+  md: {    
+    shadowColor: '#000',    
+    shadowOffset: { width: 0, height: 2 },    
+    shadowOpacity: 0.23,    
+    shadowRadius: 2.62,    
+    elevation: 4,    
+  },    
+  lg: {    
+    shadowColor: '#000',    
+    shadowOffset: { width: 0, height: 4 },    
+    shadowOpacity: 0.30,    
+    shadowRadius: 4.65,    
+    elevation: 8,    
+  },    
+};    
     
-  // Tamaños de fuente  
-  fontSize: {  
-    xs: 12,  
-    sm: 14,  
-    base: 16,  
-    lg: 18,  
-    xl: 20,  
-    xxl: 24,  
-    xxxl: 28,  
-    display: 32,  
-  },  
+export const commonStyles = {    
+  card: {    
+    backgroundColor: colors.backgroundCard,    
+    borderRadius: borderRadius.lg,    
+    padding: spacing.lg,    
+    ...shadows.md,    
+  },    
+      
+  input: {    
+    width: '100%' as const,    
+    height: 50,    
+    borderWidth: 1,    
+    borderColor: colors.border,    
+    borderRadius: borderRadius.md,    
+    paddingHorizontal: spacing.md,    
+    fontSize: typography.fontSize.base,    
+    backgroundColor: colors.backgroundCard,    
+    color: colors.textPrimary,    
+  },    
+      
+  button: {    
+    width: '100%' as const,    
+    height: 50,    
+    backgroundColor: colors.primary,    
+    borderRadius: borderRadius.md,    
+    justifyContent: 'center' as const,    
+    alignItems: 'center' as const,    
+  },    
+      
+  buttonText: {    
+    color: colors.textPrimary,    
+    fontSize: typography.fontSize.base,    
+    fontWeight: typography.fontWeight.semibold,    
+  },    
+      
+  title: {    
+    fontSize: typography.fontSize.xxxl,    
+    fontWeight: typography.fontWeight.bold,    
+    color: colors.textPrimary,    
+  },    
+      
+  subtitle: {    
+    fontSize: typography.fontSize.lg,    
+    color: colors.textSecondary,    
+  },    
+      
+  label: {    
+    fontSize: typography.fontSize.sm,    
+    fontWeight: typography.fontWeight.semibold,    
+    color: colors.textPrimary,    
+    marginBottom: spacing.sm,    
+  },    
+};    
     
-  // Pesos de fuente  
-  fontWeight: {  
-    regular: '400' as const,  
-    medium: '500' as const,  
-    semibold: '600' as const,  
-    bold: '700' as const,  
-  },  
-    
-  // Alturas de línea  
-  lineHeight: {  
-    tight: 1.2,  
-    normal: 1.5,  
-    relaxed: 1.75,  
-  },  
-};  
-  
-export const spacing = {  
-  xs: 4,  
-  sm: 8,  
-  md: 12,  
-  base: 16,  
-  lg: 20,  
-  xl: 24,  
-  xxl: 32,  
-  xxxl: 40,  
-};  
-  
-export const borderRadius = {  
-  sm: 4,  
-  base: 8,  
-  lg: 12,  
-  xl: 16,  
-  full: 9999,  
-};  
-  
-export const shadows = {  
-  sm: {  
-    shadowColor: '#000',  
-    shadowOffset: { width: 0, height: 1 },  
-    shadowOpacity: 0.05,  
-    shadowRadius: 2,  
-    elevation: 1,  
-  },  
-  base: {  
-    shadowColor: '#000',  
-    shadowOffset: { width: 0, height: 2 },  
-    shadowOpacity: 0.1,  
-    shadowRadius: 4,  
-    elevation: 3,  
-  },  
-  lg: {  
-    shadowColor: '#000',  
-    shadowOffset: { width: 0, height: 4 },  
-    shadowOpacity: 0.15,  
-    shadowRadius: 8,  
-    elevation: 5,  
-  },  
-};  
-  
-// Estilos comunes reutilizables  
-export const commonStyles = {  
-  container: {  
-    flex: 1,  
-    backgroundColor: colors.background,  
-  },  
-    
-  card: {  
-    backgroundColor: colors.backgroundCard,  
-    borderRadius: borderRadius.lg,  
-    padding: spacing.base,  
-    ...shadows.base,  
-  },  
-    
-  input: {  
-    height: 50,  
-    borderWidth: 1,  
-    borderColor: colors.border,  
-    borderRadius: borderRadius.base,  
-    paddingHorizontal: spacing.base,  
-    fontSize: typography.fontSize.base,  
-    backgroundColor: colors.backgroundCard,  
-    color: colors.textPrimary,  
-  },  
-    
-  button: {  
-    height: 50,  
-    backgroundColor: colors.primary,  
-    borderRadius: borderRadius.base,  
-    justifyContent: 'center' as const,  
-    alignItems: 'center' as const,  
-  },  
-    
-  buttonText: {  
-    color: colors.textInverse,  
-    fontSize: typography.fontSize.base,  
-    fontWeight: typography.fontWeight.semibold,  
-  },  
-    
-  title: {  
-    fontSize: typography.fontSize.xxxl,  
-    fontWeight: typography.fontWeight.bold,  
-    color: colors.textPrimary,  
-  },  
-    
-  subtitle: {  
-    fontSize: typography.fontSize.lg,  
-    color: colors.textSecondary,  
-  },  
-    
-  label: {  
-    fontSize: typography.fontSize.sm,  
-    fontWeight: typography.fontWeight.semibold,  
-    color: colors.textPrimary,  
-    marginBottom: spacing.sm,  
-  },  
-};  
-  
-export default {  
-  colors,  
-  typography,  
-  spacing,  
-  borderRadius,  
-  shadows,  
-  commonStyles,  
+export default {    
+  colors,    
+  typography,    
+  spacing,    
+  borderRadius,    
+  shadows,    
+  commonStyles,    
 };

@@ -173,65 +173,31 @@ function App() {
     );  
   }  
         
-  return (        
-    <SafeAreaProvider>        
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />        
-      <NavigationContainer>        
-        <Stack.Navigator initialRouteName={initialRoute}>  {/* MODIFICADO: ruta inicial dinámica */}  
-          <Stack.Screen        
-            name="Login"        
-            component={LoginScreen}        
-            options={{ headerShown: false }}        
-          />        
-          <Stack.Screen        
-            name="Onboarding"        
-            component={OnboardingScreen}        
-            options={{ headerShown: false }}        
-          />        
-          <Stack.Screen        
-            name="CreateFlat"        
-            component={CreateFlatScreen}        
-            options={{ title: 'Crear Piso' }}        
-          />        
-          <Stack.Screen        
-            name="JoinFlat"        
-            component={JoinFlatScreen}        
-            options={{ title: 'Unirse a Piso' }}        
-          />        
-          <Stack.Screen         
-            name="Home"         
-            component={HomeScreen}        
-            options={{ title: 'Inicio' }}        
-          />        
-          <Stack.Screen         
-            name="Profile"         
-            component={ProfileScreen}        
-            options={{ title: 'Perfil' }}        
-          />        
-          <Stack.Screen         
-            name="Tasks"         
-            component={TasksScreen}        
-            options={{ title: 'Tareas' }}        
-          />        
-          <Stack.Screen         
-            name="CreateTask"         
-            component={CreateTaskScreen}        
-            options={{ title: 'Crear Tarea' }}        
-          />    
-          <Stack.Screen         
-            name="Expenses"         
-            component={ExpensesScreen}        
-            options={{ title: 'Gastos' }}        
-          />    
-          <Stack.Screen         
-            name="CreateExpense"         
-            component={CreateExpenseScreen}        
-            options={{ title: 'Añadir Gasto' }}        
-          />    
-        </Stack.Navigator>        
-      </NavigationContainer>        
-    </SafeAreaProvider>        
-  );        
+  return (      
+  <SafeAreaProvider>      
+    <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />      
+    {initializing ? (  
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>  
+        <ActivityIndicator size="large" color="#007AFF" />  
+      </View>  
+    ) : (  
+      <NavigationContainer>      
+        <Stack.Navigator initialRouteName={initialRoute}>  
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />  
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />  
+          <Stack.Screen name="CreateFlat" component={CreateFlatScreen} options={{ title: 'Crear Piso' }} />  
+          <Stack.Screen name="JoinFlat" component={JoinFlatScreen} options={{ title: 'Unirse a Piso' }} />  
+          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Inicio' }} />  
+          <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Perfil' }} />  
+          <Stack.Screen name="Tasks" component={TasksScreen} options={{ title: 'Tareas' }} />  
+          <Stack.Screen name="CreateTask" component={CreateTaskScreen} options={{ title: 'Crear Tarea' }} />  
+          <Stack.Screen name="Expenses" component={ExpensesScreen} options={{ title: 'Gastos' }} />  
+          <Stack.Screen name="CreateExpense" component={CreateExpenseScreen} options={{ title: 'Añadir Gasto' }} />  
+        </Stack.Navigator>      
+      </NavigationContainer>  
+    )}  
+  </SafeAreaProvider>      
+);        
 }        
         
 export default App;
