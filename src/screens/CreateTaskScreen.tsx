@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,    
     borderWidth: 1,    
     borderColor: colors.border,    
-    backgroundColor: colors.white,    
+    color: colors.textInverse,  
   },    
   categoryButtonSelected: {    
     backgroundColor: colors.primary,    
@@ -261,10 +261,10 @@ const styles = StyleSheet.create({
   },    
   categoryLabel: {    
     fontSize: 14,    
-    color: colors.text,    
+    backgroundColor: colors.backgroundCard,  
   },    
   categoryLabelSelected: {    
-    color: colors.white,    
+    backgroundColor: colors.backgroundCard,
     fontWeight: '600',    
   },    
   button: {    

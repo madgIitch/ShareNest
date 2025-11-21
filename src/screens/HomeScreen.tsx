@@ -15,11 +15,11 @@ export default function HomeScreen({ navigation }: Props) {
           Tu espacio para compartir y conectar    
         </Text>    
     
-        <View style={styles.card}>    
-          <Text style={styles.cardTitle}>Inicio</Text>    
-          <Text style={styles.cardText}>    
-            Aquí verás las publicaciones de tu comunidad    
-          </Text>    
+        <View style={styles.card}>  
+          <Text style={styles.cardTitle}>Inicio</Text>  
+          <Text style={[styles.cardText, { color: colors.textPrimary }]}>  
+            Aquí verás las publicaciones de tu comunidad  
+          </Text>  
         </View>    
     
         <View style={styles.card}>    
@@ -81,11 +81,11 @@ const styles = StyleSheet.create({
     ...typography.h3,    
     marginBottom: spacing.sm,    
   },    
-  cardText: {    
-    ...typography.body,    
-    color: colors.textSecondary,    
-    lineHeight: 20,    
-  },    
+  cardText: {  
+  ...typography.body,  
+  color: colors.textSecondary,  
+  lineHeight: typography.fontSize.base * typography.lineHeight.normal,  // ✅ Relativo  
+},    
   button: {    
     ...commonStyles.button,    
     marginTop: spacing.lg,    

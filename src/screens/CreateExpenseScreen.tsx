@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,  
     borderWidth: 1,  
     borderColor: colors.border,  
-    backgroundColor: colors.surface,  
+    backgroundColor: colors.backgroundCard,  
   },  
   categoryButtonSelected: {  
     backgroundColor: colors.primary,  
@@ -224,10 +224,10 @@ const styles = StyleSheet.create({
   },  
   categoryLabel: {  
     ...typography.body,  
-    color: colors.text,  
+    color: colors.textPrimary,  
   },  
   categoryLabelSelected: {  
-    color: colors.surface,  
+    color: colors.textInverse,
     fontWeight: '600',  
   },  
   infoBox: {  

@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },    
   header: {    
     padding: spacing.md,    
-    backgroundColor: colors.surface,    
+    backgroundColor: colors.backgroundCard,  
     borderBottomWidth: 1,    
     borderBottomColor: colors.border,    
   },    
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },    
   summaryLabel: {    
     ...typography.body,    
-    color: colors.surface,    
+    color: colors.textInverse,
     marginBottom: spacing.xs,    
   },    
   summaryAmount: {    
