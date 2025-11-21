@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';  
 import { NativeStackScreenProps } from '@react-navigation/native-stack';  
 import { RootStackParamList } from '../../App';  
-import { colors, typography, spacing, commonStyles } from '../theme';  
+import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';  
   
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;  
   
@@ -39,41 +39,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',  
     alignItems: 'center',  
     padding: spacing.lg,  
-    backgroundColor: colors.background,  
+    backgroundColor: colors.background, // Transparente para mostrar gradiente  
   },  
   title: {  
-    ...typography.h1,  
+    fontSize: typography.fontSize.display,  
+    fontWeight: typography.fontWeight.bold,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.md,  
     textAlign: 'center',  
   },  
   description: {  
     ...typography.body,  
-    color: colors.textSecondary,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.xl * 2.5, // 50px  
     textAlign: 'center',  
+    opacity: 0.9,  
   },  
   optionsContainer: {  
     width: '100%',  
   },  
   primaryButton: {  
-    ...commonStyles.button,  
+    height: 50,  
+    width: '100%',  
+    backgroundColor: colors.primary, // Turquesa  
+    borderRadius: borderRadius.lg,  
+    justifyContent: 'center',  
+    alignItems: 'center',  
     marginBottom: spacing.md,  
+    ...shadows.base,  
   },  
   primaryButtonText: {  
-    ...commonStyles.buttonText,  
+    color: colors.textInverse, // Blanco sobre turquesa  
+    fontSize: typography.fontSize.base,  
+    fontWeight: typography.fontWeight.semibold,  
   },  
   secondaryButton: {  
     width: '100%',  
     height: 50,  
-    backgroundColor: colors.background,  
-    borderRadius: 8,  
+    backgroundColor: colors.backgroundGlass, // Glass transparente  
+    borderRadius: borderRadius.lg,  
     justifyContent: 'center',  
     alignItems: 'center',  
     borderWidth: 1,  
-    borderColor: colors.primary,  
+    borderColor: colors.border, // Borde glass blanco  
   },  
   secondaryButtonText: {  
-    color: colors.primary,  
+    color: colors.textOnGradient, // Blanco sobre glass  
     fontSize: 16,  
     fontWeight: '600',  
   },  

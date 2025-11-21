@@ -1,10 +1,19 @@
 import React, { useState } from 'react';  
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';  
+import {   
+  View,   
+  Text,   
+  TextInput,   
+  TouchableOpacity,   
+  StyleSheet,   
+  Alert,   
+  ActivityIndicator,   
+  ScrollView   
+} from 'react-native';  
 import { NativeStackScreenProps } from '@react-navigation/native-stack';  
 import { RootStackParamList } from '../../App';  
 import firestore from '@react-native-firebase/firestore';  
 import { useAuthStore } from '../store/authStore';  
-import { colors, typography, spacing, commonStyles } from '../theme';  
+import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';  
   
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateFlat'>;  
   
@@ -109,7 +118,7 @@ export default function CreateFlatScreen({ navigation }: Props) {
           disabled={loading}  
         >  
           {loading ? (  
-            <ActivityIndicator color={colors.white} />  
+            <ActivityIndicator color={colors.textInverse} />  
           ) : (  
             <Text style={styles.buttonText}>Crear Piso</Text>  
           )}  
@@ -122,37 +131,54 @@ export default function CreateFlatScreen({ navigation }: Props) {
 const styles = StyleSheet.create({  
   container: {  
     flex: 1,  
-    backgroundColor: colors.background,  
+    backgroundColor: colors.background, // Transparente para mostrar gradiente  
   },  
   content: {  
     padding: spacing.lg,  
   },  
   title: {  
     ...typography.h1,  
-    marginBottom: spacing.xs,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
+    marginBottom: spacing.sm,  
   },  
   description: {  
     ...typography.body,  
-    color: colors.textSecondary,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.xl,  
+    opacity: 0.9,  
   },  
   label: {  
     ...typography.label,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.xs,  
     marginTop: spacing.sm,  
   },  
   input: {  
-    ...commonStyles.input,  
+    height: 50,  
+    borderWidth: 1,  
+    borderColor: colors.border, // Borde glass blanco semitransparente  
+    borderRadius: borderRadius.lg,  
+    paddingHorizontal: spacing.base,  
+    fontSize: typography.fontSize.base,  
+    backgroundColor: colors.backgroundGlass, // Glass transparente  
+    color: colors.textPrimary, // Texto oscuro en input  
     marginBottom: spacing.md,  
   },  
   button: {  
-    ...commonStyles.button,  
+    height: 50,  
+    backgroundColor: colors.primary, // Turquesa  
+    borderRadius: borderRadius.lg,  
+    justifyContent: 'center',  
+    alignItems: 'center',  
     marginTop: spacing.lg,  
+    ...shadows.base,  
   },  
   buttonDisabled: {  
     opacity: 0.6,  
   },  
   buttonText: {  
-    ...commonStyles.buttonText,  
+    color: colors.textInverse, // Blanco sobre turquesa  
+    fontSize: typography.fontSize.base,  
+    fontWeight: typography.fontWeight.semibold,  
   },  
 });

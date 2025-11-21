@@ -1,9 +1,17 @@
 import React, { useState } from 'react';  
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';  
+import {   
+  View,   
+  Text,   
+  TextInput,   
+  TouchableOpacity,   
+  StyleSheet,   
+  Alert,   
+  ActivityIndicator   
+} from 'react-native';  
 import { NativeStackScreenProps } from '@react-navigation/native-stack';  
 import { RootStackParamList } from '../../App';  
 import { useAuthStore } from '../store/authStore';  
-import { colors, typography, spacing, borderRadius, commonStyles } from '../theme';  
+import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';  
   
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;  
   
@@ -42,6 +50,7 @@ export default function LoginScreen({ navigation }: Props) {
       <TextInput  
         style={styles.input}  
         placeholder="Email"  
+        placeholderTextColor={colors.textSecondary}  
         value={email}  
         onChangeText={setEmail}  
         keyboardType="email-address"  
@@ -52,6 +61,7 @@ export default function LoginScreen({ navigation }: Props) {
       <TextInput  
         style={styles.input}  
         placeholder="Contraseña"  
+        placeholderTextColor={colors.textSecondary}  
         value={password}  
         onChangeText={setPassword}  
         secureTextEntry  
@@ -93,37 +103,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',  
     alignItems: 'center',  
     padding: spacing.lg,  
-    backgroundColor: colors.backgroundCard,  
+    backgroundColor: colors.background, // Transparente para mostrar gradiente  
   },  
   title: {  
-    ...commonStyles.title,  
+    fontSize: typography.fontSize.display,  
+    fontWeight: typography.fontWeight.bold,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.sm,  
   },  
   subtitle: {  
-    ...commonStyles.subtitle,  
+    fontSize: typography.fontSize.xxl,  
+    fontWeight: typography.fontWeight.semibold,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.xxl,  
+    opacity: 0.9,  
   },  
   input: {  
-    ...commonStyles.input,  
+    height: 50,  
     width: '100%',  
+    borderWidth: 1,  
+    borderColor: colors.border, // Borde glass blanco semitransparente  
+    borderRadius: borderRadius.lg,  
+    paddingHorizontal: spacing.base,  
+    fontSize: typography.fontSize.base,  
+    backgroundColor: colors.backgroundGlass, // Glass transparente  
+    color: colors.textPrimary, // Texto oscuro en input  
     marginBottom: spacing.base,  
   },  
   button: {  
-    ...commonStyles.button,  
+    height: 50,  
     width: '100%',  
+    backgroundColor: colors.primary, // Turquesa  
+    borderRadius: borderRadius.lg,  
+    justifyContent: 'center',  
+    alignItems: 'center',  
     marginTop: spacing.sm,  
+    ...shadows.base,  
   },  
   buttonDisabled: {  
     opacity: 0.6,  
   },  
   buttonText: {  
-    ...commonStyles.buttonText,  
+    color: colors.textInverse, // Blanco sobre turquesa  
+    fontSize: typography.fontSize.base,  
+    fontWeight: typography.fontWeight.semibold,  
   },  
   linkButton: {  
     marginTop: spacing.lg,  
   },  
   linkText: {  
-    color: colors.primary,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     fontSize: typography.fontSize.sm,  
+    textDecorationLine: 'underline',  
   },  
 });

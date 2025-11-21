@@ -175,28 +175,35 @@ export default function CreateExpenseScreen({ navigation }: Props) {
 const styles = StyleSheet.create({  
   container: {  
     flex: 1,  
-    backgroundColor: colors.background,  
+    backgroundColor: colors.background, // Transparente para mostrar gradiente  
   },  
   content: {  
     padding: spacing.lg,  
   },  
   title: {  
     ...typography.h1,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.sm,  
   },  
   description: {  
     ...typography.body,  
-    color: colors.textSecondary,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.xl,  
+    opacity: 0.9,  
   },  
   label: {  
     ...typography.label,  
+    color: colors.textOnGradient, // Blanco sobre gradiente  
     marginBottom: spacing.xs,  
     marginTop: spacing.sm,  
   },  
   input: {  
     ...commonStyles.input,  
     marginBottom: spacing.sm,  
+    backgroundColor: colors.backgroundGlass, // Glass transparente  
+    borderColor: colors.border, // Borde glass blanco  
+    color: colors.textPrimary, // Texto oscuro en input  
+    placeholderTextColor: colors.textSecondary,  
   },  
   categoryContainer: {  
     flexDirection: 'row',  
@@ -209,14 +216,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',  
     paddingVertical: spacing.sm,  
     paddingHorizontal: spacing.md,  
-    borderRadius: 8,  
+    borderRadius: borderRadius.lg,  
     borderWidth: 1,  
-    borderColor: colors.border,  
-    backgroundColor: colors.backgroundCard,  
+    borderColor: colors.border, // Borde glass  
+    backgroundColor: colors.backgroundGlass, // Fondo glass transparente  
   },  
   categoryButtonSelected: {  
-    backgroundColor: colors.primary,  
+    backgroundColor: colors.primary, // Turquesa sólido  
     borderColor: colors.primary,  
+    ...shadows.base, // Sombra para destacar  
   },  
   categoryIcon: {  
     fontSize: 20,  
@@ -224,32 +232,38 @@ const styles = StyleSheet.create({
   },  
   categoryLabel: {  
     ...typography.body,  
-    color: colors.textPrimary,  
+    color: colors.textOnGradient, // Blanco sobre glass  
+    fontSize: typography.fontSize.sm,  
   },  
   categoryLabelSelected: {  
-    color: colors.textInverse,
+    color: colors.textInverse, // Blanco sobre turquesa  
     fontWeight: '600',  
   },  
   infoBox: {  
-    backgroundColor: colors.info + '20', // 20% opacity  
-    borderRadius: 8,  
+    backgroundColor: colors.backgroundGlassLight, // Glass más opaco  
+    borderRadius: borderRadius.lg,  
+    borderWidth: 1,  
+    borderColor: colors.border,  
     padding: spacing.md,  
     marginTop: spacing.lg,  
     marginBottom: spacing.md,  
   },  
   infoText: {  
     ...typography.caption,  
-    color: colors.info,  
+    color: colors.textOnGradient, // Blanco sobre glass  
     lineHeight: 20,  
   },  
   button: {  
     ...commonStyles.button,  
     marginTop: spacing.lg,  
+    backgroundColor: colors.primary, // Turquesa  
+    ...shadows.base,  
   },  
   buttonDisabled: {  
     opacity: 0.6,  
   },  
   buttonText: {  
     ...commonStyles.buttonText,  
+    color: colors.textInverse, // Blanco sobre turquesa  
   },  
 });
