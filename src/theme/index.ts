@@ -310,7 +310,7 @@ export default {
   colors,  
   typography,  
   spacing,  
-  borderRadius,  // ← Debe estar aquí también  
+  borderRadius,  
   shadows,  
   commonStyles,  
 };
