@@ -13,7 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
 import firestore from '@react-native-firebase/firestore';  
 import { useAuthStore } from '../store/authStore';  
-import { colors, typography, spacing, commonStyles } from '../theme';  
+import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';
   
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateExpense'>;  
   

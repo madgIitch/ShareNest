@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';  
 import { NativeStackScreenProps } from '@react-navigation/native-stack';  
 import { RootStackParamList } from '../../App';  
-import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';  
+import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';
   
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;  
   
