@@ -1,80 +1,79 @@
 // src/theme/index.ts  
   
 /**  
- * Sistema de tema centralizado para ShareNest  
- * Paleta clara con glassmorphism basada en gradientes vibrantes  
+ * ShareNest Theme System  
+ * Glassmorphism design with vibrant gradients  
  *   
- * Principios de diseño:  
- * - Gradiente turquesa (#52D5E6) a verde lima (#B0EE87)  
- * - Efecto glassmorphism con transparencias y blur  
- * - Contraste mínimo 4.5:1 (WCAG AA)  
- * - Elevación mediante transparencias y sombras suaves  
+ * Design Principles:  
+ * - Turquoise (#52D5E6) to Lime Green (#B0EE87) gradient  
+ * - Glassmorphism effects with transparency and blur  
+ * - WCAG AA contrast ratio (minimum 4.5:1)  
+ * - Elevation through transparency and soft shadows  
  */  
   
 export const colors = {  
-  // Colores de gradiente principal  
-  gradientStart: '#52D5E6',    // Turquesa brillante - Inicio del gradiente  
-  gradientEnd: '#B0EE87',      // Verde lima - Final del gradiente  
+  // Gradient Colors  
+  gradientStart: '#52D5E6',    // Turquoise - gradient start  
+  gradientEnd: '#B0EE87',      // Lime green - gradient end  
     
-  // Colores primarios derivados del gradiente  
-  primary: '#52D5E6',          // Turquesa - Color principal de marca  
-  primaryDark: '#3BAFC4',      // Turquesa oscuro - Estados presionados  
-  primaryLight: '#7FE0ED',     // Turquesa claro - Acentos sutiles  
+  // Brand Colors  
+  primary: '#52D5E6',          // Turquoise - primary brand  
+  primaryDark: '#3BAFC4',      // Dark turquoise - pressed states  
+  primaryLight: '#7FE0ED',     // Light turquoise - accents  
     
-  // Colores secundarios (verde lima)  
-  secondary: '#B0EE87',        // Verde lima - Color secundario  
-  secondaryDark: '#8FD96A',    // Verde lima oscuro - Estados presionados  
-  secondaryLight: '#C8F5A3',   // Verde lima claro - Acentos  
+  secondary: '#B0EE87',        // Lime green - secondary brand  
+  secondaryDark: '#8FD96A',    // Dark lime green - pressed states  
+  secondaryLight: '#C8F5A3',   // Light lime green - accents  
     
-  // Colores de estado semántico (ajustados para fondo claro)  
-  success: '#4CAF50',          // Verde 500 - Éxito/confirmación  
-  warning: '#FF9800',          // Naranja 500 - Advertencia  
-  error: '#F44336',            // Rojo 500 - Mensajes de error  
-  info: '#2196F3',             // Azul 500 - Información general  
+  // Semantic Colors  
+  success: '#4CAF50',          // Green 500 - success states  
+  warning: '#FF9800',          // Orange 500 - warnings  
+  error: '#F44336',            // Red 500 - error states  
+  info: '#2196F3',             // Blue 500 - information  
     
-  // Colores de fondo (glassmorphism)  
-  background: 'transparent',                    // Fondo transparente para gradiente  
-  backgroundGlass: 'rgba(255, 255, 255, 0.1)', // Fondo glass principal  
-  backgroundGlassLight: 'rgba(255, 255, 255, 0.15)', // Glass más opaco  
-  backgroundGlassDark: 'rgba(255, 255, 255, 0.05)',  // Glass más transparente  
-  backgroundCard: 'rgba(255, 255, 255, 0.2)',   // Tarjetas con más opacidad  
-  backgroundOverlay: 'rgba(0, 0, 0, 0.3)',      // Overlay oscuro  
+  // Background Colors (Glassmorphism)  
+  background: 'transparent',                    // Transparent for gradient  
+  backgroundGlass: 'rgba(255, 255, 255, 0.1)', // Main glass effect  
+  backgroundGlassLight: 'rgba(255, 255, 255, 0.15)', // Lighter glass  
+  backgroundGlassDark: 'rgba(255, 255, 255, 0.05)',  // Darker glass  
+  backgroundCard: 'rgba(255, 255, 255, 0.25)',  // Cards with more opacity  
+  backgroundOverlay: 'rgba(0, 0, 0, 0.3)',      // Dark overlay  
     
-  // Colores de texto (jerarquía para fondos claros/gradientes)  
-  textPrimary: '#1A1A1A',      // Negro casi puro - Texto principal  
-  textSecondary: '#4A4A4A',    // Gris oscuro - Texto secundario  
-  textTertiary: '#6A6A6A',     // Gris medio - Texto terciario  
-  textInverse: '#FFFFFF',      // Blanco - Texto sobre fondos oscuros  
-  textOnGradient: '#FFFFFF',   // Blanco - Texto sobre gradiente  
+  // Text Colors (Hierarchy for light/gradient backgrounds)  
+  textPrimary: '#1A1A1A',      // Near black - primary text  
+  textSecondary: '#4A4A4A',    // Dark gray - secondary text  
+  textTertiary: '#6A6A6A',     // Medium gray - tertiary text  
+  textInverse: '#FFFFFF',      // White - text on dark backgrounds  
+  textOnGradient: '#FFFFFF',   // White - text on gradient (use sparingly)  
     
-  // Colores de borde (glassmorphism)  
-  border: 'rgba(255, 255, 255, 0.3)',      // Borde glass estándar  
-  borderLight: 'rgba(255, 255, 255, 0.2)', // Borde glass sutil  
-  borderDark: 'rgba(255, 255, 255, 0.4)',  // Borde glass pronunciado  
+  // Border Colors (Glassmorphism)  
+  border: 'rgba(255, 255, 255, 0.3)',      // Standard glass border  
+  borderLight: 'rgba(255, 255, 255, 0.2)', // Subtle glass border  
+  borderDark: 'rgba(255, 255, 255, 0.4)',  // Pronounced glass border  
     
-  // Colores de categorías (vibrantes para combinar con gradiente)  
-  categoryBlue: '#42A5F5',     // Azul 400  
-  categoryGreen: '#66BB6A',    // Verde 400  
-  categoryOrange: '#FFA726',   // Naranja 400  
-  categoryRed: '#EF5350',      // Rojo 400  
-  categoryPurple: '#AB47BC',   // Púrpura 400  
+  // Category Colors  
+  categoryBlue: '#42A5F5',     // Blue 400  
+  categoryGreen: '#66BB6A',    // Green 400  
+  categoryOrange: '#FFA726',   // Orange 400  
+  categoryRed: '#EF5350',      // Red 400  
+  categoryPurple: '#AB47BC',   // Purple 400  
   categoryTeal: '#26A69A',     // Teal 400  
     
-  // Colores adicionales para UI  
+  // Utility Colors  
   white: '#FFFFFF',  
   black: '#000000',  
   surface: '#FFFFFF',  
 };  
   
 export const typography = {  
-  // Familias de fuentes  
+  // Font Families  
   fontFamily: {  
     regular: 'System',  
     medium: 'System',  
     bold: 'System',  
   },  
     
-  // Tamaños de fuente (escala modular)  
+  // Font Sizes (Modular Scale)  
   fontSize: {  
     xs: 12,  
     sm: 14,  
@@ -86,7 +85,7 @@ export const typography = {
     display: 32,  
   },  
     
-  // Pesos de fuente  
+  // Font Weights  
   fontWeight: {  
     regular: '400' as const,  
     medium: '500' as const,  
@@ -94,25 +93,25 @@ export const typography = {
     bold: '700' as const,  
   },  
     
-  // Alturas de línea  
+  // Line Heights  
   lineHeight: {  
     tight: 1.2,  
     normal: 1.5,  
     relaxed: 1.75,  
   },  
     
-  // Estilos de texto predefinidos  
+  // Typography Presets  
   h1: {  
-    fontSize: 28,  
-    fontWeight: '700' as const,  
-    lineHeight: 1.2,  
-    color: colors.textOnGradient,  
+  fontSize: 28,  
+  fontWeight: '700' as const,  
+  lineHeight: 1.2,  
+  color: colors.textPrimary, // Cambiado de textOnGradient  
   },  
   h2: {  
     fontSize: 24,  
     fontWeight: '600' as const,  
     lineHeight: 1.3,  
-    color: colors.textOnGradient,  
+    color: colors.textPrimary, // Cambiado de textOnGradient  
   },  
   h3: {  
     fontSize: 20,  
@@ -160,8 +159,8 @@ export const borderRadius = {
 };  
   
 /**  
- * Sombras para glassmorphism  
- * Sombras suaves que complementan el efecto glass  
+ * Shadows for Glassmorphism  
+ * Soft shadows that complement glass effects  
  */  
 export const shadows = {  
   none: {  
@@ -202,17 +201,17 @@ export const shadows = {
 };  
   
 /**  
- * Estilos comunes reutilizables  
- * Implementan glassmorphism y gradientes  
+ * Common Reusable Styles  
+ * Implements glassmorphism and gradients  
  */  
 export const commonStyles = {  
-  // Contenedor principal con gradiente  
+  // Main container with gradient background  
   container: {  
     flex: 1,  
     backgroundColor: colors.background,  
   },  
     
-  // Tarjeta con efecto glassmorphism  
+  // Card with glassmorphism effect  
   card: {  
     backgroundColor: colors.backgroundCard,  
     borderRadius: borderRadius.xxl,  
@@ -222,7 +221,7 @@ export const commonStyles = {
     ...shadows.glass,  
   },  
     
-  // Tarjeta glass más sutil  
+  // Lighter glass card  
   cardLight: {  
     backgroundColor: colors.backgroundGlass,  
     borderRadius: borderRadius.xl,  
@@ -232,7 +231,7 @@ export const commonStyles = {
     ...shadows.base,  
   },  
     
-  // Input de texto con efecto glass  
+  // Text input with glass effect  
   input: {  
     height: 50,  
     borderWidth: 1,  
@@ -244,7 +243,7 @@ export const commonStyles = {
     color: colors.textPrimary,  
   },  
     
-  // Botón primario (turquesa)  
+  // Primary button (turquoise)  
   button: {  
     height: 50,  
     backgroundColor: colors.primary,  
@@ -254,7 +253,7 @@ export const commonStyles = {
     ...shadows.base,  
   },  
     
-  // Botón secundario (verde lima)  
+  // Secondary button (lime green)  
   buttonSecondary: {  
     height: 50,  
     backgroundColor: colors.secondary,  
@@ -264,7 +263,7 @@ export const commonStyles = {
     ...shadows.base,  
   },  
     
-  // Botón glass (transparente)  
+  // Glass button (transparent)  
   buttonGlass: {  
     height: 50,  
     backgroundColor: colors.backgroundGlass,  
@@ -275,31 +274,31 @@ export const commonStyles = {
     alignItems: 'center' as const,  
   },  
     
-  // Texto de botón  
+  // Button text  
   buttonText: {  
     color: colors.textInverse,  
     fontSize: typography.fontSize.base,  
     fontWeight: typography.fontWeight.semibold,  
   },  
     
-  // Texto de botón glass  
+  // Glass button text  
   buttonTextGlass: {  
     color: colors.textPrimary,  
     fontSize: typography.fontSize.base,  
     fontWeight: typography.fontWeight.semibold,  
   },  
     
-  // Título principal  
+  // Title  
   title: {  
     ...typography.h1,  
   },  
     
-  // Subtítulo  
+  // Subtitle  
   subtitle: {  
     ...typography.h2,  
   },  
     
-  // Label de formulario  
+  // Form label  
   label: {  
     ...typography.label,  
     marginBottom: spacing.sm,  

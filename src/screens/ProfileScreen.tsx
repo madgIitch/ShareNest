@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';  
 import { NativeStackScreenProps } from '@react-navigation/native-stack';  
 import { RootStackParamList } from '../../App';  
-import { colors, typography, spacing, borderRadius, shadows } from '../theme';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';  
   
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;  
   
@@ -80,7 +80,7 @@ export default function ProfileScreen({ navigation }: Props) {
 const styles = StyleSheet.create({  
   container: {  
     flex: 1,  
-    backgroundColor: colors.background, // Transparente para mostrar gradiente  
+    backgroundColor: colors.background,  
   },  
   content: {  
     padding: spacing.lg,  
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     width: 80,  
     height: 80,  
     borderRadius: 40,  
-    backgroundColor: colors.primary, // Turquesa  
+    backgroundColor: colors.primary,  
     justifyContent: 'center',  
     alignItems: 'center',  
     marginBottom: spacing.md,  
@@ -103,21 +103,24 @@ const styles = StyleSheet.create({
   avatarText: {  
     fontSize: typography.fontSize.display,  
     fontWeight: typography.fontWeight.bold,  
-    color: colors.textInverse, // Blanco sobre turquesa  
+    color: colors.textInverse,  
   },  
   name: {  
     fontSize: typography.fontSize.xxl,  
     fontWeight: typography.fontWeight.semibold,  
-    color: colors.textOnGradient, // Blanco sobre gradiente  
+    color: colors.textPrimary,  
     marginBottom: spacing.xs,  
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',  
+    textShadowOffset: { width: 0, height: 1 },  
+    textShadowRadius: 2,  
   },  
   email: {  
     ...typography.caption,  
-    color: colors.textOnGradient, // Blanco sobre gradiente  
+    color: colors.textSecondary,  
     opacity: 0.9,  
   },  
   section: {  
-    backgroundColor: colors.backgroundCard, // Glass más opaco  
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',  
     borderRadius: borderRadius.xxl,  
     borderWidth: 1,  
     borderColor: colors.border,  
@@ -128,9 +131,11 @@ const styles = StyleSheet.create({
   sectionTitle: {  
     ...typography.body,  
     fontWeight: '600',  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textPrimary,  
     padding: spacing.md,  
-    backgroundColor: colors.backgroundGlassLight, // Glass más opaco para header  
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',  
+    borderBottomWidth: 1,  
+    borderBottomColor: colors.border,  
   },  
   menuItem: {  
     flexDirection: 'row',  
@@ -142,24 +147,24 @@ const styles = StyleSheet.create({
   },  
   menuText: {  
     ...typography.body,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textPrimary,  
   },  
   menuArrow: {  
     fontSize: 24,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textSecondary,  
     opacity: 0.7,  
   },  
   logoutButton: {  
-    backgroundColor: colors.backgroundGlass, // Glass transparente  
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',  
     borderRadius: borderRadius.lg,  
     padding: spacing.md,  
     alignItems: 'center',  
     borderWidth: 1,  
-    borderColor: colors.error, // Borde rojo  
+    borderColor: colors.error,  
   },  
   logoutText: {  
     ...typography.body,  
-    color: colors.error, // Texto rojo  
+    color: colors.error,  
     fontWeight: '600',  
   },  
 });
