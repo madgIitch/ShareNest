@@ -13,7 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
 import firestore from '@react-native-firebase/firestore';  
 import { useAuthStore } from '../store/authStore';  
-import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
   
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateTask'>;  
   
@@ -41,13 +41,13 @@ export default function CreateTaskScreen({ navigation }: Props) {
       return;  
     }  
   
-    const daysNum = parseInt(rotationDays);  
+  const daysNum = parseInt(rotationDays, 10);  
     if (isNaN(daysNum) || daysNum < 1) {  
       Alert.alert('Error', 'Los días de rotación deben ser al menos 1');  
       return;  
     }  
   
-    const pointsNum = parseInt(points);  
+    const pointsNum = parseInt(points, 10);  
     if (isNaN(pointsNum) || pointsNum < 1) {  
       Alert.alert('Error', 'Los puntos deben ser al menos 1');  
       return;  

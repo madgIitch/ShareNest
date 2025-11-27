@@ -110,6 +110,7 @@ export default function CreateExpenseScreen({ navigation }: Props) {
         <TextInput  
           style={styles.input}  
           placeholder="Ej: Compra del supermercado"  
+          placeholderTextColor={colors.textSecondary} // Add this prop  
           value={title}  
           onChangeText={setTitle}  
           editable={!loading}  
@@ -119,6 +120,7 @@ export default function CreateExpenseScreen({ navigation }: Props) {
         <TextInput  
           style={styles.input}  
           placeholder="Ej: 45.50"  
+          placeholderTextColor={colors.textSecondary} // Add this prop  
           value={amount}  
           onChangeText={setAmount}  
           keyboardType="decimal-pad"  
@@ -203,7 +205,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundGlass, // Glass transparente  
     borderColor: colors.border, // Borde glass blanco  
     color: colors.textPrimary, // Texto oscuro en input  
-    placeholderTextColor: colors.textSecondary,  
   },  
   categoryContainer: {  
     flexDirection: 'row',  

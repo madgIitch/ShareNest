@@ -13,7 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
 import firestore from '@react-native-firebase/firestore';  
 import { useAuthStore } from '../store/authStore';  
-import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';
   
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateFlat'>;  
   
@@ -34,7 +34,7 @@ export default function CreateFlatScreen({ navigation }: Props) {
       return;  
     }  
   
-    const roommatesNum = parseInt(roommates);  
+  const roommatesNum = parseInt(roommates, 10);
     if (isNaN(roommatesNum) || roommatesNum < 2) {  
       Alert.alert('Error', 'El número de roommates debe ser al menos 2');  
       return;  

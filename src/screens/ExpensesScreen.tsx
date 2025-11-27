@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';  
+import React, { useEffect, useState, useCallback } from 'react';  
 import {  
   View,  
   Text,  
@@ -12,7 +12,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';  
 import { useExpenseStore } from '../store/expenseStore';  
 import { useAuthStore } from '../store/authStore';  
-import { colors, typography, spacing, borderRadius, shadows, commonStyles } from '../theme';  
+import { colors, typography, spacing, borderRadius, shadows } from '../theme';  
   
 type Props = NativeStackScreenProps<RootStackParamList, 'Expenses'>;  
   
@@ -22,14 +22,7 @@ export default function ExpensesScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);  
   const [monthlyTotal, setMonthlyTotal] = useState(0);  
   
-  useEffect(() => {  
-    if (user?.flatId) {  
-      loadExpenses();  
-      loadMonthlyTotal();  
-    }  
-  }, [user?.flatId]);  
-  
-  const loadExpenses = async () => {  
+  const loadExpenses = useCallback(async () => {  
     if (!user?.flatId) return;  
     try {  
       const now = new Date();  
@@ -37,9 +30,9 @@ export default function ExpensesScreen({ navigation }: Props) {
     } catch (error: any) {  
       Alert.alert('Error', error.message);  
     }  
-  };  
+  }, [user?.flatId, fetchExpenses]);  
   
-  const loadMonthlyTotal = async () => {  
+  const loadMonthlyTotal = useCallback(async () => {  
     if (!user?.flatId || !user?.uid) return;  
     try {  
       const now = new Date();  
@@ -48,16 +41,25 @@ export default function ExpensesScreen({ navigation }: Props) {
     } catch (error: any) {  
       Alert.alert('Error', error.message);  
     }  
-  };  
+  }, [user?.flatId, user?.uid, getMonthlyTotal]);  
+  
+  useEffect(() => {  
+    if (user?.flatId) {  
+      loadExpenses();  
+      loadMonthlyTotal();  
+    }  
+  }, [user?.flatId, loadExpenses, loadMonthlyTotal]);  
   
   const renderExpense = ({ item }: { item: any }) => {  
     const isPaidByMe = item.paidBy === user?.uid;  
-    const categoryEmoji = {  
+      
+    const categoryEmojiMap: { [key: string]: string } = {  
       papel: '🧻',  
       limpieza: '🧹',  
       comida: '🍕',  
       otro: '📦',  
-    }[item.category] || '📦';  
+    };  
+    const categoryEmoji = categoryEmojiMap[item.category] || '📦';  
   
     return (  
       <View style={styles.expenseCard}>  
@@ -135,7 +137,7 @@ export default function ExpensesScreen({ navigation }: Props) {
 const styles = StyleSheet.create({  
   container: {  
     flex: 1,  
-    backgroundColor: colors.background, // Transparente para mostrar gradiente  
+    backgroundColor: colors.background,  
   },  
   centerContainer: {  
     flex: 1,  
@@ -145,12 +147,12 @@ const styles = StyleSheet.create({
   },  
   header: {  
     padding: spacing.lg,  
-    backgroundColor: colors.backgroundGlass, // Glass transparente  
+    backgroundColor: colors.backgroundGlass,  
     borderBottomWidth: 1,  
     borderBottomColor: colors.border,  
   },  
   summaryCard: {  
-    backgroundColor: colors.backgroundCard, // Glass más opaco  
+    backgroundColor: colors.backgroundCard,  
     borderRadius: borderRadius.xxl,  
     borderWidth: 1,  
     borderColor: colors.border,  
@@ -161,24 +163,24 @@ const styles = StyleSheet.create({
   },  
   summaryLabel: {  
     ...typography.body,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     marginBottom: spacing.xs,  
   },  
   summaryAmount: {  
     ...typography.h1,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     fontWeight: 'bold',  
   },  
   addButton: {  
     height: 50,  
-    backgroundColor: colors.primary, // Turquesa  
+    backgroundColor: colors.primary,  
     borderRadius: borderRadius.lg,  
     justifyContent: 'center',  
     alignItems: 'center',  
     ...shadows.base,  
   },  
   addButtonText: {  
-    color: colors.textInverse, // Blanco sobre turquesa  
+    color: colors.textInverse,  
     fontSize: typography.fontSize.base,  
     fontWeight: typography.fontWeight.semibold,  
   },  
@@ -186,7 +188,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,  
   },  
   expenseCard: {  
-    backgroundColor: colors.backgroundCard, // Glass más opaco  
+    backgroundColor: colors.backgroundCard,  
     borderRadius: borderRadius.xxl,  
     borderWidth: 1,  
     borderColor: colors.border,  
@@ -208,12 +210,12 @@ const styles = StyleSheet.create({
   },  
   expenseTitle: {  
     ...typography.h3,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     marginBottom: spacing.xs,  
   },  
   expenseCategory: {  
     ...typography.caption,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     textTransform: 'capitalize',  
     opacity: 0.8,  
   },  
@@ -222,12 +224,12 @@ const styles = StyleSheet.create({
   },  
   totalAmount: {  
     ...typography.h3,  
-    color: colors.primary, // Turquesa para destacar  
+    color: colors.primary,  
     marginBottom: spacing.xs,  
   },  
   perPersonAmount: {  
     ...typography.caption,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     opacity: 0.8,  
   },  
   expenseFooter: {  
@@ -240,16 +242,16 @@ const styles = StyleSheet.create({
   },  
   expenseDate: {  
     ...typography.caption,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     opacity: 0.8,  
   },  
   paidByText: {  
     ...typography.caption,  
-    color: colors.textOnGradient, // Blanco sobre glass  
+    color: colors.textOnGradient,  
     opacity: 0.8,  
   },  
   paidByMeText: {  
-    color: colors.secondary, // Verde lima para destacar  
+    color: colors.secondary,  
     fontWeight: '600',  
     opacity: 1,  
   },  
@@ -259,7 +261,7 @@ const styles = StyleSheet.create({
   },  
   emptyText: {  
     ...typography.body,  
-    color: colors.textOnGradient, // Blanco sobre gradiente  
+    color: colors.textOnGradient,  
     opacity: 0.8,  
   },  
 });
