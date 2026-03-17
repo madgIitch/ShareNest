@@ -11,8 +11,10 @@ import {
 
 import { EmptyState } from "../../src/components/ui/EmptyState";
 import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
+import { SuperfriEndzGate } from "../../src/components/ui/SuperfriEndzGate";
 import { TagBadge } from "../../src/components/ui/TagBadge";
 import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
+import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import type { Database, ListingStatus } from "../../src/types/database";
@@ -26,11 +28,17 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "rented", label: "Archivados" },
 ];
 
+const FREE_LISTING_LIMIT = 1;
+
 export default function MyListingsScreen() {
   const { session } = useAuth();
   const [tab, setTab] = useState<Tab>("active");
   const { data: listings, isLoading } = useMyListings(session?.user?.id);
   const updateStatus = useUpdateListingStatus();
+  const { data: isSuper = false } = useIsSuperfriendz();
+
+  const activeCount = (listings ?? []).filter((l) => l.status === "active").length;
+  const atFreeLimit = !isSuper && activeCount >= FREE_LISTING_LIMIT;
 
   const filtered = (listings ?? []).filter((l) => l.status === tab);
 
@@ -98,9 +106,23 @@ export default function MyListingsScreen() {
         />
       )}
 
+      {/* Free plan limit banner */}
+      {atFreeLimit && (
+        <View style={styles.limitBanner}>
+          <SuperfriEndzGate ctaLabel="Publicar más anuncios — Superfriendz" />
+        </View>
+      )}
+
       {/* FAB */}
-      <Pressable style={styles.fab} onPress={() => router.push("/listing/new")}>
-        <Text style={styles.fabText}>＋</Text>
+      <Pressable
+        style={[styles.fab, atFreeLimit && styles.fabLocked]}
+        onPress={() => {
+          if (atFreeLimit) return;
+          router.push("/listing/new");
+        }}
+        accessibilityLabel={atFreeLimit ? "Límite del plan gratuito alcanzado" : "Nuevo anuncio"}
+      >
+        <Text style={styles.fabText}>{atFreeLimit ? "🔒" : "＋"}</Text>
       </Pressable>
     </View>
   );
@@ -264,9 +286,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  fabText: {
-    color: colors.white,
-    fontSize: 28,
-    lineHeight: 32,
-  },
+  fabLocked: { backgroundColor: colors.gray300 },
+  fabText: { color: colors.white, fontSize: 28, lineHeight: 32 },
+  limitBanner: { padding: spacing[4], paddingBottom: 0 },
 });

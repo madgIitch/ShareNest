@@ -58,6 +58,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="household"
+        options={{
+          title: "Hogar",
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🏡" focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="account"
         options={{
           title: "Perfil",

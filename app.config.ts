@@ -47,11 +47,22 @@ const config: ExpoConfig = {
         sounds: [],
       },
     ],
+    "expo-web-browser",
+    // "expo-updates", // uncomment after: npx expo install expo-updates
   ],
+  updates: {
+    url: "https://u.expo.dev/YOUR_EAS_PROJECT_ID",
+  },
+  runtimeVersion: {
+    policy: "appVersion",
+  },
   extra: {
     appEnv,
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "",
+    eas: {
+      projectId: "YOUR_EAS_PROJECT_ID",
+    },
   },
 };
 

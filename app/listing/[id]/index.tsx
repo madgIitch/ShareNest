@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import { useProfile } from "../../../src/hooks/useProfile";
 import { useMyRequestForListing } from "../../../src/hooks/useRequests";
 import { useConversations } from "../../../src/hooks/useConversations";
 import { useAuth } from "../../../src/providers/AuthProvider";
+import { useHaptics } from "../../../src/hooks/useHaptics";
 import { colors, fontSize, radius, spacing } from "../../../src/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -39,6 +40,7 @@ export default function ListingDetailScreen() {
 
   const isOwner = myId === listing?.owner_id;
   const [sharing, setSharing] = useState(false);
+  const haptics = useHaptics();
 
   const handleShare = async () => {
     if (!listing) return;
@@ -226,7 +228,8 @@ export default function ListingDetailScreen() {
             {!myRequest && (
               <Pressable
                 style={styles.contactBtn}
-                onPress={() => setRequestSheetOpen(true)}
+                onPress={() => { haptics.medium(); setRequestSheetOpen(true); }}
+                accessibilityLabel="Solicitar habitación"
               >
                 <Text style={styles.contactBtnText}>💬 Solicitar habitación</Text>
               </Pressable>

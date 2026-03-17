@@ -220,6 +220,89 @@ export type Database = {
         };
         Relationships: [];
       };
+      households: {
+        Row: {
+          id: string;
+          listing_id: string | null;
+          name: string;
+          created_by: string | null;
+          invite_code: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id?: string | null;
+          name: string;
+          created_by?: string | null;
+          invite_code?: string;
+          created_at?: string;
+        };
+        Update: { name?: string; listing_id?: string | null };
+        Relationships: [];
+      };
+      household_members: {
+        Row: {
+          id: string;
+          household_id: string;
+          user_id: string;
+          role: "admin" | "member";
+          joined_at: string;
+        };
+        Insert: {
+          household_id: string;
+          user_id: string;
+          role?: "admin" | "member";
+        };
+        Update: { role?: "admin" | "member" };
+        Relationships: [];
+      };
+      expenses: {
+        Row: {
+          id: string;
+          household_id: string;
+          paid_by: string;
+          amount: number;
+          category: "luz" | "agua" | "gas" | "internet" | "comida" | "limpieza" | "otros";
+          description: string | null;
+          receipt_url: string | null;
+          date: string;
+          split_type: "equal" | "custom";
+          created_at: string;
+        };
+        Insert: {
+          household_id: string;
+          paid_by: string;
+          amount: number;
+          category?: "luz" | "agua" | "gas" | "internet" | "comida" | "limpieza" | "otros";
+          description?: string | null;
+          receipt_url?: string | null;
+          date?: string;
+          split_type?: "equal" | "custom";
+        };
+        Update: {
+          description?: string | null;
+          receipt_url?: string | null;
+        };
+        Relationships: [];
+      };
+      expense_splits: {
+        Row: {
+          id: string;
+          expense_id: string;
+          user_id: string;
+          amount: number;
+          is_settled: boolean;
+          settled_at: string | null;
+        };
+        Insert: {
+          expense_id: string;
+          user_id: string;
+          amount: number;
+          is_settled?: boolean;
+        };
+        Update: { is_settled?: boolean; settled_at?: string | null };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -234,6 +317,14 @@ export type Database = {
       search_users: {
         Args: { p_query: string; p_limit?: number };
         Returns: { id: string; full_name: string | null; avatar_url: string | null; username: string | null; verified_at: string | null; city: string | null }[];
+      };
+      join_household_by_code: {
+        Args: { p_code: string };
+        Returns: string;
+      };
+      my_household: {
+        Args: Record<string, never>;
+        Returns: { id: string; name: string; invite_code: string; listing_id: string | null; created_by: string; created_at: string; member_role: string }[];
       };
       search_listings: {
         Args: {

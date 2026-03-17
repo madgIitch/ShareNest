@@ -11,3 +11,18 @@ verify_jwt = true
 
 [functions.notify-friend-request]
 verify_jwt = true
+
+[functions.calculate-balances]
+verify_jwt = true
+
+[functions.notify-expense-added]
+verify_jwt = false
+
+[functions.create-stripe-session]
+verify_jwt = true
+
+[functions.create-stripe-portal]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false

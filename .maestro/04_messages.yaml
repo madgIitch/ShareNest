@@ -1,0 +1,12 @@
+# .maestro/04_messages.yaml
+# Tests: Messages tab loads without crash
+appId: com.sharenest.app
+---
+- launchApp
+
+- tapOn: "Mensajes"
+- waitForAnimationToEnd
+
+# Either shows conversations or empty state
+- assertTrue:
+    condition: ${visible("Mensajes") || visible("No tienes conversaciones")}

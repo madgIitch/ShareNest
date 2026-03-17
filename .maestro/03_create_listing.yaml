@@ -1,0 +1,39 @@
+# .maestro/03_create_listing.yaml
+# Tests: Create a new listing
+appId: com.sharenest.app
+---
+- launchApp
+
+- tapOn: "Mis anuncios"
+- waitForAnimationToEnd
+
+# Open new listing wizard via FAB
+- tapOn:
+    id: "fab-new-listing"
+
+- assertVisible: "Nuevo anuncio"
+
+# Step 1 — basic info
+- tapOn:
+    id: "input-title"
+- inputText: "Test habitación Maestro"
+
+- tapOn:
+    id: "input-city"
+- inputText: "Barcelona"
+
+- tapOn:
+    id: "input-price"
+- inputText: "600"
+
+- tapOn: "Siguiente"
+
+# Step 2 — details (tap next without optional fields)
+- tapOn: "Siguiente"
+
+# Step 3 — publish
+- tapOn: "Publicar anuncio"
+- waitForAnimationToEnd
+
+# Should show in my listings
+- assertVisible: "Test habitación Maestro"
