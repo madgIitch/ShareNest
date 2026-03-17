@@ -1,202 +1,447 @@
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 
-import { ListingCard } from "../../src/components/ui/ListingCard";
-import type { ListingPreview } from "../../src/components/ui/ListingCard";
-import { CitySelector } from "../../src/components/ui/CitySelector";
 import { EmptyState } from "../../src/components/ui/EmptyState";
+import { ListingCard } from "../../src/components/ui/ListingCard";
 import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
-import { useActiveListings } from "../../src/hooks/useListings";
-import { colors, fontSize, spacing } from "../../src/theme";
+import { FilterSheet } from "../../src/components/explore/FilterSheet";
+import { ListingsMap } from "../../src/components/explore/ListingsMap";
+import { useSearchListings, useListingsForMap } from "../../src/hooks/useSearchListings";
+import { loadFilters, saveFilters } from "../../src/lib/filterStorage";
+import { colors, fontSize, radius, spacing } from "../../src/theme";
+import { DEFAULT_FILTERS, countActiveFilters } from "../../src/types/filters";
+import type { ListingFilters } from "../../src/types/filters";
 import type { Database } from "../../src/types/database";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 
-function listingToPreview(l: Listing): ListingPreview {
-  return {
-    id: l.id,
-    title: l.title,
-    price: l.price,
-    city: l.city,
-    type: l.type,
-    image_url: (l.images as string[])[0] ?? null,
-    tags: [
-      ...(l.is_furnished ? ["Amueblado"] : []),
-      ...(l.pets_allowed ? ["Mascotas OK"] : []),
-      ...(l.smokers_allowed ? ["Fumadores OK"] : []),
-    ],
-  };
-}
-
-const TYPE_FILTERS = [
-  { key: undefined, label: "Todos" },
-  { key: "offer", label: "Ofrezco" },
-  { key: "search", label: "Busco" },
-] as const;
+type ViewMode = "list" | "map";
 
 export default function ExploreScreen() {
-  const [city, setCity] = useState("");
-  const [cityPickerOpen, setCityPickerOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<"offer" | "search" | undefined>(undefined);
+  const [filters, setFilters] = useState<ListingFilters>(DEFAULT_FILTERS);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [queryInput, setQueryInput] = useState(""); // raw text input
 
-  const { data: listings, isLoading, refetch } = useActiveListings(city || undefined);
+  // Debounced query — fires 400ms after typing stops
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleQueryChange = (text: string) => {
+    setQueryInput(text);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setFilters((f) => ({ ...f, query: text }));
+    }, 400);
+  };
 
-  const filtered = (listings ?? []).filter(
-    (l) => !typeFilter || l.type === typeFilter,
-  );
+  // Load saved filters on mount
+  useEffect(() => {
+    loadFilters().then((saved) => {
+      setFilters(saved);
+      setQueryInput(saved.query);
+    });
+  }, []);
+
+  const activeFilterCount = countActiveFilters(filters);
+
+  // List view: cursor-based infinite query
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useSearchListings(filters);
+
+  const allListings = data?.pages.flatMap((p) => p.items) ?? [];
+
+  // Map view: bulk geo query (only when map is visible)
+  const { data: mapListings = [] } = useListingsForMap(filters, viewMode === "map");
+
+  const handleApplyFilters = (newFilters: ListingFilters) => {
+    setFilters(newFilters);
+    setQueryInput(newFilters.query);
+    saveFilters(newFilters);
+  };
+
+  const removeFilter = (key: keyof ListingFilters) => {
+    const updated = { ...filters, [key]: DEFAULT_FILTERS[key] };
+    setFilters(updated);
+    saveFilters(updated);
+    if (key === "query") setQueryInput("");
+  };
+
+  const handleEnableGeo = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const updated = {
+        ...filters,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        radiusKm: filters.radiusKm,
+      };
+      setFilters(updated);
+      saveFilters(updated);
+    } catch {
+      // silently ignore
+    }
+  };
 
   return (
     <View style={styles.screen}>
-      {/* Barra de búsqueda / filtros */}
-      <View style={styles.filterBar}>
-        <Pressable
-          style={styles.cityButton}
-          onPress={() => setCityPickerOpen(true)}
-        >
-          <Text style={[styles.cityButtonText, !city && styles.cityPlaceholder]}>
-            📍 {city || "Todas las ciudades"}
-          </Text>
-          {city ? (
-            <Pressable
-              onPress={() => setCity("")}
-              hitSlop={8}
-            >
-              <Text style={styles.clearCity}>✕</Text>
+      {/* ── Search bar + filter button ─────────────────────────────── */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por título, ciudad..."
+            placeholderTextColor={colors.textTertiary}
+            value={queryInput}
+            onChangeText={handleQueryChange}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {queryInput.length > 0 && (
+            <Pressable onPress={() => { setQueryInput(""); setFilters((f) => ({ ...f, query: "" })); }} hitSlop={8}>
+              <Text style={styles.clearIcon}>✕</Text>
             </Pressable>
-          ) : null}
-        </Pressable>
-
-        <View style={styles.typeFilters}>
-          {TYPE_FILTERS.map((f) => (
-            <Pressable
-              key={String(f.key)}
-              style={[styles.typeChip, typeFilter === f.key && styles.typeChipActive]}
-              onPress={() => setTypeFilter(f.key)}
-            >
-              <Text style={[styles.typeChipText, typeFilter === f.key && styles.typeChipTextActive]}>
-                {f.label}
-              </Text>
-            </Pressable>
-          ))}
+          )}
         </View>
+
+        <Pressable
+          style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+          onPress={() => setFilterSheetOpen(true)}
+        >
+          <Text style={styles.filterBtnIcon}>⚙</Text>
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </Pressable>
       </View>
 
-      {/* CitySelector (hidden trigger) */}
-      {cityPickerOpen && (
-        <View style={styles.citySelectorOverlay}>
-          <CitySelector
-            value={city}
-            onChange={(v) => { setCity(v); setCityPickerOpen(false); }}
-          />
+      {/* ── View toggle + geo button ───────────────────────────────── */}
+      <View style={styles.toolbar}>
+        <View style={styles.viewToggle}>
+          <Pressable
+            style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
+            onPress={() => setViewMode("list")}
+          >
+            <Text style={[styles.toggleText, viewMode === "list" && styles.toggleTextActive]}>
+              📋 Lista
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.toggleBtn, viewMode === "map" && styles.toggleBtnActive]}
+            onPress={() => setViewMode("map")}
+          >
+            <Text style={[styles.toggleText, viewMode === "map" && styles.toggleTextActive]}>
+              🗺 Mapa
+            </Text>
+          </Pressable>
         </View>
+
+        {filters.lat == null && (
+          <Pressable style={styles.geoBtn} onPress={handleEnableGeo}>
+            <Text style={styles.geoBtnText}>📍 Cerca de mí</Text>
+          </Pressable>
+        )}
+        {filters.lat != null && (
+          <Pressable style={[styles.geoBtn, styles.geoBtnActive]} onPress={() => removeFilter("lat")}>
+            <Text style={[styles.geoBtnText, styles.geoBtnTextActive]}>
+              📍 {filters.radiusKm} km ✕
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* ── Active filter chips ────────────────────────────────────── */}
+      {activeFilterCount > 0 && (
+        <ActiveChips filters={filters} onRemove={removeFilter} />
       )}
 
-      {isLoading ? (
-        <View style={styles.list}>
-          {[1, 2, 3].map((i) => <ListingCardSkeleton key={i} />)}
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={filtered.length === 0 ? { flex: 1 } : styles.list}
-          refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
-          }
-          renderItem={({ item }) => (
-            <ListingCard
-              listing={listingToPreview(item)}
-              onPress={() => router.push(`/listing/${item.id}`)}
+      {/* ── Content ───────────────────────────────────────────────── */}
+      {viewMode === "list" ? (
+        <>
+          {isLoading ? (
+            <View style={styles.list}>
+              {[1, 2, 3].map((i) => <ListingCardSkeleton key={i} />)}
+            </View>
+          ) : (
+            <FlatList
+              data={allListings}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={allListings.length === 0 ? { flex: 1 } : styles.list}
+              refreshControl={
+                <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
+              }
+              onEndReached={() => {
+                if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+              }}
+              onEndReachedThreshold={0.3}
+              renderItem={({ item }) => (
+                <ListingCard
+                  listing={{
+                    id: item.id,
+                    title: item.title,
+                    price: item.price,
+                    city: item.city,
+                    type: item.type,
+                    image_url: (item.images as string[])[0] ?? null,
+                  }}
+                  onPress={() => router.push(`/listing/${item.id}`)}
+                />
+              )}
+              ListFooterComponent={
+                isFetchingNextPage ? (
+                  <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[4] }} />
+                ) : null
+              }
+              ListEmptyComponent={
+                <EmptyState
+                  icon="🏡"
+                  title="Sin resultados"
+                  subtitle={
+                    activeFilterCount > 0
+                      ? "Prueba a ajustar los filtros."
+                      : "Aún no hay anuncios. ¡Sé el primero!"
+                  }
+                  action={
+                    activeFilterCount > 0
+                      ? { label: "Limpiar filtros", onPress: () => handleApplyFilters(DEFAULT_FILTERS) }
+                      : undefined
+                  }
+                />
+              }
             />
           )}
-          ListEmptyComponent={
-            <EmptyState
-              icon="🏡"
-              title="Sin resultados"
-              subtitle={
-                city
-                  ? `No hay anuncios activos en ${city}.`
-                  : "Aún no hay anuncios. ¡Sé el primero!"
-              }
-              action={
-                city ? { label: "Ver todas las ciudades", onPress: () => setCity("") } : undefined
-              }
-            />
-          }
-        />
+        </>
+      ) : (
+        <ListingsMap listings={mapListings} />
       )}
+
+      <FilterSheet
+        visible={filterSheetOpen}
+        filters={filters}
+        onClose={() => setFilterSheetOpen(false)}
+        onApply={handleApplyFilters}
+      />
     </View>
+  );
+}
+
+// ─── Active filter chips ───────────────────────────────────────────────────────
+
+function ActiveChips({
+  filters,
+  onRemove,
+}: {
+  filters: ListingFilters;
+  onRemove: (key: keyof ListingFilters) => void;
+}) {
+  const chips: { key: keyof ListingFilters; label: string }[] = [];
+
+  if (filters.city) chips.push({ key: "city", label: `📍 ${filters.city}` });
+  if (filters.type) chips.push({ key: "type", label: filters.type === "offer" ? "Ofrezco" : "Busco" });
+  if (filters.priceMin !== undefined) chips.push({ key: "priceMin", label: `≥ €${filters.priceMin}` });
+  if (filters.priceMax !== undefined) chips.push({ key: "priceMax", label: `≤ €${filters.priceMax}` });
+  if (filters.sizeMin !== undefined) chips.push({ key: "sizeMin", label: `≥ ${filters.sizeMin} m²` });
+  if (filters.availableFrom) chips.push({ key: "availableFrom", label: `Hasta ${filters.availableFrom}` });
+  if (filters.petsAllowed !== undefined) chips.push({ key: "petsAllowed", label: filters.petsAllowed ? "🐾 Mascotas" : "🚫 Sin mascotas" });
+  if (filters.smokersAllowed !== undefined) chips.push({ key: "smokersAllowed", label: filters.smokersAllowed ? "🚬 Fumadores" : "🚭 No fumadores" });
+
+  if (chips.length === 0) return null;
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chips}
+    >
+      {chips.map(({ key, label }) => (
+        <Pressable key={key} style={styles.chip} onPress={() => onRemove(key)}>
+          <Text style={styles.chipText}>{label}</Text>
+          <Text style={styles.chipX}> ✕</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  filterBar: {
+
+  // Search row
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[3],
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    padding: spacing[3],
     gap: spacing[2],
   },
-  cityButton: {
+  searchBar: {
+    flex: 1,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: colors.gray100,
-    borderRadius: 9999,
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[2] + 2,
-  },
-  cityButtonText: {
-    fontSize: fontSize.sm,
-    color: colors.text,
-    fontWeight: "500",
-  },
-  cityPlaceholder: {
-    color: colors.textTertiary,
-  },
-  clearCity: {
-    color: colors.textTertiary,
-    fontSize: 14,
-    fontWeight: "600",
-    paddingLeft: spacing[2],
-  },
-  typeFilters: {
-    flexDirection: "row",
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
     gap: spacing[2],
   },
-  typeChip: {
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[1] + 2,
-    borderRadius: 9999,
-    backgroundColor: colors.gray100,
+  searchIcon: {
+    fontSize: 14,
   },
-  typeChipActive: {
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    padding: 0,
+  },
+  clearIcon: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    fontWeight: "700",
+  },
+  filterBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.gray100,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBtnActive: {
     backgroundColor: colors.primaryLight,
   },
-  typeChipText: {
+  filterBtnIcon: {
+    fontSize: 16,
+  },
+  filterBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  filterBadgeText: {
+    fontSize: 9,
+    color: colors.white,
+    fontWeight: "700",
+  },
+
+  // Toolbar
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing[2],
+  },
+  viewToggle: {
+    flexDirection: "row",
+    backgroundColor: colors.gray100,
+    borderRadius: radius.full,
+    padding: 3,
+    gap: 2,
+  },
+  toggleBtn: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1] + 2,
+    borderRadius: radius.full,
+  },
+  toggleBtnActive: {
+    backgroundColor: colors.white,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  toggleText: {
     fontSize: fontSize.xs,
     fontWeight: "600",
     color: colors.textSecondary,
   },
-  typeChipTextActive: {
+  toggleTextActive: {
+    color: colors.text,
+  },
+  geoBtn: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1] + 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.gray100,
+  },
+  geoBtnActive: {
+    backgroundColor: colors.primaryLight,
+  },
+  geoBtnText: {
+    fontSize: fontSize.xs,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  geoBtnTextActive: {
+    color: colors.primaryDark,
+  },
+
+  // Active filter chips
+  chips: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    gap: spacing[2],
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+  },
+  chipText: {
+    fontSize: fontSize.xs,
+    fontWeight: "600",
+    color: colors.primaryDark,
+  },
+  chipX: {
+    fontSize: fontSize.xs,
     color: colors.primary,
+    fontWeight: "700",
   },
-  citySelectorOverlay: {
-    position: "absolute",
-    top: 80,
-    left: spacing[3],
-    right: spacing[3],
-    zIndex: 10,
-  },
+
+  // List
   list: {
     padding: spacing[4],
     gap: spacing[3],

@@ -41,6 +41,8 @@ type FormData = {
   is_furnished: boolean;
   pets_allowed: boolean;
   smokers_allowed: boolean;
+  lat: number | null;
+  lng: number | null;
 };
 
 type Props = {
@@ -60,6 +62,8 @@ const EMPTY_FORM: FormData = {
   is_furnished: false,
   pets_allowed: false,
   smokers_allowed: false,
+  lat: null,
+  lng: null,
 };
 
 function listingToForm(l: Listing): FormData {
@@ -76,6 +80,8 @@ function listingToForm(l: Listing): FormData {
     is_furnished: l.is_furnished,
     pets_allowed: l.pets_allowed,
     smokers_allowed: l.smokers_allowed,
+    lat: l.lat ?? null,
+    lng: l.lng ?? null,
   };
 }
 
@@ -110,6 +116,7 @@ export function ListingWizard({ initial }: Props) {
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const [geo] = await Location.reverseGeocodeAsync(pos.coords);
       if (geo?.city) set("city", geo.city);
+      setForm((f) => ({ ...f, lat: pos.coords.latitude, lng: pos.coords.longitude }));
     } catch {
       Alert.alert("Error", "No se pudo obtener la ubicación.");
     } finally {
@@ -190,6 +197,8 @@ export function ListingWizard({ initial }: Props) {
         is_furnished: form.is_furnished,
         pets_allowed: form.pets_allowed,
         smokers_allowed: form.smokers_allowed,
+        lat: form.lat,
+        lng: form.lng,
         images: allImages,
       };
 

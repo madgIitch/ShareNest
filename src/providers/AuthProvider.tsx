@@ -68,19 +68,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const bootstrap = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          throw error;
-        }
-
-        if (!mounted) {
-          return;
-        }
+        if (error) throw error;
+        if (!mounted) return;
 
         setSession(data.session);
-      } finally {
-        if (mounted) {
-          setLoading(false);
+
+        // Load profile in the same tick so index.tsx never sees session+null profile
+        if (data.session?.user?.id) {
+          await ensureProfileExists(data.session.user.id);
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", data.session.user.id)
+            .single();
+          if (mounted && profileData) setProfile(profileData as Profile);
         }
+      } finally {
+        if (mounted) setLoading(false);
       }
     };
 

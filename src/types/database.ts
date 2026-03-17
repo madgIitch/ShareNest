@@ -105,7 +105,27 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      search_listings: {
+        Args: {
+          p_query?:          string | null;
+          p_city?:           string | null;
+          p_type?:           "offer" | "search" | null;
+          p_price_min?:      number | null;
+          p_price_max?:      number | null;
+          p_size_min?:       number | null;
+          p_pets?:           boolean | null;
+          p_smokers?:        boolean | null;
+          p_available_from?: string | null;
+          p_lat?:            number | null;
+          p_lng?:            number | null;
+          p_radius_km?:      number | null;
+          p_cursor?:         string | null;
+          p_limit?:          number | null;
+        };
+        Returns: Database["public"]["Tables"]["listings"]["Row"][];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
