@@ -1,0 +1,13 @@
+project_id = "iuzmjhndaapftnxasdyc"
+
+[functions.listing-share-image]
+verify_jwt = false
+
+[functions.notify-new-message]
+verify_jwt = true
+
+[functions.notify-request-update]
+verify_jwt = true
+
+[functions.notify-friend-request]
+verify_jwt = true

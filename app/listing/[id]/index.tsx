@@ -11,6 +11,8 @@ import {
   Text,
   View,
 } from "react-native";
+import * as Sharing from "expo-sharing";
+import { shareService } from "../../../src/services/shareService";
 
 import { UserAvatar } from "../../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../../src/components/ui/TagBadge";
@@ -36,6 +38,23 @@ export default function ListingDetailScreen() {
   const deleteListing = useDeleteListing();
 
   const isOwner = myId === listing?.owner_id;
+  const [sharing, setSharing] = useState(false);
+
+  const handleShare = async () => {
+    if (!listing) return;
+    setSharing(true);
+    try {
+      const path = await shareService.getListingShareImageFile(listing.id);
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(path, { mimeType: "image/png", dialogTitle: "Compartir en Instagram" });
+      }
+    } catch {
+      Alert.alert("Error", "No se pudo generar la imagen. Inténtalo de nuevo.");
+    } finally {
+      setSharing(false);
+    }
+  };
 
   // Request state (for non-owners)
   const { data: myRequest } = useMyRequestForListing(id, myId);
@@ -245,6 +264,18 @@ export default function ListingDetailScreen() {
           </>
         )}
 
+        {/* Share template */}
+        <Pressable
+          style={[styles.shareBtn, sharing && styles.shareBtnDisabled]}
+          onPress={handleShare}
+          disabled={sharing}
+        >
+          {sharing
+            ? <ActivityIndicator color={colors.primary} />
+            : <Text style={styles.shareBtnText}>📸 Compartir en Instagram</Text>
+          }
+        </Pressable>
+
         {/* Acciones del owner */}
         {isOwner && (
           <View style={styles.ownerActions}>
@@ -389,4 +420,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteBtnText: { fontWeight: "600", color: colors.error },
+  shareBtn: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    paddingVertical: spacing[3] + 2,
+    gap: spacing[2],
+  },
+  shareBtnDisabled: { opacity: 0.5 },
+  shareBtnText: { color: colors.primary, fontWeight: "700", fontSize: fontSize.md },
 });

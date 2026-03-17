@@ -1,10 +1,13 @@
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import { useAuth } from "../src/providers/AuthProvider";
+import { useUpdateNotifPrefs } from "../src/hooks/useNotificationPrefs";
+import { colors, fontSize, radius, spacing } from "../src/theme";
 
 export default function SettingsScreen() {
   const { session, profile, signOut } = useAuth();
+  const updatePrefs = useUpdateNotifPrefs();
 
   const handleSignOut = async () => {
     Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
@@ -20,11 +23,15 @@ export default function SettingsScreen() {
     ]);
   };
 
+  const toggle = (key: "notif_messages" | "notif_requests" | "notif_friendz", value: boolean) => {
+    updatePrefs.mutate({ [key]: value });
+  };
+
   const email = session?.user?.email ?? "-";
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Cabecera de usuario */}
+      {/* User card */}
       <View style={styles.userCard}>
         {profile?.avatar_url ? (
           <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
@@ -46,7 +53,8 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Acciones */}
+      {/* Account */}
+      <Text style={styles.sectionHeader}>Cuenta</Text>
       <View style={styles.section}>
         <Pressable style={styles.row} onPress={() => router.push("/profile")}>
           <Text style={styles.rowLabel}>Editar perfil</Text>
@@ -54,8 +62,50 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
+      {/* Notification preferences */}
+      <Text style={styles.sectionHeader}>Notificaciones</Text>
       <View style={styles.section}>
-        <Pressable style={[styles.row, styles.rowDanger]} onPress={handleSignOut}>
+        <View style={styles.row}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Mensajes</Text>
+            <Text style={styles.rowSubtitle}>Nuevos mensajes en tus chats</Text>
+          </View>
+          <Switch
+            value={profile?.notif_messages ?? true}
+            onValueChange={(v) => toggle("notif_messages", v)}
+            trackColor={{ true: colors.primary }}
+            thumbColor={colors.white}
+          />
+        </View>
+        <View style={[styles.row, styles.rowBorder]}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Solicitudes</Text>
+            <Text style={styles.rowSubtitle}>Cuando aceptan o deniegan tu solicitud</Text>
+          </View>
+          <Switch
+            value={profile?.notif_requests ?? true}
+            onValueChange={(v) => toggle("notif_requests", v)}
+            trackColor={{ true: colors.primary }}
+            thumbColor={colors.white}
+          />
+        </View>
+        <View style={[styles.row, styles.rowBorder]}>
+          <View style={styles.rowContent}>
+            <Text style={styles.rowLabel}>Friendz</Text>
+            <Text style={styles.rowSubtitle}>Nuevas solicitudes de conexión</Text>
+          </View>
+          <Switch
+            value={profile?.notif_friendz ?? true}
+            onValueChange={(v) => toggle("notif_friendz", v)}
+            trackColor={{ true: colors.primary }}
+            thumbColor={colors.white}
+          />
+        </View>
+      </View>
+
+      {/* Sign out */}
+      <View style={styles.section}>
+        <Pressable style={[styles.row, styles.rowCenter]} onPress={handleSignOut}>
           <Text style={styles.rowLabelDanger}>Cerrar sesión</Text>
         </Pressable>
       </View>
@@ -65,94 +115,76 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: "#f4f6fa",
+    padding: spacing[5],
+    backgroundColor: colors.background,
     flexGrow: 1,
   },
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: colors.surface,
+    borderRadius: radius["2xl"],
+    padding: spacing[4],
+    marginBottom: spacing[5],
     borderWidth: 1,
-    borderColor: "#e6e9ef",
-    gap: 14,
+    borderColor: colors.border,
+    gap: spacing[4],
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-  },
+  avatar: { width: 60, height: 60, borderRadius: 30 },
   avatarPlaceholder: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#c7d7f0",
+    backgroundColor: colors.primaryLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarInitial: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1f63f1",
-  },
-  userInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  userName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  userEmail: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
+  avatarInitial: { fontSize: 24, fontWeight: "700", color: colors.primary },
+  userInfo: { flex: 1, gap: 2 },
+  userName: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
+  userEmail: { fontSize: fontSize.sm, color: colors.textSecondary },
   badge: {
     marginTop: 4,
     alignSelf: "flex-start",
     backgroundColor: "#dcfce7",
-    borderRadius: 20,
-    paddingHorizontal: 10,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
     paddingVertical: 2,
   },
-  badgeText: {
-    color: "#16a34a",
+  badgeText: { color: "#16a34a", fontWeight: "700", fontSize: fontSize.xs },
+
+  sectionHeader: {
+    fontSize: fontSize.xs,
     fontWeight: "700",
-    fontSize: 12,
+    color: colors.textTertiary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: spacing[2],
+    marginLeft: spacing[1],
   },
   section: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radius["2xl"],
     borderWidth: 1,
-    borderColor: "#e6e9ef",
-    marginBottom: 12,
+    borderColor: colors.border,
+    marginBottom: spacing[4],
     overflow: "hidden",
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 15,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3] + 2,
   },
-  rowDanger: {
-    justifyContent: "center",
+  rowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
-  rowLabel: {
-    fontSize: 16,
-    color: "#111827",
-  },
-  rowArrow: {
-    fontSize: 20,
-    color: "#9ca3af",
-  },
-  rowLabelDanger: {
-    fontSize: 16,
-    color: "#dc2626",
-    fontWeight: "600",
-  },
+  rowCenter: { justifyContent: "center" },
+  rowContent: { flex: 1, gap: 2 },
+  rowLabel: { fontSize: fontSize.md, color: colors.text },
+  rowSubtitle: { fontSize: fontSize.xs, color: colors.textSecondary },
+  rowArrow: { fontSize: 20, color: colors.textTertiary },
+  rowLabelDanger: { fontSize: fontSize.md, color: colors.error, fontWeight: "600" },
 });

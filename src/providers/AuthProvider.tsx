@@ -1,42 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { PropsWithChildren } from "react";
 import type { Session } from "@supabase/supabase-js";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
-
 import { supabase } from "../lib/supabase";
+import { pushTokenService } from "../services/pushTokenService";
 import type { Database } from "../types/database";
-
-async function registerPushToken(userId: string) {
-  // expo-notifications remote push is not supported in Expo Go (SDK 53+)
-  // Dynamic import prevents the module from loading at all in Expo Go
-  if (Constants.executionEnvironment === "storeClient") return;
-
-  try {
-    const Notifications = await import("expo-notifications");
-
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("messages", {
-        name: "Mensajes",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-      });
-    }
-
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== "granted") return;
-
-    const token = await Notifications.getDevicePushTokenAsync();
-    if (token.data) {
-      await supabase
-        .from("profiles")
-        .update({ push_token: token.data })
-        .eq("id", userId);
-    }
-  } catch {
-    // Push token registration is non-critical
-  }
-}
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -116,7 +83,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             .single();
           if (mounted && profileData) setProfile(profileData as Profile);
           // Register push token (non-blocking)
-          void registerPushToken(data.session.user.id);
+          void pushTokenService.register(data.session.user.id);
         }
       } finally {
         if (mounted) setLoading(false);

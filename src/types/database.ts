@@ -19,6 +19,9 @@ export type Database = {
           city: string | null;
           verified_at: string | null;
           push_token: string | null;
+          notif_messages: boolean;
+          notif_requests: boolean;
+          notif_friendz: boolean;
           created_at: string;
         };
         Insert: {
@@ -31,6 +34,9 @@ export type Database = {
           city?: string | null;
           verified_at?: string | null;
           push_token?: string | null;
+          notif_messages?: boolean;
+          notif_requests?: boolean;
+          notif_friendz?: boolean;
           created_at?: string;
         };
         Update: {
@@ -42,6 +48,9 @@ export type Database = {
           city?: string | null;
           verified_at?: string | null;
           push_token?: string | null;
+          notif_messages?: boolean;
+          notif_requests?: boolean;
+          notif_friendz?: boolean;
         };
         Relationships: [];
       };
@@ -153,6 +162,23 @@ export type Database = {
           last_message_at?: string | null;
           last_message_preview?: string | null;
         };
+        Relationships: [];
+      };
+      push_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          platform: "ios" | "android";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          platform: "ios" | "android";
+        };
+        Update: never;
         Relationships: [];
       };
       connections: {
