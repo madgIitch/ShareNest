@@ -21,6 +21,10 @@ export default function RootLayout() {
               <Stack.Screen name="verify-phone" options={{ title: "Verificar móvil" }} />
               <Stack.Screen name="onboarding" options={{ title: "Bienvenido/a" }} />
               <Stack.Screen name="home" options={{ title: "ShareNest" }} />
+              <Stack.Screen name="profile" options={{ title: "Mi perfil" }} />
+              <Stack.Screen name="profile/[id]" options={{ title: "Perfil" }} />
+              <Stack.Screen name="settings" options={{ title: "Configuración" }} />
+              <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
             </Stack>
           </AuthProvider>
         </QueryProvider>

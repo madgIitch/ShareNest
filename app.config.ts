@@ -5,6 +5,7 @@ const appEnv = process.env.APP_ENV ?? "dev";
 const config: ExpoConfig = {
   name: "ShareNest",
   slug: "sharenest",
+  scheme: "sharenest",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",

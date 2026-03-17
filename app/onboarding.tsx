@@ -1,7 +1,18 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
+import { pickAvatar, resizeAvatar, uploadAvatar } from "../src/lib/avatar";
 import { normalizePhoneNumber } from "../src/lib/phone";
 import { supabase } from "../src/lib/supabase";
 import { useAuth } from "../src/providers/AuthProvider";
@@ -13,7 +24,30 @@ export default function OnboardingScreen() {
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const userId = session?.user?.id ?? "";
+
+  const handlePickAvatar = async () => {
+    try {
+      setUploadingAvatar(true);
+      const asset = await pickAvatar();
+      if (!asset) return;
+
+      setAvatarUri(asset.uri);
+      const path = await uploadAvatar(userId, asset.uri);
+      const thumbUrl = await resizeAvatar(userId, path);
+      setAvatarUrl(thumbUrl);
+    } catch (error) {
+      Alert.alert("Error al subir foto", (error as Error).message);
+      setAvatarUri(null);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!session?.user?.id) {
@@ -35,11 +69,10 @@ export default function OnboardingScreen() {
         city: city.trim() || null,
         bio: bio.trim() || null,
         phone: phone.trim() ? normalizePhoneNumber(phone) : null,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       await refreshProfile();
       router.replace("/home");
@@ -51,12 +84,35 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>Bienvenido/a</Text>
       <Text style={styles.subtitle}>Completa tu perfil. Esta pantalla solo aparece una vez.</Text>
 
+      {/* Avatar */}
+      <View style={styles.avatarSection}>
+        <Pressable onPress={handlePickAvatar} disabled={uploadingAvatar}>
+          <View style={styles.avatarWrapper}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarIcon}>📷</Text>
+              </View>
+            )}
+            {uploadingAvatar && (
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator color="#fff" />
+              </View>
+            )}
+          </View>
+          <Text style={styles.avatarLabel}>
+            {avatarUri ? "Cambiar foto" : "Añadir foto de perfil"}
+          </Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.label}>Nombre completo *</Text>
-      <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
+      <TextInput style={styles.input} value={fullName} onChangeText={setFullName} placeholder="Tu nombre" />
 
       <Text style={styles.label}>Username *</Text>
       <TextInput
@@ -68,7 +124,7 @@ export default function OnboardingScreen() {
       />
 
       <Text style={styles.label}>Ciudad</Text>
-      <TextInput style={styles.input} value={city} onChangeText={setCity} />
+      <TextInput style={styles.input} placeholder="Barcelona" value={city} onChangeText={setCity} />
 
       <Text style={styles.label}>Teléfono</Text>
       <TextInput
@@ -84,12 +140,19 @@ export default function OnboardingScreen() {
         multiline
         numberOfLines={3}
         style={[styles.input, styles.bio]}
+        placeholder="Cuéntanos algo sobre ti..."
         value={bio}
         onChangeText={setBio}
       />
 
-      <Pressable style={styles.button} onPress={handleSave} disabled={saving}>
-        <Text style={styles.buttonText}>Guardar y continuar</Text>
+      <Pressable
+        style={[styles.button, saving && styles.buttonDisabled]}
+        onPress={handleSave}
+        disabled={saving}
+      >
+        <Text style={styles.buttonText}>
+          {saving ? "Guardando..." : "Guardar y continuar"}
+        </Text>
       </Pressable>
     </ScrollView>
   );
@@ -104,11 +167,53 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: "700",
-    marginBottom: 8,
+    marginBottom: 6,
+    color: "#111827",
   },
   subtitle: {
     color: "#666",
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  avatarWrapper: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 88,
+    height: 88,
+  },
+  avatarPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "#e8f0fe",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#c7d7f0",
+    borderStyle: "dashed",
+  },
+  avatarIcon: {
+    fontSize: 30,
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarLabel: {
+    textAlign: "center",
+    fontSize: 13,
+    color: "#1f63f1",
+    fontWeight: "600",
   },
   label: {
     fontSize: 14,
@@ -122,6 +227,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 12,
+    fontSize: 16,
+    color: "#111827",
   },
   bio: {
     minHeight: 90,
@@ -129,13 +236,17 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 8,
-    backgroundColor: "#1c6ef2",
+    backgroundColor: "#1f63f1",
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

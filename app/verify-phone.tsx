@@ -3,9 +3,11 @@ import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { supabase } from "../src/lib/supabase";
+import { useAuth } from "../src/providers/AuthProvider";
 
 export default function VerifyPhoneScreen() {
   const params = useLocalSearchParams<{ phone?: string }>();
+  const { session, refreshProfile } = useAuth();
   const [otpCode, setOtpCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -26,11 +28,18 @@ export default function VerifyPhoneScreen() {
         type: "sms",
       });
 
-      if (error) {
-        throw error;
+      if (error) throw error;
+
+      // Marcar el teléfono como verificado en el perfil
+      if (session?.user?.id) {
+        await supabase
+          .from("profiles")
+          .update({ verified_at: new Date().toISOString() })
+          .eq("id", session.user.id);
+        await refreshProfile();
       }
 
-      router.replace("/");
+      router.back();
     } catch (error) {
       Alert.alert("No se pudo verificar", (error as Error).message);
     } finally {
