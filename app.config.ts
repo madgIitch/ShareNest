@@ -17,13 +17,16 @@ const config: ExpoConfig = {
   },
   ios: {
     supportsTablet: true,
+    googleServicesFile: "./GoogleService-Info.plist",
   },
   android: {
+    package: "com.sharenest.app",
     adaptiveIcon: {
       foregroundImage: "./assets/android-icon-foreground.png",
       backgroundColor: "#2952C4",
     },
     predictiveBackGestureEnabled: false,
+    googleServicesFile: "./google-services.json",
   },
   web: {
     favicon: "./assets/favicon.png",
@@ -37,6 +40,14 @@ const config: ExpoConfig = {
     ],
     "expo-secure-store",
     "expo-font",
+    [
+      "expo-notifications",
+      {
+        icon: "./assets/icon.png",
+        color: "#10b981",
+        sounds: [],
+      },
+    ],
   ],
   extra: {
     appEnv,

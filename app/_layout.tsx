@@ -31,6 +31,8 @@ export default function RootLayout() {
                 <Stack.Screen name="listing/[id]/index" options={{ title: "Anuncio" }} />
                 <Stack.Screen name="listing/[id]/edit" options={{ title: "Editar anuncio" }} />
                 <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+                <Stack.Screen name="conversation/[id]" options={{ title: "Chat" }} />
+                <Stack.Screen name="requests/[id]" options={{ title: "Solicitud" }} />
               </Stack>
             </ToastProvider>
           </AuthProvider>

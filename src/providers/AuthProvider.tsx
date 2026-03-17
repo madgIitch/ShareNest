@@ -1,9 +1,38 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { PropsWithChildren } from "react";
 import type { Session } from "@supabase/supabase-js";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 
 import { supabase } from "../lib/supabase";
 import type { Database } from "../types/database";
+
+async function registerPushToken(userId: string) {
+  try {
+    // Android notification channel must be created before requesting permissions
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("messages", {
+        name: "Mensajes",
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+    }
+
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== "granted") return;
+
+    // Use native device token (FCM on Android, APNs on iOS)
+    const token = await Notifications.getDevicePushTokenAsync();
+    if (token.data) {
+      await supabase
+        .from("profiles")
+        .update({ push_token: token.data })
+        .eq("id", userId);
+    }
+  } catch {
+    // Push token registration is non-critical
+  }
+}
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -82,6 +111,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
             .eq("id", data.session.user.id)
             .single();
           if (mounted && profileData) setProfile(profileData as Profile);
+          // Register push token (non-blocking)
+          void registerPushToken(data.session.user.id);
         }
       } finally {
         if (mounted) setLoading(false);

@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,8 +15,11 @@ import {
 import { UserAvatar } from "../../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../../src/components/ui/TagBadge";
 import { PriceTag } from "../../../src/components/ui/PriceTag";
+import { SendRequestSheet } from "../../../src/components/requests/SendRequestSheet";
 import { useListing, useUpdateListingStatus, useDeleteListing } from "../../../src/hooks/useListings";
 import { useProfile } from "../../../src/hooks/useProfile";
+import { useMyRequestForListing } from "../../../src/hooks/useRequests";
+import { useConversations } from "../../../src/hooks/useConversations";
 import { useAuth } from "../../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../../src/theme";
 
@@ -24,12 +28,22 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
+  const myId = session?.user?.id;
+
   const { data: listing, isLoading } = useListing(id);
   const { data: owner } = useProfile(listing?.owner_id);
   const updateStatus = useUpdateListingStatus();
   const deleteListing = useDeleteListing();
 
-  const isOwner = session?.user?.id === listing?.owner_id;
+  const isOwner = myId === listing?.owner_id;
+
+  // Request state (for non-owners)
+  const { data: myRequest } = useMyRequestForListing(id, myId);
+  const { data: conversations = [] } = useConversations(myId);
+  const [requestSheetOpen, setRequestSheetOpen] = useState(false);
+
+  // Find conversation linked to this listing (if request accepted)
+  const linkedConversation = conversations.find((c) => c.listing_id === id);
 
   if (isLoading || !listing) {
     return (
@@ -187,11 +201,48 @@ export default function ListingDetailScreen() {
           </Pressable>
         )}
 
-        {/* Acción de contacto (Sprint 5) */}
-        {!isOwner && (
-          <Pressable style={styles.contactBtn}>
-            <Text style={styles.contactBtnText}>💬 Enviar mensaje</Text>
-          </Pressable>
+        {/* Acción de contacto */}
+        {!isOwner && listing && myId && (
+          <>
+            {!myRequest && (
+              <Pressable
+                style={styles.contactBtn}
+                onPress={() => setRequestSheetOpen(true)}
+              >
+                <Text style={styles.contactBtnText}>💬 Solicitar habitación</Text>
+              </Pressable>
+            )}
+
+            {myRequest?.status === "pending" && (
+              <View style={[styles.contactBtn, styles.contactBtnPending]}>
+                <Text style={styles.contactBtnPendingText}>⏳ Solicitud enviada — esperando respuesta</Text>
+              </View>
+            )}
+
+            {myRequest?.status === "accepted" && linkedConversation && (
+              <Pressable
+                style={styles.contactBtn}
+                onPress={() => router.push(`/conversation/${linkedConversation.id}`)}
+              >
+                <Text style={styles.contactBtnText}>💬 Abrir chat</Text>
+              </Pressable>
+            )}
+
+            {myRequest?.status === "denied" && (
+              <View style={[styles.contactBtn, styles.contactBtnDenied]}>
+                <Text style={styles.contactBtnDeniedText}>Tu solicitud no fue aceptada</Text>
+              </View>
+            )}
+
+            <SendRequestSheet
+              visible={requestSheetOpen}
+              onClose={() => setRequestSheetOpen(false)}
+              listingId={listing.id}
+              listingTitle={listing.title}
+              ownerId={listing.owner_id}
+              requesterId={myId}
+            />
+          </>
         )}
 
         {/* Acciones del owner */}
@@ -296,6 +347,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   contactBtnText: { color: colors.white, fontWeight: "700", fontSize: fontSize.md },
+  contactBtnPending: { backgroundColor: colors.warningLight },
+  contactBtnPendingText: { color: colors.warning, fontWeight: "600", fontSize: fontSize.sm },
+  contactBtnDenied: { backgroundColor: colors.errorLight },
+  contactBtnDeniedText: { color: colors.error, fontWeight: "600", fontSize: fontSize.sm },
   ownerActions: { gap: spacing[2] },
   editBtn: {
     backgroundColor: colors.surface,

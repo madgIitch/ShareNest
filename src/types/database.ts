@@ -2,6 +2,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export type ListingType = "offer" | "search";
 export type ListingStatus = "active" | "paused" | "rented";
+export type RequestStatus = "pending" | "accepted" | "denied";
 
 export type Database = {
   public: {
@@ -16,6 +17,7 @@ export type Database = {
           phone: string | null;
           city: string | null;
           verified_at: string | null;
+          push_token: string | null;
           created_at: string;
         };
         Insert: {
@@ -27,6 +29,7 @@ export type Database = {
           phone?: string | null;
           city?: string | null;
           verified_at?: string | null;
+          push_token?: string | null;
           created_at?: string;
         };
         Update: {
@@ -37,6 +40,7 @@ export type Database = {
           phone?: string | null;
           city?: string | null;
           verified_at?: string | null;
+          push_token?: string | null;
         };
         Relationships: [];
       };
@@ -100,6 +104,73 @@ export type Database = {
           lng?: number | null;
           status?: ListingStatus;
           images?: string[];
+        };
+        Relationships: [];
+      };
+      requests: {
+        Row: {
+          id: string;
+          listing_id: string;
+          requester_id: string;
+          owner_id: string;
+          status: RequestStatus;
+          message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id: string;
+          requester_id: string;
+          owner_id: string;
+          status?: RequestStatus;
+          message?: string | null;
+        };
+        Update: {
+          status?: RequestStatus;
+        };
+        Relationships: [];
+      };
+      conversations: {
+        Row: {
+          id: string;
+          listing_id: string | null;
+          request_id: string | null;
+          participant_a: string;
+          participant_b: string;
+          last_message_at: string | null;
+          last_message_preview: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          listing_id?: string | null;
+          request_id?: string | null;
+          participant_a: string;
+          participant_b: string;
+        };
+        Update: {
+          last_message_at?: string | null;
+          last_message_preview?: string | null;
+        };
+        Relationships: [];
+      };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+        };
+        Update: {
+          read_at?: string | null;
         };
         Relationships: [];
       };
