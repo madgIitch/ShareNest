@@ -1,9 +1,12 @@
+// src/components/explore/ListingsMap.tsx
+// Map using MapLibre GL + OpenFreeMap tiles — no account, no API key.
+// Install: npx expo install @maplibre/maplibre-react-native
+// In app.config.ts plugins add: "@maplibre/maplibre-react-native"
+import MapLibreGL from "@maplibre/maplibre-react-native";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
 import Supercluster from "supercluster";
 import { router } from "expo-router";
-
 import { ListingCard } from "../ui/ListingCard";
 import { colors, fontSize, radius, spacing } from "../../theme";
 import type { Database } from "../../types/database";
@@ -11,21 +14,25 @@ import type { Database } from "../../types/database";
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 type PointProps = { listing: Listing };
 
-// Default: Spain center
-const SPAIN_REGION: Region = {
-  latitude: 40.416775,
-  longitude: -3.70379,
-  latitudeDelta: 8,
-  longitudeDelta: 8,
-};
+// No API key needed — OpenFreeMap is free and open source
+MapLibreGL.setAccessToken(null);
 
-type Props = {
-  listings: Listing[];
-};
+// CARTO free vector styles — no account, no API key, Mapbox-quality visuals
+// Options (swap to taste):
+//   Voyager  (colorful, similar to Mapbox Streets): https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json
+//   Positron (clean white, minimal):                https://basemaps.cartocdn.com/gl/positron-gl-style/style.json
+//   Dark Matter (dark mode):                        https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
+const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
+
+// Spain center
+const SPAIN_CENTER: [number, number] = [-3.70379, 40.416775];
+
+type Props = { listings: Listing[] };
 
 export function ListingsMap({ listings }: Props) {
-  const mapRef = useRef<MapView>(null);
-  const [region, setRegion] = useState<Region>(SPAIN_REGION);
+  const cameraRef = useRef<MapLibreGL.Camera>(null);
+  const [zoom, setZoom] = useState(5);
+  const [bounds, setBounds] = useState<[number, number, number, number]>([-9.5, 35.8, 4.5, 43.8]);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
   const geoListings = useMemo(
@@ -33,7 +40,6 @@ export function ListingsMap({ listings }: Props) {
     [listings],
   );
 
-  // Build supercluster from geo-tagged listings
   const sc = useMemo(() => {
     const cluster = new Supercluster<PointProps>({ radius: 60, maxZoom: 20 });
     cluster.load(
@@ -46,80 +52,97 @@ export function ListingsMap({ listings }: Props) {
     return cluster;
   }, [geoListings]);
 
-  // Recompute clusters on every region change
-  const clusters = useMemo(() => {
-    const zoom = Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
-    const bbox: [number, number, number, number] = [
-      region.longitude - region.longitudeDelta / 2,
-      region.latitude  - region.latitudeDelta  / 2,
-      region.longitude + region.longitudeDelta / 2,
-      region.latitude  + region.latitudeDelta  / 2,
-    ];
-    return sc.getClusters(bbox, Math.max(0, Math.min(zoom, 20)));
-  }, [sc, region]);
+  const clusters = useMemo(
+    () => sc.getClusters(bounds, Math.max(0, Math.min(Math.round(zoom), 20))),
+    [sc, bounds, zoom],
+  );
+
+  const handleCameraChanged = (state: { properties: { zoom: number; bounds?: { ne: [number, number]; sw: [number, number] } } }) => {
+    if (state.properties.zoom != null) setZoom(state.properties.zoom);
+    const b = state.properties.bounds;
+    if (b) setBounds([b.sw[0], b.sw[1], b.ne[0], b.ne[1]]);
+  };
 
   const handleClusterPress = (clusterId: number, lat: number, lng: number) => {
-    const expansionZoom = sc.getClusterExpansionZoom(clusterId);
-    const delta = 360 / Math.pow(2, Math.min(expansionZoom, 20));
-    mapRef.current?.animateToRegion(
-      { latitude: lat, longitude: lng, latitudeDelta: delta * 0.8, longitudeDelta: delta * 0.8 },
-      400,
-    );
+    const expansionZoom = Math.min(sc.getClusterExpansionZoom(clusterId), 20);
+    cameraRef.current?.setCamera({
+      centerCoordinate: [lng, lat],
+      zoomLevel: expansionZoom,
+      animationDuration: 400,
+    });
   };
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
+      <MapLibreGL.MapView
         style={styles.map}
-        initialRegion={SPAIN_REGION}
-        onRegionChangeComplete={setRegion}
+        styleURL={MAP_STYLE}
+        logoEnabled={false}
+        attributionEnabled={false}
+        onCameraChanged={handleCameraChanged}
       >
+        <MapLibreGL.Camera
+          ref={cameraRef}
+          centerCoordinate={SPAIN_CENTER}
+          zoomLevel={5}
+        />
+
         {clusters.map((point) => {
           const [lng, lat] = point.geometry.coordinates;
 
           if ("cluster" in point.properties && point.properties.cluster) {
-            const { cluster_id, point_count } = point.properties;
+            const { cluster_id, point_count } = point.properties as {
+              cluster_id: number;
+              point_count: number;
+              cluster: boolean;
+            };
             return (
-              <Marker
+              <MapLibreGL.MarkerView
                 key={`cluster-${cluster_id}`}
-                coordinate={{ latitude: lat, longitude: lng }}
-                onPress={() => handleClusterPress(cluster_id as number, lat, lng)}
-                tracksViewChanges={false}
+                coordinate={[lng, lat]}
+                anchor={{ x: 0.5, y: 0.5 }}
               >
-                <View style={styles.cluster}>
+                <Pressable
+                  style={styles.cluster}
+                  onPress={() => handleClusterPress(cluster_id, lat, lng)}
+                  accessibilityLabel={`Grupo de ${point_count} anuncios`}
+                >
                   <Text style={styles.clusterText}>{point_count}</Text>
-                </View>
-              </Marker>
+                </Pressable>
+              </MapLibreGL.MarkerView>
             );
           }
 
           const { listing } = point.properties as PointProps;
           const isSelected = selectedListing?.id === listing.id;
           return (
-            <Marker
+            <MapLibreGL.MarkerView
               key={listing.id}
-              coordinate={{ latitude: lat, longitude: lng }}
-              onPress={() => setSelectedListing(listing)}
-              tracksViewChanges={false}
+              coordinate={[lng, lat]}
+              anchor={{ x: 0.5, y: 1 }}
             >
-              <View style={[styles.priceMarker, isSelected && styles.priceMarkerSelected]}>
+              <Pressable
+                style={[styles.priceMarker, isSelected && styles.priceMarkerSelected]}
+                onPress={() => setSelectedListing(isSelected ? null : listing)}
+                accessibilityLabel={`${listing.title} €${listing.price}/mes`}
+              >
                 <Text style={[styles.priceText, isSelected && styles.priceTextSelected]}>
                   €{listing.price}
                 </Text>
-              </View>
-            </Marker>
+              </Pressable>
+            </MapLibreGL.MarkerView>
           );
         })}
-      </MapView>
+      </MapLibreGL.MapView>
 
-      {/* Listing card overlay */}
+      {/* Selected listing card */}
       {selectedListing && (
         <View style={styles.cardOverlay}>
           <Pressable
             style={styles.dismissBtn}
             onPress={() => setSelectedListing(null)}
             hitSlop={8}
+            accessibilityLabel="Cerrar"
           >
             <Text style={styles.dismissText}>✕</Text>
           </Pressable>
@@ -137,7 +160,6 @@ export function ListingsMap({ listings }: Props) {
         </View>
       )}
 
-      {/* No geo listings hint */}
       {listings.length > 0 && geoListings.length === 0 && (
         <View style={styles.hint}>
           <Text style={styles.hintText}>
@@ -153,7 +175,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
 
-  // Cluster bubble
   cluster: {
     width: 44,
     height: 44,
@@ -169,13 +190,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  clusterText: {
-    color: colors.white,
-    fontWeight: "700",
-    fontSize: fontSize.sm,
-  },
+  clusterText: { color: colors.white, fontWeight: "700", fontSize: fontSize.sm },
 
-  // Price marker
   priceMarker: {
     paddingHorizontal: spacing[2] + 2,
     paddingVertical: 5,
@@ -189,20 +205,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  priceMarkerSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primaryDark,
-  },
-  priceText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  priceTextSelected: {
-    color: colors.white,
-  },
+  priceMarkerSelected: { backgroundColor: colors.primary, borderColor: colors.primaryDark },
+  priceText: { fontSize: 12, fontWeight: "700", color: colors.primary },
+  priceTextSelected: { color: colors.white },
 
-  // Card overlay
   cardOverlay: {
     position: "absolute",
     bottom: spacing[4],
@@ -224,13 +230,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  dismissText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontWeight: "700",
-  },
+  dismissText: { fontSize: 12, color: colors.textSecondary, fontWeight: "700" },
 
-  // Hint
   hint: {
     position: "absolute",
     bottom: spacing[4],
@@ -240,9 +241,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing[3],
   },
-  hintText: {
-    color: colors.white,
-    fontSize: fontSize.xs,
-    textAlign: "center",
-  },
+  hintText: { color: colors.white, fontSize: fontSize.xs, textAlign: "center" },
 });

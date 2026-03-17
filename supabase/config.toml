@@ -12,6 +12,9 @@ verify_jwt = true
 [functions.notify-friend-request]
 verify_jwt = true
 
+[functions.locations]
+verify_jwt = false
+
 [functions.calculate-balances]
 verify_jwt = true
 

@@ -48,6 +48,7 @@ const config: ExpoConfig = {
       },
     ],
     "expo-web-browser",
+    "@maplibre/maplibre-react-native",
     // "expo-updates", // uncomment after: npx expo install expo-updates
   ],
   updates: {
