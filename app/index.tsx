@@ -22,5 +22,5 @@ export default function IndexScreen() {
     return <Redirect href="/onboarding" />;
   }
 
-  return <Redirect href="/home" />;
+  return <Redirect href="/(tabs)/explore" />;
 }

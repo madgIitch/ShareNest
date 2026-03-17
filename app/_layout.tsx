@@ -4,6 +4,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AuthProvider } from "../src/providers/AuthProvider";
 import { QueryProvider } from "../src/providers/QueryProvider";
+import { ToastProvider } from "../src/providers/ToastProvider";
 
 export default function RootLayout() {
   return (
@@ -11,21 +12,24 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryProvider>
           <AuthProvider>
-            <Stack
-              screenOptions={{
-                headerTitleAlign: "center",
-              }}
-            >
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ title: "Acceso" }} />
-              <Stack.Screen name="verify-phone" options={{ title: "Verificar móvil" }} />
-              <Stack.Screen name="onboarding" options={{ title: "Bienvenido/a" }} />
-              <Stack.Screen name="home" options={{ title: "ShareNest" }} />
-              <Stack.Screen name="profile" options={{ title: "Mi perfil" }} />
-              <Stack.Screen name="profile/[id]" options={{ title: "Perfil" }} />
-              <Stack.Screen name="settings" options={{ title: "Configuración" }} />
-              <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-            </Stack>
+            <ToastProvider>
+              <Stack
+                screenOptions={{
+                  headerTitleAlign: "center",
+                }}
+              >
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="verify-phone" options={{ title: "Verificar móvil" }} />
+                <Stack.Screen name="onboarding" options={{ title: "Bienvenido/a" }} />
+                <Stack.Screen name="profile" options={{ title: "Mi perfil" }} />
+                <Stack.Screen name="profile/[id]" options={{ title: "Perfil" }} />
+                <Stack.Screen name="settings" options={{ title: "Configuración" }} />
+                <Stack.Screen name="components-demo" options={{ title: "UI Components" }} />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+              </Stack>
+            </ToastProvider>
           </AuthProvider>
         </QueryProvider>
       </SafeAreaProvider>

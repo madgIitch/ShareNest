@@ -40,9 +40,12 @@ export default function LoginScreen() {
         const { error } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
+          options: {
+            emailRedirectTo: "sharenest://auth/callback",
+          },
         });
         if (error) throw error;
-        Alert.alert("Cuenta creada", "Ya puedes iniciar sesion con tu email y contraseña.");
+        Alert.alert("Cuenta creada", "Revisa tu email para confirmar la cuenta.");
       }
     } catch (error) {
       Alert.alert("Error", (error as Error).message);

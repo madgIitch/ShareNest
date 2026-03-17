@@ -1,7 +1,7 @@
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 
 import { supabase } from "./supabase";
-import { env } from "./env";
 
 export async function pickAvatar(): Promise<ImagePicker.ImagePickerAsset | null> {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -21,14 +21,24 @@ export async function pickAvatar(): Promise<ImagePicker.ImagePickerAsset | null>
 }
 
 export async function uploadAvatar(userId: string, uri: string): Promise<string> {
-  const ext = uri.split(".").pop()?.toLowerCase() ?? "jpg";
+  // Extraer extensión limpia (sin query params)
+  const rawExt = uri.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
+  const ext = rawExt === "jpg" ? "jpeg" : rawExt;
   const path = `${userId}/avatar.${ext}`;
+  const contentType = `image/${ext}`;
 
-  const response = await fetch(uri);
-  const blob = await response.blob();
+  // Leer el archivo como base64 y convertir a Uint8Array
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: "base64",
+  });
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
 
-  const { error } = await supabase.storage.from("avatars").upload(path, blob, {
-    contentType: `image/${ext}`,
+  const { error } = await supabase.storage.from("avatars").upload(path, bytes, {
+    contentType,
     upsert: true,
   });
 
@@ -38,17 +48,25 @@ export async function uploadAvatar(userId: string, uri: string): Promise<string>
 }
 
 export async function resizeAvatar(userId: string, path: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke("resize-avatar", {
-    body: { userId, path },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke("resize-avatar", {
+      body: { userId, path },
+    });
 
-  if (error) throw error;
+    if (!error && (data as { thumbUrl?: string })?.thumbUrl) {
+      return (data as { thumbUrl: string }).thumbUrl;
+    }
+  } catch {
+    // Edge function no disponible — usar el original
+  }
 
-  return (data as { thumbUrl: string }).thumbUrl;
+  // Fallback: URL pública del original
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export function getAvatarUrl(userId: string, variant: "avatar" | "thumb" = "avatar"): string {
-  const ext = variant === "thumb" ? "thumb.jpg" : "avatar.jpg";
-  const { data } = supabase.storage.from("avatars").getPublicUrl(`${userId}/${ext}`);
+  const filename = variant === "thumb" ? "thumb.jpg" : "avatar.jpeg";
+  const { data } = supabase.storage.from("avatars").getPublicUrl(`${userId}/${filename}`);
   return data.publicUrl;
 }

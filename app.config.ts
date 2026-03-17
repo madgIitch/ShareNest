@@ -30,7 +30,16 @@ const config: ExpoConfig = {
   web: {
     favicon: "./assets/favicon.png",
   },
-  plugins: ["expo-router", "expo-secure-store"],
+  plugins: [
+    [
+      "expo-router",
+      {
+        origin: "https://sharenest.app",
+      },
+    ],
+    "expo-secure-store",
+    "expo-font",
+  ],
   extra: {
     appEnv,
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
