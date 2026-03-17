@@ -20,10 +20,11 @@ export type ListingPreview = {
 
 type Props = {
   listing: ListingPreview;
+  connectionDegree?: 1 | 2 | null;
   onPress?: () => void;
 };
 
-export function ListingCard({ listing, onPress }: Props) {
+export function ListingCard({ listing, connectionDegree, onPress }: Props) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -50,6 +51,21 @@ export function ListingCard({ listing, onPress }: Props) {
               listing.type === "offer" ? styles.typeBadgeTextOffer : styles.typeBadgeTextSearch,
             ]}>
               {listing.type === "offer" ? "Ofrezco" : "Busco"}
+            </Text>
+          </View>
+        )}
+
+        {/* Friendz badge – bottom left */}
+        {connectionDegree != null && (
+          <View style={[
+            styles.friEndzBadge,
+            connectionDegree === 1 ? styles.friEndzBadge1 : styles.friEndzBadge2,
+          ]}>
+            <Text style={[
+              styles.friEndzBadgeText,
+              connectionDegree === 1 ? styles.friEndzBadgeText1 : styles.friEndzBadgeText2,
+            ]}>
+              {connectionDegree === 1 ? "👥 Friendz" : "👥 Amigo de amigo"}
             </Text>
           </View>
         )}
@@ -131,6 +147,19 @@ const styles = StyleSheet.create({
   typeBadgeTextSearch: {
     color: colors.verify,
   },
+  friEndzBadge: {
+    position: "absolute",
+    bottom: spacing[2],
+    left: spacing[2],
+    paddingHorizontal: spacing[2] + 2,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  friEndzBadge1: { backgroundColor: colors.primaryLight },
+  friEndzBadge2: { backgroundColor: "rgba(255,255,255,0.85)" },
+  friEndzBadgeText: { fontSize: fontSize.xs, fontWeight: "700" },
+  friEndzBadgeText1: { color: colors.primaryDark },
+  friEndzBadgeText2: { color: colors.textSecondary },
   likeBtn: {
     position: "absolute",
     top: spacing[2],

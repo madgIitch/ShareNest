@@ -19,6 +19,8 @@ import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
 import { FilterSheet } from "../../src/components/explore/FilterSheet";
 import { ListingsMap } from "../../src/components/explore/ListingsMap";
 import { useSearchListings, useListingsForMap } from "../../src/hooks/useSearchListings";
+import { useMyFriendz } from "../../src/hooks/useConnections";
+import { useAuth } from "../../src/providers/AuthProvider";
 import { loadFilters, saveFilters } from "../../src/lib/filterStorage";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import { DEFAULT_FILTERS, countActiveFilters } from "../../src/types/filters";
@@ -30,6 +32,10 @@ type Listing = Database["public"]["Tables"]["listings"]["Row"];
 type ViewMode = "list" | "map";
 
 export default function ExploreScreen() {
+  const { session } = useAuth();
+  const { data: friendz = [] } = useMyFriendz(session?.user?.id);
+  const friendzIds = new Set(friendz.map((f) => f.id));
+
   const [filters, setFilters] = useState<ListingFilters>(DEFAULT_FILTERS);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
@@ -205,6 +211,13 @@ export default function ExploreScreen() {
                     type: item.type,
                     image_url: (item.images as string[])[0] ?? null,
                   }}
+                  connectionDegree={
+                    item.owner_id === session?.user?.id
+                      ? null
+                      : friendzIds.has(item.owner_id)
+                        ? 1
+                        : null
+                  }
                   onPress={() => router.push(`/listing/${item.id}`)}
                 />
               )}

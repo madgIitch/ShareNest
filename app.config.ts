@@ -17,7 +17,6 @@ const config: ExpoConfig = {
   },
   ios: {
     supportsTablet: true,
-    googleServicesFile: "./GoogleService-Info.plist",
   },
   android: {
     package: "com.sharenest.app",

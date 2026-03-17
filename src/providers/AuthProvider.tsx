@@ -1,15 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { PropsWithChildren } from "react";
 import type { Session } from "@supabase/supabase-js";
-import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import { supabase } from "../lib/supabase";
 import type { Database } from "../types/database";
 
 async function registerPushToken(userId: string) {
+  // expo-notifications remote push is not supported in Expo Go (SDK 53+)
+  // Dynamic import prevents the module from loading at all in Expo Go
+  if (Constants.executionEnvironment === "storeClient") return;
+
   try {
-    // Android notification channel must be created before requesting permissions
+    const Notifications = await import("expo-notifications");
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("messages", {
         name: "Mensajes",
@@ -21,7 +26,6 @@ async function registerPushToken(userId: string) {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== "granted") return;
 
-    // Use native device token (FCM on Android, APNs on iOS)
     const token = await Notifications.getDevicePushTokenAsync();
     if (token.data) {
       await supabase

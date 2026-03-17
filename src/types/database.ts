@@ -3,6 +3,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export type ListingType = "offer" | "search";
 export type ListingStatus = "active" | "paused" | "rented";
 export type RequestStatus = "pending" | "accepted" | "denied";
+export type ConnectionStatus = "pending" | "accepted";
 
 export type Database = {
   public: {
@@ -154,6 +155,25 @@ export type Database = {
         };
         Relationships: [];
       };
+      connections: {
+        Row: {
+          id: string;
+          requester_id: string;
+          addressee_id: string;
+          status: ConnectionStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          addressee_id: string;
+          status?: ConnectionStatus;
+        };
+        Update: {
+          status?: ConnectionStatus;
+        };
+        Relationships: [];
+      };
       messages: {
         Row: {
           id: string;
@@ -177,6 +197,18 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_mutual_friends: {
+        Args: { p_user_a: string; p_user_b: string };
+        Returns: { id: string; full_name: string | null; avatar_url: string | null; username: string | null; verified_at: string | null }[];
+      };
+      get_connection_degree: {
+        Args: { p_viewer: string; p_target: string };
+        Returns: number | null;
+      };
+      search_users: {
+        Args: { p_query: string; p_limit?: number };
+        Returns: { id: string; full_name: string | null; avatar_url: string | null; username: string | null; verified_at: string | null; city: string | null }[];
+      };
       search_listings: {
         Args: {
           p_query?:          string | null;
