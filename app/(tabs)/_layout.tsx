@@ -25,8 +25,8 @@ export default function TabsLayout() {
         name="explore"
         options={{
           title: "Explorar",
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="🔍" color={color} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🔍" focused={focused} />
           ),
         }}
       />
@@ -34,8 +34,8 @@ export default function TabsLayout() {
         name="listings"
         options={{
           title: "Mis anuncios",
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="🏠" color={color} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🏠" focused={focused} />
           ),
         }}
       />
@@ -43,8 +43,8 @@ export default function TabsLayout() {
         name="messages"
         options={{
           title: "Mensajes",
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="💬" color={color} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="💬" focused={focused} />
           ),
         }}
       />
@@ -52,8 +52,8 @@ export default function TabsLayout() {
         name="account"
         options={{
           title: "Perfil",
-          tabBarIcon: ({ color }) => (
-            <TabIcon emoji="👤" color={color} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="👤" focused={focused} />
           ),
         }}
       />
@@ -61,7 +61,7 @@ export default function TabsLayout() {
   );
 }
 
-function TabIcon({ emoji, color }: { emoji: string; color: string }) {
+function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   const { Text } = require("react-native");
-  return <Text style={{ fontSize: 20, opacity: color === colors.primary ? 1 : 0.5 }}>{emoji}</Text>;
+  return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>;
 }

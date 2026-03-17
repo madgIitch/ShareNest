@@ -1,8 +1,12 @@
 export const colors = {
-  // Brand
-  primary: "#1f63f1",
-  primaryLight: "#e8f0fe",
-  primaryDark: "#1449c4",
+  // Brand – emerald
+  primary: "#10b981",
+  primaryLight: "#d1fae5",
+  primaryDark: "#059669",
+
+  // Accent – blue (verification badge, search-type label)
+  verify: "#3b82f6",
+  verifyLight: "#dbeafe",
 
   // Semantic
   success: "#16a34a",
@@ -25,7 +29,7 @@ export const colors = {
   gray900: "#111827",
 
   // Surfaces
-  background: "#f4f6fa",
+  background: "#f3f3f5",
   surface: "#ffffff",
   border: "#e6e9ef",
 

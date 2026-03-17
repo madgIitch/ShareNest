@@ -2,15 +2,13 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, fontSize, radius, spacing } from "../../theme";
 import { PriceTag } from "./PriceTag";
-import { TagBadge } from "./TagBadge";
-import { UserAvatar } from "./UserAvatar";
 
-// Tipo provisional hasta Sprint 4 (listings DB)
 export type ListingPreview = {
   id: string;
   title: string;
   price: number;
   city: string;
+  type?: "offer" | "search";
   image_url: string | null;
   tags?: string[];
   owner?: {
@@ -31,7 +29,7 @@ export function ListingCard({ listing, onPress }: Props) {
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
     >
-      {/* Imagen */}
+      {/* Imagen 4:3 */}
       <View style={styles.imageContainer}>
         {listing.image_url ? (
           <Image source={{ uri: listing.image_url }} style={styles.image} />
@@ -40,6 +38,26 @@ export function ListingCard({ listing, onPress }: Props) {
             <Text style={styles.imagePlaceholderIcon}>🏠</Text>
           </View>
         )}
+
+        {/* Tipo badge – top left */}
+        {listing.type && (
+          <View style={[
+            styles.typeBadge,
+            listing.type === "offer" ? styles.typeBadgeOffer : styles.typeBadgeSearch,
+          ]}>
+            <Text style={[
+              styles.typeBadgeText,
+              listing.type === "offer" ? styles.typeBadgeTextOffer : styles.typeBadgeTextSearch,
+            ]}>
+              {listing.type === "offer" ? "Ofrezco" : "Busco"}
+            </Text>
+          </View>
+        )}
+
+        {/* Like button – top right */}
+        <Pressable style={styles.likeBtn} hitSlop={8}>
+          <Text style={styles.likeBtnText}>♡</Text>
+        </Pressable>
       </View>
 
       <View style={styles.body}>
@@ -51,27 +69,8 @@ export function ListingCard({ listing, onPress }: Props) {
           {listing.title}
         </Text>
 
-        {/* Tags */}
-        {listing.tags && listing.tags.length > 0 && (
-          <View style={styles.tags}>
-            {listing.tags.slice(0, 3).map((tag) => (
-              <TagBadge key={tag} label={tag} />
-            ))}
-          </View>
-        )}
-
-        {/* Footer: precio + avatar */}
-        <View style={styles.footer}>
-          <PriceTag amount={listing.price} size="sm" />
-          {listing.owner && (
-            <UserAvatar
-              avatarUrl={listing.owner.avatar_url}
-              name={listing.owner.full_name}
-              size="xs"
-              verified={!!listing.owner.verified_at}
-            />
-          )}
-        </View>
+        {/* Footer: precio */}
+        <PriceTag amount={listing.price} size="sm" />
       </View>
     </Pressable>
   );
@@ -80,9 +79,7 @@ export function ListingCard({ listing, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius["2xl"],
     overflow: "hidden",
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
@@ -94,7 +91,7 @@ const styles = StyleSheet.create({
     opacity: 0.92,
   },
   imageContainer: {
-    height: 160,
+    aspectRatio: 4 / 3,
     backgroundColor: colors.gray100,
   },
   image: {
@@ -110,9 +107,49 @@ const styles = StyleSheet.create({
   imagePlaceholderIcon: {
     fontSize: 40,
   },
+  typeBadge: {
+    position: "absolute",
+    top: spacing[2],
+    left: spacing[2],
+    paddingHorizontal: spacing[2] + 2,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  typeBadgeOffer: {
+    backgroundColor: colors.primaryLight,
+  },
+  typeBadgeSearch: {
+    backgroundColor: colors.verifyLight,
+  },
+  typeBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+  },
+  typeBadgeTextOffer: {
+    color: colors.primaryDark,
+  },
+  typeBadgeTextSearch: {
+    color: colors.verify,
+  },
+  likeBtn: {
+    position: "absolute",
+    top: spacing[2],
+    right: spacing[2],
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  likeBtnText: {
+    fontSize: 16,
+    color: colors.gray600,
+    lineHeight: 18,
+  },
   body: {
     padding: spacing[3],
-    gap: spacing[2],
+    gap: 4,
   },
   city: {
     fontSize: fontSize.xs,
@@ -124,16 +161,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.text,
     lineHeight: 20,
-  },
-  tags: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[1],
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: spacing[1],
   },
 });

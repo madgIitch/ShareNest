@@ -16,9 +16,9 @@ export default function AccountScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Tarjeta de perfil */}
-      <Pressable style={styles.profileCard} onPress={() => router.push("/profile")}>
-        <View style={styles.profileLeft}>
+      {/* Avatar + nombre */}
+      <View style={styles.profileHeader}>
+        <View style={styles.avatarWrapper}>
           {profile?.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
           ) : (
@@ -28,33 +28,28 @@ export default function AccountScreen() {
               </Text>
             </View>
           )}
-          <View style={styles.profileInfo}>
-            <Text style={styles.name} numberOfLines={1}>
-              {profile?.full_name ?? "Sin nombre"}
-            </Text>
-            {profile?.username && (
-              <Text style={styles.username}>@{profile.username}</Text>
-            )}
-            {profile?.city && (
-              <Text style={styles.city}>📍 {profile.city}</Text>
-            )}
-            {profile?.verified_at && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>✓ Verificado</Text>
-              </View>
-            )}
-          </View>
+          {profile?.verified_at && (
+            <View style={styles.verifyDot}>
+              <Text style={styles.verifyDotText}>✓</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.arrow}>›</Text>
-      </Pressable>
+
+        <Text style={styles.name}>{profile?.full_name ?? "Sin nombre"}</Text>
+        {profile?.username && (
+          <Text style={styles.username}>@{profile.username}</Text>
+        )}
+        {profile?.city && (
+          <Text style={styles.city}>📍 {profile.city}</Text>
+        )}
+
+        <Pressable style={styles.editProfileBtn} onPress={() => router.push("/profile")}>
+          <Text style={styles.editProfileBtnText}>Editar perfil</Text>
+        </Pressable>
+      </View>
 
       {/* Acciones */}
       <View style={styles.section}>
-        <Pressable style={styles.row} onPress={() => router.push("/profile")}>
-          <Text style={styles.rowLabel}>Editar perfil</Text>
-          <Text style={styles.arrow}>›</Text>
-        </Pressable>
-        <View style={styles.divider} />
         <Pressable style={styles.row} onPress={() => router.push("/settings")}>
           <Text style={styles.rowLabel}>Configuración</Text>
           <Text style={styles.arrow}>›</Text>
@@ -82,48 +77,66 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: spacing[3],
   },
-  profileCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  profileHeader: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing[4],
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  profileLeft: {
-    flexDirection: "row",
+    borderRadius: radius["2xl"],
+    padding: spacing[5],
     alignItems: "center",
-    gap: spacing[3],
-    flex: 1,
+    gap: spacing[1],
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarWrapper: {
+    marginBottom: spacing[2],
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: colors.primary,
   },
   avatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: colors.primaryLight,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 3,
+    borderColor: colors.primary,
   },
   avatarInitial: {
-    fontSize: 22,
+    fontSize: 30,
     fontWeight: "700",
     color: colors.primary,
   },
-  profileInfo: {
-    flex: 1,
-    gap: 2,
+  verifyDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 22,
+    height: 22,
+    borderRadius: radius.full,
+    backgroundColor: colors.verify,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  verifyDotText: {
+    fontSize: 10,
+    color: colors.white,
+    fontWeight: "700",
   },
   name: {
-    fontSize: fontSize.lg,
+    fontSize: fontSize.xl,
     fontWeight: "700",
     color: colors.text,
+    marginTop: spacing[1],
   },
   username: {
     fontSize: fontSize.sm,
@@ -133,18 +146,18 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
   },
-  badge: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    backgroundColor: colors.successLight,
+  editProfileBtn: {
+    marginTop: spacing[3],
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[2],
     borderRadius: radius.full,
-    paddingHorizontal: spacing[2] + 2,
-    paddingVertical: 2,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
-  badgeText: {
-    color: colors.success,
+  editProfileBtnText: {
+    color: colors.primary,
     fontWeight: "700",
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
   },
   arrow: {
     fontSize: 22,
@@ -152,10 +165,13 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.xl,
     overflow: "hidden",
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

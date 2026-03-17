@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: "absolute",
-    backgroundColor: colors.success,
+    backgroundColor: colors.verify,
     borderRadius: radius.full,
     width: 16,
     height: 16,
