@@ -4,6 +4,7 @@ const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 const headers = {
   apikey: ANON_KEY,
+  Authorization: `Bearer ${ANON_KEY}`,
   "Content-Type": "application/json",
 };
 

@@ -26,7 +26,10 @@ serve(async (req: Request) => {
   if (corsRes) return corsRes;
 
   const url = new URL(req.url);
-  const segments = url.pathname.replace(/^\/functions\/v1\/locations\/?/, "").split("/").filter(Boolean);
+  // Strip any prefix up to and including "locations" to handle both
+  // /functions/v1/locations/cities and /locations/cities path formats
+  const relativePath = url.pathname.replace(/^.*\/locations\/?/, "");
+  const segments = relativePath.split("/").filter(Boolean);
   // segments: [] | ["cities"] | ["cities", id] | ["cities","track"] | ["places", id] | ["places","track"]
 
   try {

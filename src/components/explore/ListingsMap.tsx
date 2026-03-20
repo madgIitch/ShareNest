@@ -1,8 +1,6 @@
 // src/components/explore/ListingsMap.tsx
-// Map using MapLibre GL + OpenFreeMap tiles — no account, no API key.
-// Install: npx expo install @maplibre/maplibre-react-native
-// In app.config.ts plugins add: "@maplibre/maplibre-react-native"
-import MapLibreGL from "@maplibre/maplibre-react-native";
+// Map using react-native-maps — Fabric/New Architecture compatible.
+import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from "react-native-maps";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Supercluster from "supercluster";
@@ -14,23 +12,23 @@ import type { Database } from "../../types/database";
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 type PointProps = { listing: Listing };
 
-// No API key needed — OpenFreeMap is free and open source
-MapLibreGL.setAccessToken(null);
+// Spain bounding box
+const SPAIN_REGION = {
+  latitude: 40.416775,
+  longitude: -3.70379,
+  latitudeDelta: 10,
+  longitudeDelta: 12,
+};
 
-// CARTO free vector styles — no account, no API key, Mapbox-quality visuals
-// Options (swap to taste):
-//   Voyager  (colorful, similar to Mapbox Streets): https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json
-//   Positron (clean white, minimal):                https://basemaps.cartocdn.com/gl/positron-gl-style/style.json
-//   Dark Matter (dark mode):                        https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
-
-// Spain center
-const SPAIN_CENTER: [number, number] = [-3.70379, 40.416775];
+// Zoom level (0-20) to latitudeDelta approximation
+function zoomToLatDelta(zoom: number) {
+  return 360 / Math.pow(2, zoom);
+}
 
 type Props = { listings: Listing[] };
 
 export function ListingsMap({ listings }: Props) {
-  const cameraRef = useRef<MapLibreGL.Camera>(null);
+  const mapRef = useRef<MapView>(null);
   const [zoom, setZoom] = useState(5);
   const [bounds, setBounds] = useState<[number, number, number, number]>([-9.5, 35.8, 4.5, 43.8]);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
@@ -57,36 +55,47 @@ export function ListingsMap({ listings }: Props) {
     [sc, bounds, zoom],
   );
 
-  const handleCameraChanged = (state: { properties: { zoom: number; bounds?: { ne: [number, number]; sw: [number, number] } } }) => {
-    if (state.properties.zoom != null) setZoom(state.properties.zoom);
-    const b = state.properties.bounds;
-    if (b) setBounds([b.sw[0], b.sw[1], b.ne[0], b.ne[1]]);
+  const handleRegionChange = (region: {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  }) => {
+    // Approximate zoom from latitudeDelta
+    const z = Math.round(Math.log2(360 / region.latitudeDelta));
+    setZoom(Math.max(0, Math.min(z, 20)));
+
+    const west = region.longitude - region.longitudeDelta / 2;
+    const east = region.longitude + region.longitudeDelta / 2;
+    const south = region.latitude - region.latitudeDelta / 2;
+    const north = region.latitude + region.latitudeDelta / 2;
+    setBounds([west, south, east, north]);
   };
 
   const handleClusterPress = (clusterId: number, lat: number, lng: number) => {
     const expansionZoom = Math.min(sc.getClusterExpansionZoom(clusterId), 20);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [lng, lat],
-      zoomLevel: expansionZoom,
-      animationDuration: 400,
-    });
+    const delta = zoomToLatDelta(expansionZoom);
+    mapRef.current?.animateToRegion(
+      { latitude: lat, longitude: lng, latitudeDelta: delta, longitudeDelta: delta },
+      400,
+    );
   };
 
   return (
     <View style={styles.container}>
-      <MapLibreGL.MapView
+      <MapView
+        ref={mapRef}
         style={styles.map}
-        styleURL={MAP_STYLE}
-        logoEnabled={false}
-        attributionEnabled={false}
-        onCameraChanged={handleCameraChanged}
+        provider={PROVIDER_DEFAULT}
+        mapType="none"
+        initialRegion={SPAIN_REGION}
+        onRegionChangeComplete={handleRegionChange}
       >
-        <MapLibreGL.Camera
-          ref={cameraRef}
-          centerCoordinate={SPAIN_CENTER}
-          zoomLevel={5}
+        <UrlTile
+          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maximumZ={19}
+          shouldReplaceMapContent
         />
-
         {clusters.map((point) => {
           const [lng, lat] = point.geometry.coordinates;
 
@@ -97,43 +106,39 @@ export function ListingsMap({ listings }: Props) {
               cluster: boolean;
             };
             return (
-              <MapLibreGL.MarkerView
+              <Marker
                 key={`cluster-${cluster_id}`}
-                coordinate={[lng, lat]}
+                coordinate={{ latitude: lat, longitude: lng }}
                 anchor={{ x: 0.5, y: 0.5 }}
+                onPress={() => handleClusterPress(cluster_id, lat, lng)}
+                tracksViewChanges={false}
               >
-                <Pressable
-                  style={styles.cluster}
-                  onPress={() => handleClusterPress(cluster_id, lat, lng)}
-                  accessibilityLabel={`Grupo de ${point_count} anuncios`}
-                >
+                <View style={styles.cluster}>
                   <Text style={styles.clusterText}>{point_count}</Text>
-                </Pressable>
-              </MapLibreGL.MarkerView>
+                </View>
+              </Marker>
             );
           }
 
           const { listing } = point.properties as PointProps;
           const isSelected = selectedListing?.id === listing.id;
           return (
-            <MapLibreGL.MarkerView
+            <Marker
               key={listing.id}
-              coordinate={[lng, lat]}
+              coordinate={{ latitude: lat, longitude: lng }}
               anchor={{ x: 0.5, y: 1 }}
+              onPress={() => setSelectedListing(isSelected ? null : listing)}
+              tracksViewChanges={false}
             >
-              <Pressable
-                style={[styles.priceMarker, isSelected && styles.priceMarkerSelected]}
-                onPress={() => setSelectedListing(isSelected ? null : listing)}
-                accessibilityLabel={`${listing.title} €${listing.price}/mes`}
-              >
+              <View style={[styles.priceMarker, isSelected && styles.priceMarkerSelected]}>
                 <Text style={[styles.priceText, isSelected && styles.priceTextSelected]}>
                   €{listing.price}
                 </Text>
-              </Pressable>
-            </MapLibreGL.MarkerView>
+              </View>
+            </Marker>
           );
         })}
-      </MapLibreGL.MapView>
+      </MapView>
 
       {/* Selected listing card */}
       {selectedListing && (

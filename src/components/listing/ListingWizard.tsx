@@ -17,6 +17,8 @@ import {
 } from "react-native";
 
 import { CitySelector } from "../ui/CitySelector";
+import { DistrictSelector } from "../ui/DistrictSelector";
+import { locationService, type City, type Place } from "../../services/locationService";
 import { PriceTag } from "../ui/PriceTag";
 import { TagBadge } from "../ui/TagBadge";
 import { useCreateListing } from "../../hooks/useListings";
@@ -33,6 +35,7 @@ type FormData = {
   title: string;
   description: string;
   city: string;
+  city_id: string | null;
   district: string;
   price: string;
   size_m2: string;
@@ -54,6 +57,7 @@ const EMPTY_FORM: FormData = {
   title: "",
   description: "",
   city: "",
+  city_id: null,
   district: "",
   price: "",
   size_m2: "",
@@ -72,6 +76,7 @@ function listingToForm(l: Listing): FormData {
     title: l.title,
     description: l.description ?? "",
     city: l.city,
+    city_id: l.city_id ?? null,
     district: l.district ?? "",
     price: l.price.toString(),
     size_m2: l.size_m2?.toString() ?? "",
@@ -102,6 +107,27 @@ export function ListingWizard({ initial }: Props) {
 
   const set = (key: keyof FormData, value: string | boolean) => {
     setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  // --- City / District selection ---
+  const handleCitySelect = (city: City) => {
+    setForm((f) => ({
+      ...f,
+      city: city.name,
+      city_id: city.id,
+      district: "",
+      lat: city.centroid?.lat ?? f.lat,
+      lng: city.centroid?.lon ?? f.lng,
+    }));
+  };
+
+  const handleDistrictSelect = (place: Place) => {
+    setForm((f) => ({
+      ...f,
+      district: place.name,
+      lat: place.centroid?.lat ?? f.lat,
+      lng: place.centroid?.lon ?? f.lng,
+    }));
   };
 
   // --- Geocoding ---
@@ -189,6 +215,7 @@ export function ListingWizard({ initial }: Props) {
         title: form.title.trim(),
         description: form.description.trim() || null,
         city: form.city,
+        city_id: form.city_id,
         district: form.district.trim() || null,
         price: Number(form.price),
         size_m2: form.size_m2 ? Number(form.size_m2) : null,
@@ -229,7 +256,16 @@ export function ListingWizard({ initial }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        {step === 1 && <Step1 form={form} set={set} onDetectLocation={handleDetectLocation} locating={locating} />}
+        {step === 1 && (
+          <Step1
+            form={form}
+            set={set}
+            onCitySelect={handleCitySelect}
+            onDistrictSelect={handleDistrictSelect}
+            onDetectLocation={handleDetectLocation}
+            locating={locating}
+          />
+        )}
         {step === 2 && <Step2 photos={photoUris} onAdd={handleAddPhotos} onRemove={handleRemovePhoto} onMove={handleMovePhoto} />}
         {step === 3 && <Step3 form={form} set={set} photos={photoUris} />}
       </ScrollView>
@@ -270,11 +306,15 @@ export function ListingWizard({ initial }: Props) {
 function Step1({
   form,
   set,
+  onCitySelect,
+  onDistrictSelect,
   onDetectLocation,
   locating,
 }: {
   form: FormData;
   set: (k: keyof FormData, v: string | boolean) => void;
+  onCitySelect: (city: City) => void;
+  onDistrictSelect: (place: Place) => void;
   onDetectLocation: () => void;
   locating: boolean;
 }) {
@@ -323,7 +363,7 @@ function Step1({
       />
 
       <Text style={styles.label}>Ciudad *</Text>
-      <CitySelector value={form.city} onChange={(v) => set("city", v)} />
+      <CitySelector value={form.city} onSelect={onCitySelect} />
       <Pressable style={styles.locationBtn} onPress={onDetectLocation} disabled={locating}>
         <Text style={styles.locationBtnText}>
           {locating ? "Detectando..." : "📍 Usar mi ubicación"}
@@ -331,12 +371,21 @@ function Step1({
       </Pressable>
 
       <Text style={styles.label}>Barrio / Distrito</Text>
-      <TextInput
-        style={styles.input}
-        value={form.district}
-        onChangeText={(v) => set("district", v)}
-        placeholder="Ej: Gràcia, Malasaña..."
-      />
+      {form.city_id ? (
+        <DistrictSelector
+          cityId={form.city_id}
+          value={form.district}
+          onSelect={onDistrictSelect}
+        />
+      ) : (
+        <TextInput
+          style={styles.input}
+          value={form.district}
+          onChangeText={(v) => set("district", v)}
+          placeholder="Selecciona primero una ciudad"
+          editable={false}
+        />
+      )}
 
       <Text style={styles.label}>Precio (€/mes) *</Text>
       <TextInput

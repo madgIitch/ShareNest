@@ -62,6 +62,7 @@ export type Database = {
           title: string;
           description: string | null;
           city: string;
+          city_id: string | null;
           district: string | null;
           price: number;
           size_m2: number | null;
@@ -84,6 +85,7 @@ export type Database = {
           title: string;
           description?: string | null;
           city: string;
+          city_id?: string | null;
           district?: string | null;
           price: number;
           size_m2?: number | null;
@@ -102,6 +104,7 @@ export type Database = {
           title?: string;
           description?: string | null;
           city?: string;
+          city_id?: string | null;
           district?: string | null;
           price?: number;
           size_m2?: number | null;
