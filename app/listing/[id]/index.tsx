@@ -17,7 +17,9 @@ import { shareService } from "../../../src/services/shareService";
 import { UserAvatar } from "../../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../../src/components/ui/TagBadge";
 import { PriceTag } from "../../../src/components/ui/PriceTag";
+import { MiniMapView } from "../../../src/components/ui/MiniMapView";
 import { SendRequestSheet } from "../../../src/components/requests/SendRequestSheet";
+import type { PrivacyLevel } from "../../../src/core/PrivacyEngine";
 import { useListing, useUpdateListingStatus, useDeleteListing } from "../../../src/hooks/useListings";
 import { useProfile } from "../../../src/hooks/useProfile";
 import { useMyRequestForListing } from "../../../src/hooks/useRequests";
@@ -40,6 +42,11 @@ export default function ListingDetailScreen() {
 
   const isOwner = myId === listing?.owner_id;
   const [sharing, setSharing] = useState(false);
+
+  // Nivel de privacidad para el mapa:
+  // 3 → owner ve la dirección exacta
+  // 2 → cualquier otro usuario que abre el detalle (interesado)
+  const privacyLevel: PrivacyLevel = isOwner ? 3 : 2;
   const haptics = useHaptics();
 
   const handleShare = async () => {
@@ -156,8 +163,18 @@ export default function ListingDetailScreen() {
         <View style={styles.locationRow}>
           <Text style={styles.location}>
             📍 {listing.city}{listing.district ? `, ${listing.district}` : ""}
+            {isOwner && listing.street ? ` · ${listing.street}${listing.street_number ? ` ${listing.street_number}` : ""}` : ""}
           </Text>
         </View>
+
+        {listing.lat != null && listing.lng != null && (
+          <MiniMapView
+            lat={listing.lat}
+            lng={listing.lng}
+            privacyLevel={privacyLevel}
+            height={200}
+          />
+        )}
 
         <PriceTag amount={listing.price} size="lg" />
 

@@ -1,11 +1,12 @@
 // src/components/explore/ListingsMap.tsx
 // Map using react-native-maps — Fabric/New Architecture compatible.
-import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Circle, Marker, UrlTile, PROVIDER_DEFAULT } from "react-native-maps";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Supercluster from "supercluster";
 import { router } from "expo-router";
 import { ListingCard } from "../ui/ListingCard";
+import { applyPrivacy } from "../../core/PrivacyEngine";
 import { colors, fontSize, radius, spacing } from "../../theme";
 import type { Database } from "../../types/database";
 
@@ -41,11 +42,18 @@ export function ListingsMap({ listings }: Props) {
   const sc = useMemo(() => {
     const cluster = new Supercluster<PointProps>({ radius: 60, maxZoom: 20 });
     cluster.load(
-      geoListings.map((l) => ({
-        type: "Feature" as const,
-        properties: { listing: l },
-        geometry: { type: "Point" as const, coordinates: [l.lng!, l.lat!] },
-      })),
+      geoListings.map((l) => {
+        // Nivel 1 para todos los pins públicos del mapa de búsqueda
+        const display = applyPrivacy(
+          { lat: l.lat!, lng: l.lng! },
+          1,
+        );
+        return {
+          type: "Feature" as const,
+          properties: { listing: l },
+          geometry: { type: "Point" as const, coordinates: [display.lng, display.lat] },
+        };
+      }),
     );
     return cluster;
   }, [geoListings]);
@@ -96,6 +104,21 @@ export function ListingsMap({ listings }: Props) {
           maximumZ={19}
           shouldReplaceMapContent
         />
+        {/* Círculo de precisión nivel 1 (500 m) sobre el pin seleccionado */}
+        {selectedListing?.lat != null && selectedListing?.lng != null && (() => {
+          const display = applyPrivacy({ lat: selectedListing.lat!, lng: selectedListing.lng! }, 1);
+          return (
+            <Circle
+              key={`circle-${selectedListing.id}`}
+              center={{ latitude: display.lat, longitude: display.lng }}
+              radius={display.accuracyRadius ?? 500}
+              fillColor="rgba(99,102,241,0.08)"
+              strokeColor="rgba(99,102,241,0.35)"
+              strokeWidth={1.5}
+            />
+          );
+        })()}
+
         {clusters.map((point) => {
           const [lng, lat] = point.geometry.coordinates;
 

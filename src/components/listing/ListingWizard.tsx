@@ -37,6 +37,7 @@ type FormData = {
   city: string;
   city_id: string | null;
   district: string;
+  place_id: string | null;
   price: string;
   size_m2: string;
   rooms: string;
@@ -59,6 +60,7 @@ const EMPTY_FORM: FormData = {
   city: "",
   city_id: null,
   district: "",
+  place_id: null,
   price: "",
   size_m2: "",
   rooms: "",
@@ -78,6 +80,7 @@ function listingToForm(l: Listing): FormData {
     city: l.city,
     city_id: l.city_id ?? null,
     district: l.district ?? "",
+    place_id: l.place_id ?? null,
     price: l.price.toString(),
     size_m2: l.size_m2?.toString() ?? "",
     rooms: l.rooms?.toString() ?? "",
@@ -116,6 +119,7 @@ export function ListingWizard({ initial }: Props) {
       city: city.name,
       city_id: city.id,
       district: "",
+      place_id: null,
       lat: city.centroid?.lat ?? f.lat,
       lng: city.centroid?.lon ?? f.lng,
     }));
@@ -125,6 +129,7 @@ export function ListingWizard({ initial }: Props) {
     setForm((f) => ({
       ...f,
       district: place.name,
+      place_id: place.id,
       lat: place.centroid?.lat ?? f.lat,
       lng: place.centroid?.lon ?? f.lng,
     }));
@@ -217,6 +222,7 @@ export function ListingWizard({ initial }: Props) {
         city: form.city,
         city_id: form.city_id,
         district: form.district.trim() || null,
+        place_id: form.place_id,
         price: Number(form.price),
         size_m2: form.size_m2 ? Number(form.size_m2) : null,
         rooms: form.rooms ? Number(form.rooms) : null,

@@ -64,6 +64,10 @@ export type Database = {
           city: string;
           city_id: string | null;
           district: string | null;
+          place_id: string | null;
+          street: string | null;
+          street_number: string | null;
+          postal_code: string | null;
           price: number;
           size_m2: number | null;
           rooms: number | null;
@@ -87,6 +91,10 @@ export type Database = {
           city: string;
           city_id?: string | null;
           district?: string | null;
+          place_id?: string | null;
+          street?: string | null;
+          street_number?: string | null;
+          postal_code?: string | null;
           price: number;
           size_m2?: number | null;
           rooms?: number | null;
@@ -106,6 +114,10 @@ export type Database = {
           city?: string;
           city_id?: string | null;
           district?: string | null;
+          place_id?: string | null;
+          street?: string | null;
+          street_number?: string | null;
+          postal_code?: string | null;
           price?: number;
           size_m2?: number | null;
           rooms?: number | null;
