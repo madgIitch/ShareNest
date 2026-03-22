@@ -1,5 +1,6 @@
 // src/hooks/useCluster.ts
 // Hook React que envuelve ClusterEngine y sincroniza con el estado del mapa.
+// Compatible con Leaflet WebView: acepta zoom + bbox directamente.
 import { useMemo, useState } from "react";
 import { ClusterEngine } from "../core/ClusterEngine";
 import type { ListingPinData, BBox, ClusterItem } from "../core/ClusterEngine";
@@ -21,21 +22,10 @@ export function useCluster(pins: ListingPinData[]) {
     [engine, region],
   );
 
-  const handleRegionChange = (r: {
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  }) => {
-    const zoom = Math.round(Math.log2(360 / r.latitudeDelta));
-    const bbox: BBox = [
-      r.longitude - r.longitudeDelta / 2,
-      r.latitude - r.latitudeDelta / 2,
-      r.longitude + r.longitudeDelta / 2,
-      r.latitude + r.latitudeDelta / 2,
-    ];
-    setRegion({ zoom: Math.max(0, Math.min(zoom, 20)), bbox });
+  /** Llamado desde el evento moveend de Leaflet via postMessage. */
+  const handleLeafletChange = (zoom: number, bbox: BBox) => {
+    setRegion({ zoom: Math.max(0, Math.min(Math.round(zoom), 20)), bbox });
   };
 
-  return { clusters, engine, handleRegionChange, bbox: region.bbox };
+  return { clusters, engine, handleLeafletChange, bbox: region.bbox };
 }
