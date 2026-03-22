@@ -44,9 +44,10 @@ export function MiniMapView({ lat, lng, privacyLevel, height = 200 }: Props) {
         pitchEnabled={false}
       >
         <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          shouldReplaceMapContent
+          urlTemplate="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png"
+          maximumZ={20}
+          tileSize={512}
+          flipY={false}
         />
 
         {display.accuracyRadius != null && (

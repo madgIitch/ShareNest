@@ -92,8 +92,30 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     void bootstrap();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "SIGNED_IN" && nextSession?.user?.id) {
+        // Load profile inline so loading=true is cleared even if user ID didn't change
+        // (e.g. user was already in session from a previous boot)
+        setLoading(true);
+        setSession(nextSession);
+        void (async () => {
+          try {
+            await ensureProfileExists(nextSession.user.id);
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", nextSession.user.id)
+              .single();
+            if (profileData) setProfile(profileData as Profile);
+          } catch {
+            // profile load failed, navigation will handle it
+          } finally {
+            setLoading(false);
+          }
+        })();
+      } else {
+        setSession(nextSession);
+      }
     });
 
     return () => {
@@ -116,6 +138,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         if (mounted) {
           setProfile(null);
         }
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
 

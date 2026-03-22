@@ -9,12 +9,14 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 import { supabase } from "../src/lib/supabase";
 
 type Mode = "login" | "register";
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,6 +38,7 @@ export default function LoginScreen() {
           password,
         });
         if (error) throw error;
+        router.replace("/");
       } else {
         const { error } = await supabase.auth.signUp({
           email: normalizedEmail,

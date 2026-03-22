@@ -1,19 +1,20 @@
 // src/components/explore/ListingsMap.tsx
-// Map using react-native-maps — Fabric/New Architecture compatible.
+// API pública del mapa (§5.1 del doc). Usa react-native-maps + Stadia tiles.
+// Toda la lógica de negocio está en ClusterEngine / PrivacyEngine (core puro).
 import MapView, { Circle, Marker, UrlTile, PROVIDER_DEFAULT } from "react-native-maps";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Supercluster from "supercluster";
 import { router } from "expo-router";
-import { ListingCard } from "../ui/ListingCard";
+import { useCluster } from "../../hooks/useCluster";
 import { applyPrivacy } from "../../core/PrivacyEngine";
+import { ListingPin } from "../ui/ListingPin";
+import { ListingCluster } from "../ui/ListingCluster";
+import { ListingCard } from "../ui/ListingCard";
 import { colors, fontSize, radius, spacing } from "../../theme";
-import type { Database } from "../../types/database";
+import type { ListingPinData, BBox } from "../../core/ClusterEngine";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
-type PointProps = { listing: Listing };
+export type { ListingPinData, BBox };
 
-// Spain bounding box
 const SPAIN_REGION = {
   latitude: 40.416775,
   longitude: -3.70379,
@@ -21,73 +22,47 @@ const SPAIN_REGION = {
   longitudeDelta: 12,
 };
 
-// Zoom level (0-20) to latitudeDelta approximation
 function zoomToLatDelta(zoom: number) {
   return 360 / Math.pow(2, zoom);
 }
 
-type Props = { listings: Listing[] };
+type Props = {
+  listings: ListingPinData[];
+  onPinPress?: (pin: ListingPinData) => void;
+  onBoundsChange?: (bounds: BBox) => void;
+};
 
-export function ListingsMap({ listings }: Props) {
+export function ListingsMap({ listings, onPinPress, onBoundsChange }: Props) {
   const mapRef = useRef<MapView>(null);
-  const [zoom, setZoom] = useState(5);
-  const [bounds, setBounds] = useState<[number, number, number, number]>([-9.5, 35.8, 4.5, 43.8]);
-  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const geoListings = useMemo(
-    () => listings.filter((l) => l.lat != null && l.lng != null),
-    [listings],
-  );
+  const { clusters, engine, handleRegionChange } = useCluster(listings);
 
-  const sc = useMemo(() => {
-    const cluster = new Supercluster<PointProps>({ radius: 60, maxZoom: 20 });
-    cluster.load(
-      geoListings.map((l) => {
-        // Nivel 1 para todos los pins públicos del mapa de búsqueda
-        const display = applyPrivacy(
-          { lat: l.lat!, lng: l.lng! },
-          1,
-        );
-        return {
-          type: "Feature" as const,
-          properties: { listing: l },
-          geometry: { type: "Point" as const, coordinates: [display.lng, display.lat] },
-        };
-      }),
-    );
-    return cluster;
-  }, [geoListings]);
-
-  const clusters = useMemo(
-    () => sc.getClusters(bounds, Math.max(0, Math.min(Math.round(zoom), 20))),
-    [sc, bounds, zoom],
-  );
-
-  const handleRegionChange = (region: {
+  const handleRegion = (r: {
     latitude: number;
     longitude: number;
     latitudeDelta: number;
     longitudeDelta: number;
   }) => {
-    // Approximate zoom from latitudeDelta
-    const z = Math.round(Math.log2(360 / region.latitudeDelta));
-    setZoom(Math.max(0, Math.min(z, 20)));
-
-    const west = region.longitude - region.longitudeDelta / 2;
-    const east = region.longitude + region.longitudeDelta / 2;
-    const south = region.latitude - region.latitudeDelta / 2;
-    const north = region.latitude + region.latitudeDelta / 2;
-    setBounds([west, south, east, north]);
+    handleRegionChange(r);
+    if (onBoundsChange) {
+      const b: BBox = [
+        r.longitude - r.longitudeDelta / 2,
+        r.latitude - r.latitudeDelta / 2,
+        r.longitude + r.longitudeDelta / 2,
+        r.latitude + r.latitudeDelta / 2,
+      ];
+      onBoundsChange(b);
+    }
   };
 
-  const handleClusterPress = (clusterId: number, lat: number, lng: number) => {
-    const expansionZoom = Math.min(sc.getClusterExpansionZoom(clusterId), 20);
-    const delta = zoomToLatDelta(expansionZoom);
-    mapRef.current?.animateToRegion(
-      { latitude: lat, longitude: lng, latitudeDelta: delta, longitudeDelta: delta },
-      400,
-    );
-  };
+  const selectedPin = selectedId
+    ? listings.find((l) => l.id === selectedId) ?? null
+    : null;
+
+  const selectedDisplay = selectedPin
+    ? applyPrivacy(selectedPin.location, selectedPin.privacyLevel)
+    : null;
 
   return (
     <View style={styles.container}>
@@ -97,78 +72,85 @@ export function ListingsMap({ listings }: Props) {
         provider={PROVIDER_DEFAULT}
         mapType="none"
         initialRegion={SPAIN_REGION}
-        onRegionChangeComplete={handleRegionChange}
+        onRegionChangeComplete={handleRegion}
       >
         <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          shouldReplaceMapContent
+          urlTemplate="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png"
+          maximumZ={20}
+          tileSize={512}
+          flipY={false}
         />
-        {/* Círculo de precisión nivel 1 (500 m) sobre el pin seleccionado */}
-        {selectedListing?.lat != null && selectedListing?.lng != null && (() => {
-          const display = applyPrivacy({ lat: selectedListing.lat!, lng: selectedListing.lng! }, 1);
-          return (
-            <Circle
-              key={`circle-${selectedListing.id}`}
-              center={{ latitude: display.lat, longitude: display.lng }}
-              radius={display.accuracyRadius ?? 500}
-              fillColor="rgba(99,102,241,0.08)"
-              strokeColor="rgba(99,102,241,0.35)"
-              strokeWidth={1.5}
-            />
-          );
-        })()}
 
-        {clusters.map((point) => {
-          const [lng, lat] = point.geometry.coordinates;
+        {/* Círculo de precisión del pin seleccionado */}
+        {selectedDisplay && selectedDisplay.accuracyRadius != null && (
+          <Circle
+            key={`circle-${selectedId}`}
+            center={{ latitude: selectedDisplay.lat, longitude: selectedDisplay.lng }}
+            radius={selectedDisplay.accuracyRadius}
+            fillColor="rgba(99,102,241,0.08)"
+            strokeColor="rgba(99,102,241,0.35)"
+            strokeWidth={1.5}
+          />
+        )}
 
-          if ("cluster" in point.properties && point.properties.cluster) {
-            const { cluster_id, point_count } = point.properties as {
-              cluster_id: number;
-              point_count: number;
-              cluster: boolean;
-            };
+        {clusters.map((item) => {
+          if (item.type === "cluster") {
             return (
               <Marker
-                key={`cluster-${cluster_id}`}
-                coordinate={{ latitude: lat, longitude: lng }}
+                key={`cluster-${item.id}`}
+                coordinate={{ latitude: item.lat, longitude: item.lng }}
                 anchor={{ x: 0.5, y: 0.5 }}
-                onPress={() => handleClusterPress(cluster_id, lat, lng)}
                 tracksViewChanges={false}
               >
-                <View style={styles.cluster}>
-                  <Text style={styles.clusterText}>{point_count}</Text>
-                </View>
+                <ListingCluster
+                  count={item.count}
+                  onPress={() => {
+                    const zoom = engine.expansionZoom(item.id);
+                    mapRef.current?.animateToRegion(
+                      {
+                        latitude: item.lat,
+                        longitude: item.lng,
+                        latitudeDelta: zoomToLatDelta(zoom),
+                        longitudeDelta: zoomToLatDelta(zoom),
+                      },
+                      400,
+                    );
+                  }}
+                />
               </Marker>
             );
           }
 
-          const { listing } = point.properties as PointProps;
-          const isSelected = selectedListing?.id === listing.id;
+          const isSelected = item.pin.id === selectedId;
           return (
             <Marker
-              key={listing.id}
-              coordinate={{ latitude: lat, longitude: lng }}
+              key={item.pin.id}
+              coordinate={{ latitude: item.lat, longitude: item.lng }}
               anchor={{ x: 0.5, y: 1 }}
-              onPress={() => setSelectedListing(isSelected ? null : listing)}
               tracksViewChanges={false}
             >
-              <View style={[styles.priceMarker, isSelected && styles.priceMarkerSelected]}>
-                <Text style={[styles.priceText, isSelected && styles.priceTextSelected]}>
-                  €{listing.price}
-                </Text>
-              </View>
+              <ListingPin
+                price={item.pin.price}
+                currency={item.pin.currency}
+                isSelected={isSelected}
+                isHighlighted={item.pin.isHighlighted}
+                onPress={() => {
+                  const next = isSelected ? null : item.pin.id;
+                  setSelectedId(next);
+                  if (next && onPinPress) onPinPress(item.pin);
+                }}
+              />
             </Marker>
           );
         })}
       </MapView>
 
-      {/* Selected listing card */}
-      {selectedListing && (
+      {/* Tarjeta del pin seleccionado */}
+      {selectedPin && (
         <View style={styles.cardOverlay}>
           <Pressable
             style={styles.dismissBtn}
-            onPress={() => setSelectedListing(null)}
+            onPress={() => setSelectedId(null)}
             hitSlop={8}
             accessibilityLabel="Cerrar"
           >
@@ -176,25 +158,26 @@ export function ListingsMap({ listings }: Props) {
           </Pressable>
           <ListingCard
             listing={{
-              id: selectedListing.id,
-              title: selectedListing.title,
-              price: selectedListing.price,
-              city: selectedListing.city,
-              type: selectedListing.type,
-              image_url: (selectedListing.images as string[])[0] ?? null,
+              id: selectedPin.id,
+              title: (selectedPin.metadata?.title as string) ?? selectedPin.id,
+              price: selectedPin.price,
+              city: (selectedPin.metadata?.city as string) ?? "",
+              type: (selectedPin.metadata?.type as "offer" | "search") ?? "offer",
+              image_url: (selectedPin.metadata?.image_url as string) ?? null,
             }}
-            onPress={() => router.push(`/listing/${selectedListing.id}`)}
+            onPress={() => router.push(`/listing/${selectedPin.id}`)}
           />
         </View>
       )}
 
-      {listings.length > 0 && geoListings.length === 0 && (
-        <View style={styles.hint}>
-          <Text style={styles.hintText}>
-            Los anuncios no tienen ubicación. Edítalos para añadir coordenadas.
-          </Text>
-        </View>
-      )}
+      {listings.length > 0 &&
+        listings.every((l) => l.location.lat == null || l.location.lng == null) && (
+          <View style={styles.hint}>
+            <Text style={styles.hintText}>
+              Los anuncios no tienen ubicación. Edítalos para añadir coordenadas.
+            </Text>
+          </View>
+        )}
     </View>
   );
 }
@@ -202,41 +185,6 @@ export function ListingsMap({ listings }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
-
-  cluster: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    borderWidth: 3,
-    borderColor: colors.white,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  clusterText: { color: colors.white, fontWeight: "700", fontSize: fontSize.sm },
-
-  priceMarker: {
-    paddingHorizontal: spacing[2] + 2,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  priceMarkerSelected: { backgroundColor: colors.primary, borderColor: colors.primaryDark },
-  priceText: { fontSize: 12, fontWeight: "700", color: colors.primary },
-  priceTextSelected: { color: colors.white },
-
   cardOverlay: {
     position: "absolute",
     bottom: spacing[4],
@@ -259,7 +207,6 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   dismissText: { fontSize: 12, color: colors.textSecondary, fontWeight: "700" },
-
   hint: {
     position: "absolute",
     bottom: spacing[4],

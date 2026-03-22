@@ -18,6 +18,7 @@ import { ListingCard } from "../../src/components/ui/ListingCard";
 import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
 import { FilterSheet } from "../../src/components/explore/FilterSheet";
 import { ListingsMap } from "../../src/components/explore/ListingsMap";
+import type { ListingPinData } from "../../src/components/explore/ListingsMap";
 import { useSearchListings, useListingsForMap } from "../../src/hooks/useSearchListings";
 import { useMyFriendz } from "../../src/hooks/useConnections";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -75,6 +76,22 @@ export default function ExploreScreen() {
 
   // Map view: bulk geo query (only when map is visible)
   const { data: mapListings = [] } = useListingsForMap(filters, viewMode === "map");
+
+  const mapPins: ListingPinData[] = mapListings
+    .filter((l) => l.lat != null && l.lng != null)
+    .map((l) => ({
+      id: l.id,
+      privacyLevel: 1,
+      location: { lat: l.lat!, lng: l.lng! },
+      price: l.price,
+      currency: "€",
+      metadata: {
+        title: l.title,
+        city: l.city,
+        type: l.type,
+        image_url: (l.images as string[])[0] ?? null,
+      },
+    }));
 
   const handleApplyFilters = (newFilters: ListingFilters) => {
     setFilters(newFilters);
@@ -246,7 +263,10 @@ export default function ExploreScreen() {
           )}
         </>
       ) : (
-        <ListingsMap listings={mapListings} />
+        <ListingsMap
+          listings={mapPins}
+          onPinPress={(pin) => router.push(`/listing/${pin.id}`)}
+        />
       )}
 
       <FilterSheet
