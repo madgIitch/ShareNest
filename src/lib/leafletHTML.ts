@@ -1,16 +1,17 @@
 // src/lib/leafletHTML.ts
 // Plantillas HTML para los mapas Leaflet embebidos en WebView.
 // OSM tiles — sin Google, sin API key, sin registro.
+// Paleta del moodboard urban-maps: warm beige, Apple Maps style.
 
 const LEAFLET_CSS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
 const LEAFLET_JS = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
 
-// Colores del tema (sincronizados con src/theme/colors.ts)
-const C_PRIMARY = "#10b981";
-const C_PRIMARY_DARK = "#059669";
-const C_WHITE = "#ffffff";
-const C_TEXT = "#111827";
-const C_BG = "#f3f4f6";
+// Paleta moodboard (warm beige / Apple Maps)
+const C_PIN      = "#3478F6"; // pin activo — azul iOS
+const C_ASSIGNED = "#34C759"; // pin asignado — verde iOS
+const C_WHITE    = "#ffffff";
+const C_TEXT     = "#1C1C1E"; // texto oscuro (no negro puro)
+const C_BG       = "#F5F2EB"; // suelo base warm beige
 
 /**
  * HTML completo para el mapa principal interactivo.
@@ -36,36 +37,39 @@ export function buildMainMapHTML(): string {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%;background:${C_BG}}
-.leaflet-control-attribution{font-size:8px}
+.leaflet-control-attribution{font-size:8px;opacity:0.6}
 
-/* Pin individual */
+/* Pin individual — estilo Apple Maps */
 .lp{
   background:${C_WHITE};
-  border:2px solid ${C_PRIMARY};
-  border-radius:12px;
-  padding:4px 8px;
+  border:2px solid ${C_PIN};
+  border-radius:20px;
+  padding:4px 10px;
   font-size:12px;
   font-weight:700;
-  color:${C_TEXT};
+  color:${C_PIN};
   white-space:nowrap;
-  box-shadow:0 2px 6px rgba(0,0,0,0.18);
+  box-shadow:0 2px 8px rgba(52,120,246,0.22);
   cursor:pointer;
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+  letter-spacing:-0.2px;
 }
-.lp.sel{background:${C_PRIMARY};color:${C_WHITE}}
-.lp.hi{border-color:${C_PRIMARY_DARK};border-width:3px}
+/* Pin seleccionado */
+.lp.sel{background:${C_PIN};color:${C_WHITE};box-shadow:0 3px 10px rgba(52,120,246,0.40)}
+/* Pin nivel 3 — confirmado */
+.lp.l3{background:${C_ASSIGNED};border-color:${C_ASSIGNED};color:${C_WHITE};box-shadow:0 2px 8px rgba(52,199,89,0.30)}
 
-/* Cluster */
+/* Cluster — burbuja azul */
 .lc{
-  background:${C_PRIMARY};
+  background:${C_PIN};
   border:3px solid ${C_WHITE};
   border-radius:50%;
   width:44px;height:44px;
   display:flex;align-items:center;justify-content:center;
-  font-size:13px;font-weight:700;color:${C_WHITE};
-  box-shadow:0 2px 8px rgba(0,0,0,0.25);
+  font-size:14px;font-weight:700;color:${C_WHITE};
+  box-shadow:0 2px 10px rgba(52,120,246,0.40);
   cursor:pointer;
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
 }
 </style>
 </head>
@@ -75,12 +79,14 @@ html,body,#map{width:100%;height:100%;background:${C_BG}}
 var map = L.map('map', { zoomControl: true })
   .setView([40.416775, -3.70379], 5);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd',
+  maxZoom: 20,
+  attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 }).addTo(map);
 
 var _markers = {};
+var _circles = {};
 var _selId   = null;
 var _last    = [];
 
@@ -101,12 +107,14 @@ map.on('moveend', function() {
 
 function clearAll() {
   Object.values(_markers).forEach(function(m) { map.removeLayer(m); });
+  Object.values(_circles).forEach(function(c) { map.removeLayer(c); });
   _markers = {};
+  _circles = {};
 }
 
-function mkPin(price, currency, sel, hi) {
-  var cls = 'lp' + (sel ? ' sel' : '') + (hi ? ' hi' : '');
-  return '<div class="' + cls + '">' + (currency || '€') + price + '</div>';
+function mkPin(price, currency, sel, privacyLevel) {
+  var extra = sel ? ' sel' : (privacyLevel === 3 ? ' l3' : '');
+  return '<div class="lp' + extra + '">' + (currency || '€') + price + '</div>';
 }
 
 function mkCluster(count) {
@@ -132,12 +140,29 @@ function renderClusters(clusters) {
       })(item);
       _markers['c_' + item.id] = m;
     } else {
-      var sel = item.pin.id === _selId;
+      var pin = item.pin;
+      var sel = pin.id === _selId;
+
+      // Nivel 2: círculo difuminado ±150 m (offset determinístico ya aplicado por PrivacyEngine)
+      if (pin.privacyLevel === 2) {
+        var circle = L.circle([item.lat, item.lng], {
+          radius: 150,
+          fillColor: '#3478F6',
+          fillOpacity: 0.08,
+          color: '#3478F6',
+          opacity: 0.25,
+          weight: 1.5,
+          interactive: false
+        }).addTo(map);
+        _circles[pin.id] = circle;
+      }
+
+      var label = mkPin(pin.price, pin.currency, sel, pin.privacyLevel);
       var icon2 = L.divIcon({
-        html: mkPin(item.pin.price, item.pin.currency, sel, !!item.pin.isHighlighted),
+        html: label,
         className: '',
-        iconSize: [80, 30],
-        iconAnchor: [40, 30]
+        iconSize: [null, null],
+        iconAnchor: [0, 28]
       });
       m = L.marker([item.lat, item.lng], { icon: icon2 });
       (function(it) {
@@ -148,7 +173,7 @@ function renderClusters(clusters) {
           renderClusters(_last);
         });
       })(item);
-      _markers[item.pin.id] = m;
+      _markers[pin.id] = m;
     }
     m.addTo(map);
   });
@@ -161,6 +186,17 @@ window.updateClusters = function(clusters) {
 
 window.zoomTo = function(lat, lng, zoom) {
   map.flyTo([lat, lng], zoom, { duration: 0.4 });
+};
+
+// Encuadra el mapa para mostrar todos los puntos dados [[lat,lng], ...]
+window.fitBoundsTo = function(latlngs) {
+  if (!latlngs || latlngs.length === 0) return;
+  if (latlngs.length === 1) {
+    map.flyTo(latlngs[0], 14, { duration: 0.6 });
+    return;
+  }
+  var bounds = L.latLngBounds(latlngs);
+  map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 14, duration: 0.6 });
 };
 
 window.deselect = function() {
@@ -186,8 +222,9 @@ export function buildMiniMapHTML(
     accuracyRadius != null
       ? `L.circle([${lat},${lng}],{
           radius:${accuracyRadius},
-          fillColor:'rgba(16,185,129,0.08)',fillOpacity:1,
-          color:'rgba(16,185,129,0.40)',weight:1.5
+          fillColor:'#3478F6',fillOpacity:0.08,
+          color:'#3478F6',opacity:0.25,weight:1.5,
+          interactive:false
         }).addTo(map);`
       : "";
 
@@ -204,10 +241,10 @@ html,body,#map{width:100%;height:100%;background:${C_BG}}
 .leaflet-control-zoom,.leaflet-control-attribution{display:none}
 .mp{
   width:14px;height:14px;
-  background:${C_PRIMARY};
+  background:${C_PIN};
   border:3px solid ${C_WHITE};
   border-radius:50%;
-  box-shadow:0 2px 4px rgba(0,0,0,0.25);
+  box-shadow:0 2px 4px rgba(52,120,246,0.35);
 }
 </style>
 </head>
@@ -225,7 +262,10 @@ var map = L.map('map', {
   keyboard: false
 }).setView([${lat}, ${lng}], ${zoom});
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 20,
+  attribution: '&copy; OpenStreetMap &copy; CARTO'
+}).addTo(map);
 ${circle}
 var icon = L.divIcon({
   html: '<div class="mp"></div>',

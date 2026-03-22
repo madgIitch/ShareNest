@@ -37,6 +37,22 @@ export function ListingsMap({ listings, onPinPress, onBoundsChange }: Props) {
     webviewRef.current?.injectJavaScript(js);
   }, [clusters, ready]);
 
+  // Cuando cambia el conjunto de listings (búsqueda nueva), encuadra el mapa
+  useEffect(() => {
+    if (!ready || listings.length === 0) return;
+    const latlngs = listings
+      .filter((p) => p.location.lat != null && p.location.lng != null)
+      .map((p) => {
+        const d = applyPrivacy(p.location, p.privacyLevel);
+        return [d.lat, d.lng];
+      });
+    if (latlngs.length === 0) return;
+    const js = `window.fitBoundsTo(${JSON.stringify(latlngs)}); true;`;
+    webviewRef.current?.injectJavaScript(js);
+  // Solo cuando cambia el array de listings, no en cada re-render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings, ready]);
+
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
       let data: Record<string, unknown>;
