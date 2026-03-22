@@ -1,16 +1,18 @@
 // src/components/ui/MiniMapView.tsx
 // Mini mapa no interactivo para la pantalla de detalle de listing.
-// Aplica el PrivacyEngine según el nivel del usuario.
-import MapView, { Circle, Marker, UrlTile, PROVIDER_DEFAULT } from "react-native-maps";
+// Usa Leaflet via WebView — OSM, sin Google ni API key.
+// El PrivacyEngine se aplica en RN antes de pasar las coords al HTML.
+import WebView from "react-native-webview";
 import { StyleSheet, Text, View } from "react-native";
 import { applyPrivacy, type PrivacyLevel } from "../../core/PrivacyEngine";
 import { colors, fontSize, radius, spacing } from "../../theme";
+import { buildMiniMapHTML } from "../../lib/leafletHTML";
 
-// Zoom (latitudeDelta) por nivel: más preciso = más zoom
-const DELTA: Record<PrivacyLevel, number> = {
-  1: 0.025, // barrio
-  2: 0.012, // manzana
-  3: 0.004, // calle
+// Zoom de Leaflet por nivel de privacidad (más preciso = más zoom)
+const ZOOM: Record<PrivacyLevel, number> = {
+  1: 14, // barrio
+  2: 15, // manzana
+  3: 17, // calle
 };
 
 type Props = {
@@ -22,52 +24,23 @@ type Props = {
 
 export function MiniMapView({ lat, lng, privacyLevel, height = 200 }: Props) {
   const display = applyPrivacy({ lat, lng }, privacyLevel);
-  const delta = DELTA[privacyLevel];
-
-  const region = {
-    latitude: display.lat,
-    longitude: display.lng,
-    latitudeDelta: delta,
-    longitudeDelta: delta,
-  };
+  const zoom = ZOOM[privacyLevel];
+  const html = buildMiniMapHTML(
+    display.lat,
+    display.lng,
+    zoom,
+    display.accuracyRadius ?? undefined,
+  );
 
   return (
     <View style={[styles.container, { height }]}>
-      <MapView
+      <WebView
         style={StyleSheet.absoluteFill}
-        provider={PROVIDER_DEFAULT}
-        mapType="none"
-        region={region}
+        source={{ html }}
+        javaScriptEnabled
         scrollEnabled={false}
-        zoomEnabled={false}
-        rotateEnabled={false}
-        pitchEnabled={false}
-      >
-        <UrlTile
-          urlTemplate="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png"
-          maximumZ={20}
-          tileSize={512}
-          flipY={false}
-        />
-
-        {display.accuracyRadius != null && (
-          <Circle
-            center={{ latitude: display.lat, longitude: display.lng }}
-            radius={display.accuracyRadius}
-            fillColor="rgba(99,102,241,0.08)"
-            strokeColor="rgba(99,102,241,0.40)"
-            strokeWidth={1.5}
-          />
-        )}
-
-        <Marker
-          coordinate={{ latitude: display.lat, longitude: display.lng }}
-          anchor={{ x: 0.5, y: 0.5 }}
-          tracksViewChanges={false}
-        >
-          <View style={styles.pin} />
-        </Marker>
-      </MapView>
+        originWhitelist={["*"]}
+      />
 
       {/* Pill de privacidad */}
       {privacyLevel < 3 && (
@@ -86,19 +59,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     overflow: "hidden",
     backgroundColor: colors.gray100,
-  },
-  pin: {
-    width: 14,
-    height: 14,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    borderWidth: 3,
-    borderColor: colors.white,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 4,
   },
   pill: {
     position: "absolute",

@@ -1,30 +1,21 @@
 // src/components/explore/ListingsMap.tsx
-// API pública del mapa (§5.1 del doc). Usa react-native-maps + Stadia tiles.
-// Toda la lógica de negocio está en ClusterEngine / PrivacyEngine (core puro).
-import MapView, { Circle, Marker, UrlTile, PROVIDER_DEFAULT } from "react-native-maps";
-import { useRef, useState } from "react";
+// Mapa principal con Leaflet via WebView — OSM, sin Google ni API key.
+// Comunicación RN↔WebView via postMessage / injectJavaScript.
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import WebView, { type WebViewMessageEvent } from "react-native-webview";
 import { router } from "expo-router";
 import { useCluster } from "../../hooks/useCluster";
 import { applyPrivacy } from "../../core/PrivacyEngine";
-import { ListingPin } from "../ui/ListingPin";
-import { ListingCluster } from "../ui/ListingCluster";
 import { ListingCard } from "../ui/ListingCard";
 import { colors, fontSize, radius, spacing } from "../../theme";
+import { buildMainMapHTML } from "../../lib/leafletHTML";
 import type { ListingPinData, BBox } from "../../core/ClusterEngine";
 
 export type { ListingPinData, BBox };
 
-const SPAIN_REGION = {
-  latitude: 40.416775,
-  longitude: -3.70379,
-  latitudeDelta: 10,
-  longitudeDelta: 12,
-};
-
-function zoomToLatDelta(zoom: number) {
-  return 360 / Math.pow(2, zoom);
-}
+// Construido una sola vez — evita re-renders del WebView
+const MAP_HTML = buildMainMapHTML();
 
 type Props = {
   listings: ListingPinData[];
@@ -33,124 +24,80 @@ type Props = {
 };
 
 export function ListingsMap({ listings, onPinPress, onBoundsChange }: Props) {
-  const mapRef = useRef<MapView>(null);
+  const webviewRef = useRef<WebView>(null);
+  const [ready, setReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { clusters, engine, handleRegionChange } = useCluster(listings);
+  const { clusters, engine, handleLeafletChange } = useCluster(listings);
 
-  const handleRegion = (r: {
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  }) => {
-    handleRegionChange(r);
-    if (onBoundsChange) {
-      const b: BBox = [
-        r.longitude - r.longitudeDelta / 2,
-        r.latitude - r.latitudeDelta / 2,
-        r.longitude + r.longitudeDelta / 2,
-        r.latitude + r.latitudeDelta / 2,
-      ];
-      onBoundsChange(b);
-    }
+  // Envía clusters al WebView cuando cambian (nueva búsqueda, zoom, etc.)
+  useEffect(() => {
+    if (!ready) return;
+    const js = `window.updateClusters(${JSON.stringify(clusters)}); true;`;
+    webviewRef.current?.injectJavaScript(js);
+  }, [clusters, ready]);
+
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(event.nativeEvent.data);
+      } catch {
+        return;
+      }
+
+      if (data.type === "REGION_CHANGE") {
+        handleLeafletChange(data.zoom as number, data.bbox as BBox);
+        if (onBoundsChange) onBoundsChange(data.bbox as BBox);
+      } else if (data.type === "PIN_PRESS") {
+        const id = data.id as string;
+        const deselect = data.deselect as boolean;
+        const nextId = deselect ? null : id;
+        setSelectedId(nextId);
+        if (!deselect && onPinPress) {
+          const pin = listings.find((l) => l.id === id);
+          if (pin) onPinPress(pin);
+        }
+      } else if (data.type === "CLUSTER_PRESS") {
+        const zoom = engine.expansionZoom(data.id as number);
+        const js = `window.zoomTo(${data.lat as number},${data.lng as number},${zoom}); true;`;
+        webviewRef.current?.injectJavaScript(js);
+      }
+    },
+    [handleLeafletChange, onBoundsChange, onPinPress, listings, engine],
+  );
+
+  const handleDismiss = () => {
+    setSelectedId(null);
+    webviewRef.current?.injectJavaScript(`window.deselect(); true;`);
   };
 
-  const selectedPin = selectedId
-    ? listings.find((l) => l.id === selectedId) ?? null
-    : null;
+  const selectedPin = selectedId ? (listings.find((l) => l.id === selectedId) ?? null) : null;
 
   const selectedDisplay = selectedPin
     ? applyPrivacy(selectedPin.location, selectedPin.privacyLevel)
     : null;
+  void selectedDisplay; // disponible para uso futuro (círculo de precisión, etc.)
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
+      <WebView
+        ref={webviewRef}
         style={styles.map}
-        provider={PROVIDER_DEFAULT}
-        mapType="none"
-        initialRegion={SPAIN_REGION}
-        onRegionChangeComplete={handleRegion}
-      >
-        <UrlTile
-          urlTemplate="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png"
-          maximumZ={20}
-          tileSize={512}
-          flipY={false}
-        />
-
-        {/* Círculo de precisión del pin seleccionado */}
-        {selectedDisplay && selectedDisplay.accuracyRadius != null && (
-          <Circle
-            key={`circle-${selectedId}`}
-            center={{ latitude: selectedDisplay.lat, longitude: selectedDisplay.lng }}
-            radius={selectedDisplay.accuracyRadius}
-            fillColor="rgba(99,102,241,0.08)"
-            strokeColor="rgba(99,102,241,0.35)"
-            strokeWidth={1.5}
-          />
-        )}
-
-        {clusters.map((item) => {
-          if (item.type === "cluster") {
-            return (
-              <Marker
-                key={`cluster-${item.id}`}
-                coordinate={{ latitude: item.lat, longitude: item.lng }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
-              >
-                <ListingCluster
-                  count={item.count}
-                  onPress={() => {
-                    const zoom = engine.expansionZoom(item.id);
-                    mapRef.current?.animateToRegion(
-                      {
-                        latitude: item.lat,
-                        longitude: item.lng,
-                        latitudeDelta: zoomToLatDelta(zoom),
-                        longitudeDelta: zoomToLatDelta(zoom),
-                      },
-                      400,
-                    );
-                  }}
-                />
-              </Marker>
-            );
-          }
-
-          const isSelected = item.pin.id === selectedId;
-          return (
-            <Marker
-              key={item.pin.id}
-              coordinate={{ latitude: item.lat, longitude: item.lng }}
-              anchor={{ x: 0.5, y: 1 }}
-              tracksViewChanges={false}
-            >
-              <ListingPin
-                price={item.pin.price}
-                currency={item.pin.currency}
-                isSelected={isSelected}
-                isHighlighted={item.pin.isHighlighted}
-                onPress={() => {
-                  const next = isSelected ? null : item.pin.id;
-                  setSelectedId(next);
-                  if (next && onPinPress) onPinPress(item.pin);
-                }}
-              />
-            </Marker>
-          );
-        })}
-      </MapView>
+        source={{ html: MAP_HTML }}
+        onLoad={() => setReady(true)}
+        onMessage={handleMessage}
+        javaScriptEnabled
+        domStorageEnabled
+        originWhitelist={["*"]}
+      />
 
       {/* Tarjeta del pin seleccionado */}
       {selectedPin && (
         <View style={styles.cardOverlay}>
           <Pressable
             style={styles.dismissBtn}
-            onPress={() => setSelectedId(null)}
+            onPress={handleDismiss}
             hitSlop={8}
             accessibilityLabel="Cerrar"
           >
@@ -170,6 +117,7 @@ export function ListingsMap({ listings, onPinPress, onBoundsChange }: Props) {
         </View>
       )}
 
+      {/* Aviso si los anuncios no tienen coordenadas */}
       {listings.length > 0 &&
         listings.every((l) => l.location.lat == null || l.location.lng == null) && (
           <View style={styles.hint}>
