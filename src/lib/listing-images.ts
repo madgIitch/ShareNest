@@ -1,14 +1,36 @@
-import * as FileSystem from "expo-file-system/legacy";
+﻿import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 
 import { supabase } from "./supabase";
 
 export const MAX_IMAGES = 8;
+const LISTING_PICKER_CACHE_DIR = `${FileSystem.cacheDirectory}listing-wizard-images/`;
+
+function getFileExt(uri: string): string {
+  const rawExt = uri.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
+  return rawExt === "jpg" ? "jpeg" : rawExt;
+}
+
+async function persistPickedUri(uri: string, index: number): Promise<string> {
+  if (!uri || uri.startsWith("http")) return uri;
+
+  try {
+    await FileSystem.makeDirectoryAsync(LISTING_PICKER_CACHE_DIR, { intermediates: true });
+    const ext = getFileExt(uri);
+    const safeName = `${Date.now()}-${index}.${ext}`;
+    const destination = `${LISTING_PICKER_CACHE_DIR}${safeName}`;
+    await FileSystem.copyAsync({ from: uri, to: destination });
+    return destination;
+  } catch {
+    // If copy fails, keep original URI; upload step will validate existence.
+    return uri;
+  }
+}
 
 export async function pickListingImages(): Promise<string[]> {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== "granted") {
-    throw new Error("Se necesita permiso para acceder a la galería.");
+    throw new Error("Se necesita permiso para acceder a la galeria.");
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -19,7 +41,7 @@ export async function pickListingImages(): Promise<string[]> {
   });
 
   if (result.canceled) return [];
-  return result.assets.map((a) => a.uri);
+  return Promise.all(result.assets.map((a, idx) => persistPickedUri(a.uri, idx)));
 }
 
 export async function uploadListingImage(
@@ -28,11 +50,29 @@ export async function uploadListingImage(
   uri: string,
   index: number,
 ): Promise<string> {
-  const rawExt = uri.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
-  const ext = rawExt === "jpg" ? "jpeg" : rawExt;
+  const ext = getFileExt(uri);
   const path = `${userId}/${folder}/${index}.${ext}`;
 
-  const base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists) {
+    throw new Error(
+      "No encontramos una de las fotos seleccionadas. Vuelve a seleccionarla antes de publicar.",
+    );
+  }
+
+  let base64: string;
+  try {
+    base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  } catch (error) {
+    const msg = (error as Error).message ?? "";
+    if (msg.includes("ENOENT") || msg.includes("FileNotFoundException")) {
+      throw new Error(
+        "Una foto temporal ya no esta disponible. Vuelve a abrir el selector y anadela de nuevo.",
+      );
+    }
+    throw error;
+  }
+
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -46,11 +86,11 @@ export async function uploadListingImage(
 
   if (error) throw error;
 
-  // Intentar resize (no bloqueante si la edge function no está deployada)
+  // Try resize (non-blocking if edge function is not deployed).
   try {
     await supabase.functions.invoke("resize-listing-image", { body: { path } });
   } catch {
-    // silencioso
+    // silent
   }
 
   const { data } = supabase.storage.from("listing-images").getPublicUrl(path);

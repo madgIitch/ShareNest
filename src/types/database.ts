@@ -152,6 +152,7 @@ export type Database = {
         Update: {
           address?: string;
           street_number?: string | null;
+          postal_code?: string | null;
           floor?: string | null;
           has_elevator?: boolean;
           total_m2?: number | null;

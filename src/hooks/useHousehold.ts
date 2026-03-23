@@ -23,6 +23,19 @@ export type MyHousehold = {
   member_role: string;
 };
 
+export type MyHouseholdMembership = {
+  household_id: string;
+  role: "admin" | "member";
+  joined_at: string;
+  households: {
+    id: string;
+    name: string;
+    listing_id: string | null;
+    created_by: string | null;
+    created_at: string;
+  } | null;
+};
+
 const HOUSEHOLD_KEY = ["household", "mine"];
 
 export function useMyHousehold() {
@@ -49,6 +62,23 @@ export function useHouseholdMembers(householdId: string | undefined) {
       if (error) throw error;
       return (data ?? []) as HouseholdMember[];
     },
+  });
+}
+
+export function useMyHouseholdMemberships(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["household", "memberships", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("household_members")
+        .select("household_id, role, joined_at, households(id, name, listing_id, created_by, created_at)")
+        .eq("user_id", userId!)
+        .order("joined_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as MyHouseholdMembership[];
+    },
+    staleTime: 1000 * 60,
   });
 }
 

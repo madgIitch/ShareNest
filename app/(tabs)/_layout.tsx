@@ -1,4 +1,4 @@
-import { Tabs } from "expo-router";
+﻿import { Tabs } from "expo-router";
 
 import { colors, fontSize } from "../../src/theme";
 
@@ -25,54 +25,56 @@ export default function TabsLayout() {
         name="explore"
         options={{
           title: "Explorar",
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🔍" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="listings"
         options={{
           title: "Mis anuncios",
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🏠" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: "Mensajes",
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="💬" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon emoji="💬" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="friendz"
         options={{
           title: "Friendz",
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="👥" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon emoji="👥" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="household"
         options={{
           title: "Hogar",
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🏡" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🏡" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
           title: "Perfil",
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="👤" focused={focused} />
-          ),
+          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="property/[id]"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="property/[id]/edit"
+        options={{
+          href: null,
+          headerShown: false,
         }}
       />
     </Tabs>

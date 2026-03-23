@@ -1,8 +1,7 @@
-import { router } from "expo-router";
-import { useState } from "react";
+﻿import { router } from "expo-router";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,21 +9,38 @@ import {
   Text,
   View,
 } from "react-native";
+
 import { AddExpenseSheet } from "../../src/components/expenses/AddExpenseSheet";
 import { BalanceCard } from "../../src/components/expenses/BalanceCard";
 import { ExpenseItem } from "../../src/components/expenses/ExpenseItem";
 import { useBalances, useExpenses } from "../../src/hooks/useExpenses";
-import { useHouseholdMembers, useMyHousehold } from "../../src/hooks/useHousehold";
+import {
+  useHouseholdMembers,
+  useMyHouseholdMemberships,
+  type MyHouseholdMembership,
+} from "../../src/hooks/useHousehold";
+import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
+import { useMyProperties, type PropertyWithCity } from "../../src/hooks/useProperties";
+import { useReceivedRequests } from "../../src/hooks/useRequests";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
+import type { Database } from "../../src/types/database";
+
+type Listing = Database["public"]["Tables"]["listings"]["Row"];
 
 export default function HouseholdScreen() {
   const { session } = useAuth();
   const myId = session?.user?.id ?? "";
 
-  const { data: household, isLoading } = useMyHousehold();
+  const { data: myProperties = [], isLoading: loadingProperties } = useMyProperties(myId);
+  const { data: myListings = [], isLoading: loadingListings } = useMyListings(myId);
+  const { data: receivedRequests = [], isLoading: loadingRequests } = useReceivedRequests(myId);
+  const { data: memberships = [], isLoading: loadingMemberships } = useMyHouseholdMemberships(myId);
 
-  if (isLoading) {
+  const residentMemberships = memberships.filter((m) => m.households?.created_by !== myId);
+
+  const loading = loadingProperties || loadingListings || loadingRequests || loadingMemberships;
+  if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -32,52 +48,70 @@ export default function HouseholdScreen() {
     );
   }
 
-  if (!household) {
-    return <NoHouseholdView />;
+  if (myProperties.length > 0) {
+    return (
+      <OwnerHomesDashboard
+        userId={myId}
+        properties={myProperties}
+        listings={myListings}
+        receivedRequests={receivedRequests}
+      />
+    );
   }
 
-  return <HouseholdDashboard householdId={household.id} householdName={household.name} currentUserId={myId} inviteCode={household.invite_code} />;
+  if (residentMemberships.length > 0) {
+    return <ResidentHomesView memberships={residentMemberships} />;
+  }
+
+  return <EmptyHomesView />;
 }
 
-function NoHouseholdView() {
-  return (
-    <ScrollView contentContainerStyle={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>🏡</Text>
-      <Text style={styles.emptyTitle}>Tu hogar compartido</Text>
-      <Text style={styles.emptySubtitle}>
-        Crea un hogar e invita a tus compañeros de piso para gestionar los gastos juntos.
-      </Text>
-      <Pressable style={styles.primaryBtn} onPress={() => router.push("/household/create")} accessibilityLabel="Crear hogar">
-        <Text style={styles.primaryBtnText}>＋ Crear hogar</Text>
-      </Pressable>
-      <Pressable style={styles.secondaryBtn} onPress={() => router.push("/household/join")} accessibilityLabel="Unirse con código">
-        <Text style={styles.secondaryBtnText}>🔑 Unirse con código de invitación</Text>
-      </Pressable>
-    </ScrollView>
-  );
-}
-
-function HouseholdDashboard({
-  householdId, householdName, currentUserId, inviteCode,
+function OwnerHomesDashboard({
+  userId,
+  properties,
+  listings,
+  receivedRequests,
 }: {
-  householdId: string;
-  householdName: string;
-  currentUserId: string;
-  inviteCode: string;
+  userId: string;
+  properties: PropertyWithCity[];
+  listings: Listing[];
+  receivedRequests: Array<{ listing_id: string; status: string }>;
 }) {
-  const { data: expenses = [], isLoading: loadingExp, refetch } = useExpenses(householdId);
-  const { data: balancesData, isLoading: loadingBal } = useBalances(householdId);
-  const { data: members = [] } = useHouseholdMembers(householdId);
+  const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id ?? "");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const updateStatus = useUpdateListingStatus();
+
+  const selectedProperty = useMemo(
+    () => properties.find((p) => p.id === selectedPropertyId) ?? properties[0],
+    [properties, selectedPropertyId],
+  );
+
+  const selectedHouseholdId =
+    (selectedProperty as unknown as { household_id?: string | null })?.household_id ?? null;
+
+  const { data: expenses = [], isLoading: loadingExp, refetch } = useExpenses(selectedHouseholdId ?? undefined);
+  const { data: balancesData, isLoading: loadingBal } = useBalances(selectedHouseholdId ?? undefined);
+  const { data: members = [] } = useHouseholdMembers(selectedHouseholdId ?? undefined);
+
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  };
+  const filteredListings = useMemo(() => {
+    if (!selectedProperty) return [];
+    const withProperty = listings.filter((l) => l.property_id === selectedProperty.id);
+    if (withProperty.length > 0) return withProperty;
+    if (properties.length === 1) return listings;
+    return [];
+  }, [listings, properties.length, selectedProperty]);
 
-  // Group expenses by month (YYYY-MM)
+  const occupied = filteredListings.filter((l) => l.status === "rented").length;
+  const free = filteredListings.filter((l) => l.status === "active").length;
+  const pending = receivedRequests.filter(
+    (r) => r.status === "pending" && filteredListings.some((l) => l.id === r.listing_id),
+  ).length;
+  const income = filteredListings
+    .filter((l) => l.status === "rented")
+    .reduce((sum, l) => sum + Number(l.price ?? 0), 0);
+
   const byMonth = expenses.reduce<Record<string, typeof expenses>>((acc, e) => {
     const key = e.date.slice(0, 7);
     if (!acc[key]) acc[key] = [];
@@ -85,167 +119,365 @@ function HouseholdDashboard({
     return acc;
   }, {});
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
+
   return (
     <View style={styles.screen}>
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        {/* Header info */}
-        <View style={styles.householdHeader}>
-          <View>
-            <Text style={styles.householdName}>{householdName}</Text>
-            <Text style={styles.inviteCode}>Código de invitación: {inviteCode}</Text>
+        <Text style={styles.pageTitle}>Tus pisos</Text>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorRow}>
+          {properties.map((p) => {
+            const active = p.id === selectedProperty?.id;
+            return (
+              <Pressable
+                key={p.id}
+                style={[styles.selectorChip, active && styles.selectorChipActive]}
+                onPress={() => setSelectedPropertyId(p.id)}
+              >
+                <Text style={[styles.selectorChipText, active && styles.selectorChipTextActive]} numberOfLines={1}>
+                  {p.address}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View style={styles.propertyHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.propertyTitle}>{selectedProperty?.address ?? "Piso"}</Text>
+            <Text style={styles.propertyMeta}>{selectedProperty?.city?.name ?? "Ciudad"}</Text>
           </View>
-          <Text style={styles.memberCount}>{members.length} miembro{members.length !== 1 ? "s" : ""}</Text>
+          <View style={styles.propertyHeaderActions}>
+            <Pressable
+              style={[styles.outlineBtn, !selectedProperty?.id && styles.outlineBtnDisabled]}
+              disabled={!selectedProperty?.id}
+              onPress={() => selectedProperty?.id && router.push(`/(tabs)/property/${selectedProperty.id}/edit`)}
+            >
+              <Text style={styles.outlineBtnText}>Editar piso</Text>
+            </Pressable>
+            <Pressable style={styles.outlineBtn} onPress={() => router.push("/listing/new")}>
+              <Text style={styles.outlineBtnText}>+ Habitacion</Text>
+            </Pressable>
+          </View>
         </View>
 
-        {/* Balances */}
-        <Text style={styles.sectionTitle}>Balances</Text>
-        {loadingBal ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[4] }} />
-        ) : balancesData ? (
-          <BalanceCard data={balancesData} currentUserId={currentUserId} />
-        ) : null}
+        <View style={styles.metricsRow}>
+          <Stat value={occupied} label="Ocupadas" />
+          <Stat value={free} label="Libres" />
+          <Stat value={pending} label="Solicitudes" highlight={pending > 0} />
+          <Stat value={`EUR ${income}`} label="Ingresos/mes" />
+        </View>
 
-        {/* Expenses list by month */}
-        <Text style={styles.sectionTitle}>Historial de gastos</Text>
-        {loadingExp ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[4] }} />
-        ) : expenses.length === 0 ? (
-          <View style={styles.emptyExpenses}>
-            <Text style={styles.emptyExpensesText}>Sin gastos todavía. ¡Añade el primero!</Text>
+        <View style={styles.block}>
+          <View style={styles.blockHeader}>
+            <Text style={styles.blockTitle}>Habitaciones</Text>
           </View>
-        ) : (
-          Object.entries(byMonth).map(([month, items]) => (
-            <View key={month} style={styles.monthGroup}>
-              <Text style={styles.monthLabel}>{formatMonth(month)}</Text>
-              {items.map((e) => (
-                <ExpenseItem
-                  key={e.id}
-                  expense={e}
-                  currentUserId={currentUserId}
-                  householdId={householdId}
-                />
-              ))}
-              <Text style={styles.monthTotal}>
-                Total: €{items.reduce((s, e) => s + Number(e.amount), 0).toFixed(2)}
-              </Text>
-            </View>
-          ))
-        )}
+
+          {filteredListings.length === 0 ? (
+            <Text style={styles.muted}>No hay habitaciones en este piso.</Text>
+          ) : (
+            filteredListings.map((listing) => {
+              const pendingForRoom = receivedRequests.filter(
+                (r) => r.status === "pending" && r.listing_id === listing.id,
+              ).length;
+              return (
+                <View key={listing.id} style={styles.roomCard}>
+                  <View style={styles.roomTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.roomTitle}>{listing.title}</Text>
+                      <Text style={styles.roomMeta}>
+                        EUR {listing.price}/mes
+                        {listing.size_m2 ? ` - ${listing.size_m2} m2` : ""}
+                      </Text>
+                    </View>
+                    <Text style={[styles.roomStatus, listing.status === "rented" ? styles.statusRented : styles.statusActive]}>
+                      {listing.status === "rented" ? "Ocupada" : listing.status === "active" ? "Libre" : "Borrador"}
+                    </Text>
+                  </View>
+                  <View style={styles.roomActions}>
+                    <Pressable style={styles.roomBtn} onPress={() => router.push(`/listing/${listing.id}/edit`)}>
+                      <Text style={styles.roomBtnText}>Editar</Text>
+                    </Pressable>
+                    <Pressable style={styles.roomBtn} onPress={() => router.push(`/listing/${listing.id}/candidates`)}>
+                      <Text style={styles.roomBtnText}>Candidatos {pendingForRoom > 0 ? `(${pendingForRoom})` : ""}</Text>
+                    </Pressable>
+                    {listing.status === "rented" && (
+                      <Pressable
+                        style={styles.roomBtn}
+                        onPress={() => updateStatus.mutate({ id: listing.id, status: "active" })}
+                      >
+                        <Text style={styles.roomBtnText}>Marcar libre</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        <View style={styles.block}>
+          <View style={styles.blockHeader}>
+            <Text style={styles.blockTitle}>Gastos del piso</Text>
+            {!selectedHouseholdId && <Text style={styles.muted}>Sin household</Text>}
+          </View>
+
+          {!selectedHouseholdId ? (
+            <Text style={styles.muted}>Este piso aun no tiene household activo.</Text>
+          ) : (
+            <>
+              {loadingBal ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[3] }} />
+              ) : balancesData ? (
+                <BalanceCard data={balancesData} currentUserId={userId} />
+              ) : null}
+
+              {loadingExp ? (
+                <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[3] }} />
+              ) : expenses.length === 0 ? (
+                <Text style={styles.muted}>Aun no hay gastos cargados.</Text>
+              ) : (
+                Object.entries(byMonth).map(([month, items]) => (
+                  <View key={month} style={styles.monthGroup}>
+                    <Text style={styles.monthLabel}>{formatMonth(month)}</Text>
+                    {items.map((e) => (
+                      <ExpenseItem key={e.id} expense={e} currentUserId={userId} householdId={selectedHouseholdId} />
+                    ))}
+                  </View>
+                ))
+              )}
+            </>
+          )}
+        </View>
       </ScrollView>
 
-      {/* FAB */}
-      <Pressable style={styles.fab} onPress={() => setSheetOpen(true)} accessibilityLabel="Añadir gasto">
-        <Text style={styles.fabText}>＋</Text>
-      </Pressable>
+      {selectedHouseholdId && (
+        <>
+          <Pressable style={styles.fab} onPress={() => setSheetOpen(true)} accessibilityLabel="Anadir gasto">
+            <Text style={styles.fabText}>+</Text>
+          </Pressable>
+          <AddExpenseSheet
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            householdId={selectedHouseholdId}
+            currentUserId={userId}
+            members={members}
+          />
+        </>
+      )}
+    </View>
+  );
+}
 
-      <AddExpenseSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        householdId={householdId}
-        currentUserId={currentUserId}
-        members={members}
-      />
+function ResidentHomesView({ memberships }: { memberships: MyHouseholdMembership[] }) {
+  return (
+    <ScrollView contentContainerStyle={styles.content}>
+      <Text style={styles.pageTitle}>Pisos donde vives</Text>
+      {memberships.map((m) => (
+        <View key={`${m.household_id}-${m.joined_at}`} style={styles.roomCard}>
+          <Text style={styles.roomTitle}>{m.households?.name ?? "Household"}</Text>
+          <Text style={styles.roomMeta}>Unido el {new Date(m.joined_at).toLocaleDateString("es-ES")}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+function EmptyHomesView() {
+  return (
+    <ScrollView contentContainerStyle={styles.emptyState}>
+      <Text style={styles.pageTitle}>Hogar</Text>
+      <Text style={styles.muted}>Aun no tienes pisos ni hogares compartidos.</Text>
+      <Pressable style={styles.primaryBtn} onPress={() => router.push("/listing/new")}> 
+        <Text style={styles.primaryBtnText}>Crear primer piso</Text>
+      </Pressable>
+      <Pressable style={styles.outlineBtn} onPress={() => router.push("/household/join")}> 
+        <Text style={styles.outlineBtnText}>Unirse con codigo</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+function Stat({ value, label, highlight }: { value: string | number; label: string; highlight?: boolean }) {
+  return (
+    <View style={[styles.stat, highlight && styles.statHighlight]}>
+      <Text style={[styles.statValue, highlight && styles.statValueHighlight]}>{value}</Text>
+      <Text style={[styles.statLabel, highlight && styles.statLabelHighlight]}>{label}</Text>
     </View>
   );
 }
 
 function formatMonth(ym: string) {
   const [year, month] = ym.split("-");
-  const names = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const names = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ];
   return `${names[parseInt(month, 10) - 1]} ${year}`;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
-  scrollContent: { padding: spacing[4], paddingBottom: 100, gap: spacing[3] },
+  content: { padding: spacing[4], paddingBottom: 110, gap: spacing[3] },
+  pageTitle: { fontSize: fontSize["2xl"], fontWeight: "800", color: colors.text },
 
-  householdHeader: {
+  selectorRow: { gap: spacing[2], paddingVertical: spacing[1] },
+  selectorChip: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    minWidth: 120,
+  },
+  selectorChipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  selectorChipText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: "600" },
+  selectorChipTextActive: { color: colors.primary },
+
+  propertyHeader: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing[4],
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: spacing[3],
+  },
+  propertyHeaderActions: {
+    flexDirection: "row",
+    gap: spacing[2],
+  },
+  propertyTitle: { fontSize: fontSize.lg, fontWeight: "800", color: colors.text },
+  propertyMeta: { color: colors.textSecondary, marginTop: 2 },
+
+  metricsRow: { flexDirection: "row", gap: spacing[2] },
+  stat: {
+    flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing[4],
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing[3],
+    alignItems: "center",
   },
-  householdName: { fontSize: fontSize.lg, fontWeight: "800", color: colors.text },
-  inviteCode: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
-  memberCount: { fontSize: fontSize.sm, color: colors.textSecondary },
+  statHighlight: { backgroundColor: colors.warningLight, borderColor: colors.warning + "66" },
+  statValue: { fontSize: fontSize.xl, fontWeight: "800", color: colors.text },
+  statValueHighlight: { color: colors.warning },
+  statLabel: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  statLabelHighlight: { color: colors.warning },
 
-  sectionTitle: { fontSize: fontSize.lg, fontWeight: "700", color: colors.text, marginTop: spacing[2] },
-
-  monthGroup: {
+  block: {
     backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing[4],
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    gap: spacing[3],
   },
-  monthLabel: { fontSize: fontSize.sm, fontWeight: "700", color: colors.textSecondary, marginBottom: spacing[2] },
-  monthTotal: {
-    fontSize: fontSize.sm,
+  blockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  blockTitle: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
+
+  roomCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    gap: spacing[2],
+    backgroundColor: colors.background,
+  },
+  roomTop: { flexDirection: "row", alignItems: "flex-start", gap: spacing[2] },
+  roomTitle: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
+  roomMeta: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  roomStatus: {
+    fontSize: fontSize.xs,
     fontWeight: "700",
-    color: colors.primary,
-    marginTop: spacing[2],
-    textAlign: "right",
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 4,
+    overflow: "hidden",
   },
+  statusActive: { color: colors.success, backgroundColor: colors.successLight },
+  statusRented: { color: colors.verify, backgroundColor: colors.verifyLight },
 
-  emptyExpenses: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing[6],
-    alignItems: "center",
+  roomActions: { flexDirection: "row", gap: spacing[2], flexWrap: "wrap" },
+  roomBtn: {
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.surface,
   },
-  emptyExpensesText: { color: colors.textSecondary, fontSize: fontSize.sm },
+  roomBtnText: { fontSize: fontSize.xs, fontWeight: "700", color: colors.text },
 
-  // No household
-  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: spacing[8], gap: spacing[4] },
-  emptyIcon: { fontSize: 72 },
-  emptyTitle: { fontSize: fontSize["2xl"], fontWeight: "800", color: colors.text, textAlign: "center" },
-  emptySubtitle: { fontSize: fontSize.md, color: colors.textSecondary, textAlign: "center", lineHeight: 22 },
+  monthGroup: { gap: spacing[2] },
+  monthLabel: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "700" },
+
+  muted: { color: colors.textSecondary, fontSize: fontSize.sm },
+
   primaryBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.full,
-    paddingVertical: spacing[4],
-    paddingHorizontal: spacing[8],
-    width: "100%",
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
     alignItems: "center",
   },
-  primaryBtnText: { color: colors.white, fontWeight: "700", fontSize: fontSize.md },
-  secondaryBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.full,
-    paddingVertical: spacing[4],
-    paddingHorizontal: spacing[8],
-    width: "100%",
-    alignItems: "center",
+  primaryBtnText: { color: colors.white, fontWeight: "700", fontSize: fontSize.sm },
+  outlineBtn: {
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.surface,
+    alignItems: "center",
   },
-  secondaryBtnText: { color: colors.text, fontWeight: "600", fontSize: fontSize.md },
+  outlineBtnDisabled: {
+    opacity: 0.5,
+  },
+  outlineBtnText: { color: colors.primary, fontWeight: "700", fontSize: fontSize.sm },
+
+  emptyState: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing[6],
+    gap: spacing[3],
+    backgroundColor: colors.background,
+  },
 
   fab: {
     position: "absolute",
-    bottom: spacing[6],
     right: spacing[5],
+    bottom: spacing[6],
     width: 56,
     height: 56,
     borderRadius: 28,
     backgroundColor: colors.primary,
-    justifyContent: "center",
     alignItems: "center",
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    justifyContent: "center",
+    elevation: 4,
   },
-  fabText: { color: colors.white, fontSize: 28, lineHeight: 32 },
+  fabText: { color: colors.white, fontSize: 28, lineHeight: 30, fontWeight: "700" },
 });

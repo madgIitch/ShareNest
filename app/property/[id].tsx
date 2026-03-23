@@ -197,6 +197,7 @@ export default function PropertyDashboardScreen() {
     ? `${first.street ?? ""} ${first.street_number ?? ""}`.trim() || first.city
     : "Mi piso";
   const cityLabel = first?.city ?? "";
+  const editablePropertyId = id === "mine" ? rooms[0]?.property_id ?? null : id;
 
   const handleMarkFree = (listing: Listing) => {
     Alert.alert("Marcar como libre", "El inquilino actual será desasignado.", [
@@ -206,6 +207,14 @@ export default function PropertyDashboardScreen() {
         onPress: () => updateStatus.mutateAsync({ id: listing.id, status: "active" }),
       },
     ]);
+  };
+
+  const handleBack = () => {
+    if (typeof router.canGoBack === "function" && router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/(tabs)/household");
   };
 
   if (isLoading) {
@@ -220,7 +229,7 @@ export default function PropertyDashboardScreen() {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.headerBack} onPress={() => router.back()}>
+        <Pressable style={styles.headerBack} onPress={handleBack}>
           <Text style={styles.headerBackText}>‹</Text>
         </Pressable>
         <View style={{ flex: 1 }}>
@@ -228,7 +237,10 @@ export default function PropertyDashboardScreen() {
         </View>
         <Pressable
           style={styles.editPisoBtn}
-          onPress={() => {}}
+          onPress={() => {
+            if (!editablePropertyId) return;
+            router.push(`/(tabs)/property/${editablePropertyId}/edit`);
+          }}
         >
           <Text style={styles.editPisoBtnText}>Editar piso</Text>
         </Pressable>
