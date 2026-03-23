@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -35,28 +36,42 @@ export function SendRequestSheet({
 
   const handleSend = async () => {
     if (!message.trim()) {
-      Alert.alert("Mensaje requerido", "Escribe un mensaje de presentación.");
+      Alert.alert("Mensaje requerido", "Escribe un mensaje de presentacion.");
       return;
     }
     try {
       await sendRequest.mutateAsync({ listingId, requesterId, ownerId, message: message.trim() });
       setMessage("");
       onClose();
-      Alert.alert("Solicitud enviada", "El anunciante recibirá tu solicitud pronto.");
+      Alert.alert("Solicitud enviada", "El anunciante recibira tu solicitud pronto.");
     } catch (err) {
-      Alert.alert("Error", (err as Error).message);
+      const errorWithCode = err as Error & { code?: string };
+      if (errorWithCode.code === "LIMIT_REACHED") {
+        onClose();
+        router.push({
+          pathname: "/(tabs)/messages",
+          params: {
+            tab: "sent",
+            upsell: "1",
+            fromListingId: listingId,
+            fromListingTitle: listingTitle,
+          },
+        });
+        return;
+      }
+      Alert.alert("Error", errorWithCode.message);
     }
   };
 
   return (
     <BottomSheet visible={visible} onClose={onClose} snapPoint={420}>
       <View style={styles.container}>
-        <Text style={styles.title}>Solicitar habitación</Text>
-        <Text style={styles.listing} numberOfLines={2}>🏠 {listingTitle}</Text>
+        <Text style={styles.title}>Solicitar habitacion</Text>
+        <Text style={styles.listing} numberOfLines={2}>?? {listingTitle}</Text>
 
-        <Text style={styles.label}>Mensaje de presentación</Text>
+        <Text style={styles.label}>Mensaje de presentacion</Text>
         <Text style={styles.hint}>
-          Cuéntale al anunciante quién eres, cuándo necesitas la habitación y por qué encajarías.
+          Cuentale al anunciante quien eres, cuando necesitas la habitacion y por que encajarias.
         </Text>
 
         <TextInput
@@ -64,7 +79,7 @@ export function SendRequestSheet({
           multiline
           numberOfLines={5}
           textAlignVertical="top"
-          placeholder="Hola, me llamo... Busco habitación desde... Soy..."
+          placeholder="Hola, me llamo... Busco habitacion desde... Soy..."
           placeholderTextColor={colors.textTertiary}
           value={message}
           onChangeText={setMessage}

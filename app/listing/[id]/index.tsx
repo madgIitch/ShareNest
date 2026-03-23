@@ -30,7 +30,7 @@ import { colors, fontSize, radius, spacing } from "../../../src/theme";
 
 const { width: SW } = Dimensions.get("window");
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function BillDot({ included }: { included: boolean }) {
   return (
@@ -93,19 +93,19 @@ function ResidentRow({
         </View>
         <Text style={styles.residentMutual}>
           {mutual.length > 0
-            ? `${mutual.length} ${mutual.length === 1 ? "amigo" : "amigos"} en común · ${mutual
+            ? `${mutual.length} ${mutual.length === 1 ? "amigo" : "amigos"} en comÃºn Â· ${mutual
                 .slice(0, 2)
                 .map((f) => (f.full_name ?? "").split(" ")[0])
                 .join(", ")}`
-            : "Sin amigos en común"}
+            : "Sin amigos en comÃºn"}
         </Text>
       </View>
-      <Text style={styles.residentArrow}>›</Text>
+      <Text style={styles.residentArrow}>â€º</Text>
     </Pressable>
   );
 }
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -167,12 +167,12 @@ export default function ListingDetailScreen() {
   // Min stay label
   const minStayLabel = listing.min_stay_months
     ? listing.min_stay_months >= 12
-      ? "1 año mín."
-      : `${listing.min_stay_months}m mín.`
+      ? "1 aÃ±o mÃ­n."
+      : `${listing.min_stay_months}m mÃ­n.`
     : "Flexible";
 
   const handleStatusChange = (status: "active" | "paused" | "rented") => {
-    Alert.alert("Cambiar estado", `¿Marcar como "${status}"?`, [
+    Alert.alert("Cambiar estado", `Â¿Marcar como "${status}"?`, [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Confirmar",
@@ -185,7 +185,7 @@ export default function ListingDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert("Eliminar anuncio", "Esta acción no se puede deshacer.", [
+    Alert.alert("Eliminar anuncio", "Esta acciÃ³n no se puede deshacer.", [
       { text: "Cancelar", style: "cancel" },
       {
         text: "Eliminar",
@@ -201,7 +201,7 @@ export default function ListingDetailScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
-        {/* ── Hero fotográfico con precio overlay ── */}
+        {/* â”€â”€ Hero fotogrÃ¡fico con precio overlay â”€â”€ */}
         <View style={styles.heroWrap}>
           {images.length > 0 ? (
             <FlatList
@@ -218,18 +218,18 @@ export default function ListingDetailScreen() {
             />
           ) : (
             <View style={styles.heroPlaceholder}>
-              <Text style={{ fontSize: 64 }}>🏠</Text>
+              <Text style={{ fontSize: 64 }}>ðŸ </Text>
             </View>
           )}
 
           {/* Back button */}
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>‹</Text>
+            <Text style={styles.backBtnText}>â€¹</Text>
           </Pressable>
 
           {/* Wishlist button */}
           <Pressable style={styles.heartBtn}>
-            <Text style={{ fontSize: 20 }}>♡</Text>
+            <Text style={{ fontSize: 20 }}>â™¡</Text>
           </Pressable>
 
           {/* Photo counter */}
@@ -244,17 +244,17 @@ export default function ListingDetailScreen() {
           {/* Price + location overlay */}
           <View style={styles.priceOverlay}>
             <Text style={styles.priceOverlayAmount}>
-              {listing.price} €/mes
+              {listing.price} â‚¬/mes
             </Text>
             <Text style={styles.priceOverlayLocation}>
               {listing.street
-                ? `${listing.street} · ${listing.city}`
+                ? `${listing.street} Â· ${listing.city}`
                 : `${listing.district ?? listing.city}`}
             </Text>
           </View>
         </View>
 
-        {/* ── Body ── */}
+        {/* â”€â”€ Body â”€â”€ */}
         <View style={styles.body}>
           {/* Title + metadata */}
           <View>
@@ -266,23 +266,23 @@ export default function ListingDetailScreen() {
                 listing.available_from ? `Desde ${listing.available_from}` : null,
               ]
                 .filter(Boolean)
-                .join(" · ")}
+                .join(" Â· ")}
             </Text>
           </View>
 
           {/* Stats grid 4 cols */}
           <View style={styles.statsGrid}>
             <StatCell
-              value={listing.size_m2 ? `${listing.size_m2} m²` : "—"}
-              label="Habitación"
+              value={listing.size_m2 ? `${listing.size_m2} mÂ²` : "â€”"}
+              label="HabitaciÃ³n"
             />
             <StatCell
-              value="—"
+              value="â€”"
               label="Piso total"
             />
             <StatCell
-              value={listing.rooms ? String(listing.rooms) : "—"}
-              label="Compañeros"
+              value={listing.rooms ? String(listing.rooms) : "â€”"}
+              label="CompaÃ±eros"
             />
             <StatCell value={minStayLabel} label="Estancia" />
           </View>
@@ -309,7 +309,7 @@ export default function ListingDetailScreen() {
             </View>
           </View>
 
-          {/* Zona aproximada — mapa */}
+          {/* Zona aproximada â€” mapa */}
           {listing.lat != null && listing.lng != null && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>ZONA APROXIMADA</Text>
@@ -334,10 +334,10 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          {/* Quién vive aquí */}
+          {/* QuiÃ©n vive aquÃ­ */}
           {listing.owner_id && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>QUIÉN VIVE AQUÍ</Text>
+              <Text style={styles.sectionTitle}>QUIÃ‰N VIVE AQUÃ</Text>
               <ResidentRow
                 userId={listing.owner_id}
                 myId={myId}
@@ -349,7 +349,7 @@ export default function ListingDetailScreen() {
           {/* Description */}
           {listing.description && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>DESCRIPCIÓN</Text>
+              <Text style={styles.sectionTitle}>DESCRIPCIÃ“N</Text>
               <Text style={styles.description}>{listing.description}</Text>
             </View>
           )}
@@ -361,20 +361,20 @@ export default function ListingDetailScreen() {
                 style={styles.ownerActionBtn}
                 onPress={() => router.push(`/listing/${listing.id}/edit`)}
               >
-                <Text style={styles.ownerActionText}>✏️ Editar</Text>
+                <Text style={styles.ownerActionText}>âœï¸ Editar</Text>
               </Pressable>
               <Pressable
                 style={styles.ownerActionBtn}
                 onPress={() => router.push(`/listing/${listing.id}/candidates`)}
               >
-                <Text style={styles.ownerActionText}>👥 Ver candidatos</Text>
+                <Text style={styles.ownerActionText}>ðŸ‘¥ Ver candidatos</Text>
               </Pressable>
               {listing.status === "active" && (
                 <Pressable
                   style={styles.ownerActionBtn}
                   onPress={() => handleStatusChange("paused")}
                 >
-                  <Text style={styles.ownerActionText}>⏸ Pausar</Text>
+                  <Text style={styles.ownerActionText}>â¸ Pausar</Text>
                 </Pressable>
               )}
               {listing.status === "paused" && (
@@ -382,18 +382,18 @@ export default function ListingDetailScreen() {
                   style={styles.ownerActionBtn}
                   onPress={() => handleStatusChange("active")}
                 >
-                  <Text style={styles.ownerActionText}>▶ Activar</Text>
+                  <Text style={styles.ownerActionText}>â–¶ Activar</Text>
                 </Pressable>
               )}
               <Pressable style={[styles.ownerActionBtn, styles.ownerActionDanger]} onPress={handleDelete}>
-                <Text style={[styles.ownerActionText, { color: colors.error }]}>🗑 Eliminar</Text>
+                <Text style={[styles.ownerActionText, { color: colors.error }]}>ðŸ—‘ Eliminar</Text>
               </Pressable>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* ── CTA anclado en footer ── */}
+      {/* â”€â”€ CTA anclado en footer â”€â”€ */}
       {!isOwner && myId && (
         <View style={styles.footer}>
           {!myRequest && (
@@ -404,22 +404,22 @@ export default function ListingDetailScreen() {
                 setRequestSheetOpen(true);
               }}
             >
-              <Text style={styles.ctaBtnText}>Solicitar habitación</Text>
+              <Text style={styles.ctaBtnText}>Solicitar habitaciÃ³n</Text>
             </Pressable>
           )}
           {myRequest?.status === "pending" && (
             <View style={[styles.ctaBtn, { backgroundColor: colors.warningLight }]}>
               <Text style={[styles.ctaBtnText, { color: colors.warning }]}>
-                ⏳ Solicitud enviada
+                â³ Solicitud enviada
               </Text>
             </View>
           )}
-          {myRequest?.status === "accepted" && linkedConversation && (
+          {(myRequest?.status === "offered" || myRequest?.status === "accepted" || myRequest?.status === "assigned") && linkedConversation && (
             <Pressable
               style={styles.ctaBtn}
               onPress={() => router.push(`/conversation/${linkedConversation.id}`)}
             >
-              <Text style={styles.ctaBtnText}>💬 Abrir chat</Text>
+              <Text style={styles.ctaBtnText}>ðŸ’¬ Abrir chat</Text>
             </Pressable>
           )}
           {myRequest?.status === "denied" && (
@@ -431,10 +431,10 @@ export default function ListingDetailScreen() {
           )}
 
           <Pressable style={styles.footerIconBtn}>
-            <Text style={styles.footerIconText}>★</Text>
+            <Text style={styles.footerIconText}>â˜…</Text>
           </Pressable>
           <Pressable style={styles.footerIconBtn}>
-            <Text style={styles.footerIconText}>↗</Text>
+            <Text style={styles.footerIconText}>â†—</Text>
           </Pressable>
 
           <SendRequestSheet
@@ -451,7 +451,7 @@ export default function ListingDetailScreen() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const styles = StyleSheet.create({
   centered: {
@@ -671,3 +671,5 @@ const styles = StyleSheet.create({
   },
   footerIconText: { fontSize: 18, color: colors.textSecondary },
 });
+
+

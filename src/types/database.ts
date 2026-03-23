@@ -2,7 +2,7 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export type ListingType = "offer" | "search";
 export type ListingStatus = "active" | "paused" | "rented" | "draft";
-export type RequestStatus = "pending" | "accepted" | "denied" | "invited";
+export type RequestStatus = "pending" | "invited" | "offered" | "accepted" | "assigned" | "denied";
 export type ConnectionStatus = "pending" | "accepted";
 export type ContractType = "long_term" | "temporary" | "flexible";
 export type BedType = "single" | "double" | "bunk";
@@ -167,7 +167,7 @@ export type Database = {
         Row: {
           id: string;
           owner_id: string;
-          property_id: string | null; // new — links to properties table
+          property_id: string | null; // new â€” links to properties table
           type: ListingType;
           title: string;
           description: string | null;
@@ -179,7 +179,7 @@ export type Database = {
           street_number: string | null;
           postal_code: string | null;
           price: number;
-          size_m2: number | null; // m² of the room
+          size_m2: number | null; // mÂ² of the room
           rooms: number | null;   // number of roommates
           available_from: string | null;
           is_furnished: boolean;
@@ -271,8 +271,12 @@ export type Database = {
           owner_id: string;
           status: RequestStatus;
           message: string | null;
-          presentation_message: string | null; // new — shown in candidates view
-          is_boosted: boolean;                  // new — true if Superfriendz active at send time
+          presentation_message: string | null; // new â€” shown in candidates view
+          is_boosted: boolean;                  // new â€” true if Superfriendz active at send time
+          offered_at: string | null;
+          offer_terms: Json | null;
+          requester_confirmed_at: string | null;
+          owner_confirmed_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -284,10 +288,18 @@ export type Database = {
           message?: string | null;
           presentation_message?: string | null;
           is_boosted?: boolean;
+          offered_at?: string | null;
+          offer_terms?: Json | null;
+          requester_confirmed_at?: string | null;
+          owner_confirmed_at?: string | null;
         };
         Update: {
           status?: RequestStatus;
           presentation_message?: string | null;
+          offered_at?: string | null;
+          offer_terms?: Json | null;
+          requester_confirmed_at?: string | null;
+          owner_confirmed_at?: string | null;
         };
         Relationships: [];
       };
@@ -484,6 +496,22 @@ export type Database = {
         Args: Record<string, never>;
         Returns: { id: string; name: string; invite_code: string; listing_id: string | null; created_by: string; created_at: string; member_role: string }[];
       };
+      send_offer: {
+        Args: { p_request_id: string; p_offer_terms?: Json };
+        Returns: string;
+      };
+      accept_offer: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      deny_request: {
+        Args: { p_request_id: string };
+        Returns: undefined;
+      };
+      confirm_assignment: {
+        Args: { p_request_id: string };
+        Returns: { conversation_id: string; household_id: string | null; assignment_completed: boolean }[];
+      };
       search_listings: {
         Args: {
           p_query?:          string | null;
@@ -508,3 +536,4 @@ export type Database = {
     CompositeTypes: Record<string, never>;
   };
 };
+

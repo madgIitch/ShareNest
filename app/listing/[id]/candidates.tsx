@@ -11,10 +11,12 @@ import {
 } from "react-native";
 
 import { UserAvatar } from "../../../src/components/ui/UserAvatar";
+import { useConversations } from "../../../src/hooks/useConversations";
 import { useListing } from "../../../src/hooks/useListings";
 import {
   useReceivedRequests,
   useUpdateRequestStatus,
+  type OfferTerms,
   type RequestWithDetails,
 } from "../../../src/hooks/useRequests";
 import { useMutualFriends } from "../../../src/hooks/useConnections";
@@ -22,29 +24,26 @@ import { useIsSuperfriendz } from "../../../src/hooks/useSubscription";
 import { useAuth } from "../../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../../src/theme";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type SortMode = "mutual" | "recent" | "verified";
-
-// ─── Candidate card ───────────────────────────────────────────────────────────
 
 function CandidateCard({
   request,
   myId,
-  onAccept,
+  onOffer,
   onReject,
+  onOpenChat,
 }: {
   request: RequestWithDetails;
   myId: string | undefined;
-  onAccept: (r: RequestWithDetails) => void;
+  onOffer: (r: RequestWithDetails) => void;
   onReject: (r: RequestWithDetails) => void;
+  onOpenChat: (r: RequestWithDetails) => void;
 }) {
   const { data: mutual = [] } = useMutualFriends(myId, request.requester_id);
   const { data: isSuper = false } = useIsSuperfriendz();
   const requester = request.requester;
   const isPremium = request.is_boosted;
 
-  // Elapsed time
   const elapsed = (() => {
     const diff = Date.now() - new Date(request.created_at).getTime();
     const mins = Math.floor(diff / 60000);
@@ -58,7 +57,6 @@ function CandidateCard({
 
   return (
     <View style={[styles.card, isPremium && styles.cardPremium]}>
-      {/* Header */}
       <View style={styles.cardHeader}>
         <UserAvatar
           avatarUrl={requester.avatar_url}
@@ -75,25 +73,20 @@ function CandidateCard({
               </View>
             )}
           </View>
-          <Text style={styles.cardSub}>
-            {requester.city ?? ""}
-          </Text>
-
-          {/* Mutual friends */}
+          <Text style={styles.cardSub}>{requester.city ?? ""}</Text>
           <Text style={[styles.cardMutual, mutual.length === 0 && styles.cardMutualNone]}>
             {mutual.length > 0
               ? `${mutual.length} ${mutual.length === 1 ? "amigo" : "amigos"} · ${
-                  isPremium
+                  isSuper
                     ? mutual.slice(0, 2).map((f) => (f.full_name ?? "").split(" ")[0]).join(", ")
-                    : "amigos en común"
+                    : "en comun"
                 }`
-              : "Sin amigos en común"}
+              : "Sin amigos en comun"}
           </Text>
         </View>
         <Text style={styles.elapsed}>{elapsed}</Text>
       </View>
 
-      {/* Lifestyle tags (premium only) */}
       {isPremium && (
         <View style={styles.tagsRow}>
           {["Ordenada", "No fuma", "Madrugadora"].map((t) => (
@@ -104,46 +97,30 @@ function CandidateCard({
         </View>
       )}
 
-      {/* Message */}
-      <Text
-        style={styles.message}
-        numberOfLines={isPremium ? 2 : 1}
-      >
+      <Text style={styles.message} numberOfLines={isPremium ? 2 : 1}>
         {request.presentation_message ?? request.message ?? "Sin mensaje"}
       </Text>
 
-      {/* Actions */}
       <View style={styles.actions}>
-        <Pressable
-          style={styles.actionReject}
-          onPress={() => onReject(request)}
-        >
+        <Pressable style={styles.actionReject} onPress={() => onReject(request)}>
           <Text style={styles.actionRejectText}>Rechazar</Text>
         </Pressable>
-        <Pressable
-          style={styles.actionProfile}
-          onPress={() => router.push(`/profile/${request.requester_id}`)}
-        >
+        <Pressable style={styles.actionProfile} onPress={() => router.push(`/profile/${request.requester_id}`)}>
           <Text style={styles.actionProfileText}>Ver perfil</Text>
         </Pressable>
-        <Pressable
-          style={styles.actionChat}
-          onPress={() => router.push(`/profile/${request.requester_id}`)}
-        >
-          <Text style={styles.actionChatText}>Chat</Text>
-        </Pressable>
-        <Pressable
-          style={styles.actionAccept}
-          onPress={() => onAccept(request)}
-        >
-          <Text style={styles.actionAcceptText}>Aceptar ✓</Text>
-        </Pressable>
+        {request.status === "offered" || request.status === "accepted" || request.status === "assigned" ? (
+          <Pressable style={styles.actionChat} onPress={() => onOpenChat(request)}>
+            <Text style={styles.actionChatText}>Chat</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.actionOffer} onPress={() => onOffer(request)}>
+            <Text style={styles.actionOfferText}>Ofrecer</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
 }
-
-// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function CandidatesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -152,32 +129,49 @@ export default function CandidatesScreen() {
 
   const { data: listing } = useListing(id);
   const { data: requests = [], isLoading } = useReceivedRequests(myId);
+  const { data: conversations = [] } = useConversations(myId);
   const updateRequest = useUpdateRequestStatus();
 
   const [sort, setSort] = useState<SortMode>("mutual");
 
-  // Filter to this listing only
   const listingRequests = requests.filter(
-    (r) => r.listing_id === id && r.status === "pending",
+    (r) => r.listing_id === id && (r.status === "pending" || r.status === "offered" || r.status === "accepted"),
   );
 
   const premiumCandidates = listingRequests.filter((r) => r.is_boosted);
   const standardCandidates = listingRequests.filter((r) => !r.is_boosted);
 
-  const handleAccept = (request: RequestWithDetails) => {
+  const buildOfferTerms = (request: RequestWithDetails): OfferTerms => ({
+    price: request.listing?.price ?? null,
+    available_from: request.listing?.available_from ?? null,
+    min_stay_months: request.listing?.min_stay_months ?? null,
+    bills_mode: "extra",
+  });
+
+  const openChatByRequest = (request: RequestWithDetails) => {
+    const conv = conversations.find((c) => c.request_id === request.id);
+    if (!conv?.id) {
+      Alert.alert("Chat no disponible", "Esta solicitud aun no tiene chat asociado.");
+      return;
+    }
+    router.push(`/conversation/${conv.id}`);
+  };
+
+  const handleOffer = (request: RequestWithDetails) => {
     Alert.alert(
-      "Aceptar candidato",
-      `¿Abrir chat con ${request.requester?.full_name ?? "este candidato"}? Podrás confirmar la asignación desde la conversación.`,
+      "Ofrecer habitacion",
+      `Enviar oferta formal a ${request.requester?.full_name ?? "este candidato"} para continuar en chat.`,
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Aceptar y abrir chat",
+          text: "Enviar oferta",
           onPress: async () => {
             const conv = (await updateRequest.mutateAsync({
               request,
-              status: "accepted",
+              status: "offered",
+              offerTerms: buildOfferTerms(request),
             })) as { id: string } | null;
-            if (conv) router.push(`/conversation/${conv.id}`);
+            if (conv?.id) router.push(`/conversation/${conv.id}`);
           },
         },
       ],
@@ -185,18 +179,14 @@ export default function CandidatesScreen() {
   };
 
   const handleReject = (request: RequestWithDetails) => {
-    Alert.alert(
-      "Rechazar candidato",
-      "El candidato recibirá una notificación educada.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Rechazar",
-          style: "destructive",
-          onPress: () => updateRequest.mutate({ request, status: "denied" }),
-        },
-      ],
-    );
+    Alert.alert("Rechazar candidato", "El candidato recibira una notificacion.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Rechazar",
+        style: "destructive",
+        onPress: () => updateRequest.mutate({ request, status: "denied" }),
+      },
+    ]);
   };
 
   if (isLoading) {
@@ -209,7 +199,6 @@ export default function CandidatesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Listing strip */}
       {listing && (
         <View style={styles.strip}>
           <Text style={styles.stripTitle} numberOfLines={1}>
@@ -217,18 +206,16 @@ export default function CandidatesScreen() {
           </Text>
           <Text style={styles.stripSub}>
             {listing.city}
-            {listing.district ? ` · ${listing.district}` : ""} ·{" "}
-            {listingRequests.length} solicitudes
+            {listing.district ? ` · ${listing.district}` : ""} · {listingRequests.length} solicitudes
           </Text>
         </View>
       )}
 
-      {/* Sort tabs */}
       <View style={styles.sortTabs}>
         {(
           [
-            { key: "mutual", label: "Amigos en común" },
-            { key: "recent", label: "Más recientes" },
+            { key: "mutual", label: "Amigos en comun" },
+            { key: "recent", label: "Mas recientes" },
             { key: "verified", label: "Verificados" },
           ] as { key: SortMode; label: string }[]
         ).map((tab) => (
@@ -237,24 +224,17 @@ export default function CandidatesScreen() {
             style={[styles.sortTab, sort === tab.key && styles.sortTabActive]}
             onPress={() => setSort(tab.key)}
           >
-            <Text
-              style={[styles.sortTabText, sort === tab.key && styles.sortTabTextActive]}
-            >
-              {tab.label}
-            </Text>
+            <Text style={[styles.sortTabText, sort === tab.key && styles.sortTabTextActive]}>{tab.label}</Text>
           </Pressable>
         ))}
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
-        {/* Superfriendz section */}
         {premiumCandidates.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionDivider} />
-              <Text style={styles.sectionHeaderText}>
-                Superfriendz · {premiumCandidates.length} candidatos destacados
-              </Text>
+              <Text style={styles.sectionHeaderText}>Superfriendz · {premiumCandidates.length} destacados</Text>
               <View style={styles.sectionDivider} />
             </View>
             {premiumCandidates.map((r) => (
@@ -262,21 +242,19 @@ export default function CandidatesScreen() {
                 key={r.id}
                 request={r}
                 myId={myId}
-                onAccept={handleAccept}
+                onOffer={handleOffer}
                 onReject={handleReject}
+                onOpenChat={openChatByRequest}
               />
             ))}
           </>
         )}
 
-        {/* Standard candidates */}
         {standardCandidates.length > 0 && (
           <>
             {premiumCandidates.length > 0 && (
               <View style={styles.divider}>
-                <Text style={styles.dividerText}>
-                  {standardCandidates.length} candidatos más
-                </Text>
+                <Text style={styles.dividerText}>{standardCandidates.length} candidatos mas</Text>
               </View>
             )}
             {standardCandidates.map((r) => (
@@ -284,8 +262,9 @@ export default function CandidatesScreen() {
                 key={r.id}
                 request={r}
                 myId={myId}
-                onAccept={handleAccept}
+                onOffer={handleOffer}
                 onReject={handleReject}
+                onOpenChat={openChatByRequest}
               />
             ))}
           </>
@@ -293,19 +272,14 @@ export default function CandidatesScreen() {
 
         {listingRequests.length === 0 && (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>👥</Text>
-            <Text style={styles.emptyTitle}>Sin solicitudes aún</Text>
-            <Text style={styles.emptySub}>
-              Cuando alguien solicite tu habitación aparecerá aquí.
-            </Text>
+            <Text style={styles.emptyTitle}>Sin solicitudes aun</Text>
+            <Text style={styles.emptySub}>Cuando alguien solicite tu habitacion aparecera aqui.</Text>
           </View>
         )}
       </ScrollView>
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   centered: {
@@ -315,7 +289,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  // Listing strip
   strip: {
     backgroundColor: colors.surface,
     paddingHorizontal: spacing[4],
@@ -326,7 +299,6 @@ const styles = StyleSheet.create({
   stripTitle: { fontSize: fontSize.sm, fontWeight: "700", color: colors.text },
   stripSub: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
 
-  // Sort tabs
   sortTabs: {
     flexDirection: "row",
     backgroundColor: colors.surface,
@@ -345,36 +317,14 @@ const styles = StyleSheet.create({
   sortTabText: { fontSize: fontSize.xs, fontWeight: "600", color: colors.textSecondary },
   sortTabTextActive: { color: colors.purple },
 
-  // List
   list: { padding: spacing[4], gap: spacing[3] },
-
-  // Section header (Superfriendz)
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing[2],
-    marginBottom: spacing[1],
-  },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: spacing[2], marginBottom: spacing[1] },
   sectionDivider: { flex: 1, height: 1, backgroundColor: colors.purpleLight },
-  sectionHeaderText: {
-    fontSize: fontSize.xs,
-    fontWeight: "700",
-    color: colors.purple,
-    textAlign: "center",
-  },
+  sectionHeaderText: { fontSize: fontSize.xs, fontWeight: "700", color: colors.purple, textAlign: "center" },
 
-  // Divider
-  divider: {
-    alignItems: "center",
-    paddingVertical: spacing[2],
-  },
-  dividerText: {
-    fontSize: fontSize.xs,
-    color: colors.textTertiary,
-    fontWeight: "600",
-  },
+  divider: { alignItems: "center", paddingVertical: spacing[2] },
+  dividerText: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
 
-  // Card
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -383,32 +333,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: spacing[3],
   },
-  cardPremium: {
-    backgroundColor: colors.purpleLight + "55",
-    borderColor: colors.purple + "44",
-  },
+  cardPremium: { backgroundColor: colors.purpleLight + "55", borderColor: colors.purple + "44" },
   cardHeader: { flexDirection: "row", gap: spacing[3], alignItems: "flex-start" },
   cardInfo: { flex: 1 },
   cardNameRow: { flexDirection: "row", alignItems: "center", gap: spacing[2], flexWrap: "wrap" },
   cardName: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
-  superBadge: {
-    backgroundColor: colors.purple,
-    borderRadius: radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
+  superBadge: { backgroundColor: colors.purple, borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 2 },
   superBadgeText: { fontSize: 10, fontWeight: "700", color: colors.white },
   cardSub: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 1 },
-  cardMutual: {
-    fontSize: fontSize.xs,
-    color: colors.primary,
-    fontWeight: "600",
-    marginTop: 2,
-  },
+  cardMutual: { fontSize: fontSize.xs, color: colors.primary, fontWeight: "600", marginTop: 2 },
   cardMutualNone: { color: colors.textTertiary, fontWeight: "400" },
   elapsed: { fontSize: fontSize.xs, color: colors.textTertiary },
 
-  // Tags
   tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing[1] },
   tag: {
     borderWidth: 1,
@@ -420,15 +356,9 @@ const styles = StyleSheet.create({
   },
   tagText: { fontSize: 11, color: colors.textSecondary },
 
-  // Message
   message: { fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
 
-  // Actions
-  actions: {
-    flexDirection: "row",
-    gap: spacing[2],
-    marginTop: spacing[1],
-  },
+  actions: { flexDirection: "row", gap: spacing[2], marginTop: spacing[1] },
   actionReject: {
     flex: 1,
     paddingVertical: spacing[2],
@@ -451,21 +381,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     alignItems: "center",
     borderRadius: radius.md,
-    backgroundColor: colors.gray100,
+    backgroundColor: colors.verify,
   },
-  actionChatText: { fontSize: fontSize.xs, color: colors.text, fontWeight: "600" },
-  actionAccept: {
+  actionChatText: { fontSize: fontSize.xs, color: colors.white, fontWeight: "700" },
+  actionOffer: {
     flex: 1,
     paddingVertical: spacing[2],
     alignItems: "center",
     borderRadius: radius.md,
     backgroundColor: colors.text,
   },
-  actionAcceptText: { fontSize: fontSize.xs, color: colors.white, fontWeight: "700" },
+  actionOfferText: { fontSize: fontSize.xs, color: colors.white, fontWeight: "700" },
 
-  // Empty
   empty: { alignItems: "center", paddingTop: spacing[10], gap: spacing[3] },
-  emptyIcon: { fontSize: 48 },
   emptyTitle: { fontSize: fontSize.lg, fontWeight: "700", color: colors.text },
   emptySub: {
     fontSize: fontSize.sm,
@@ -475,3 +403,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+

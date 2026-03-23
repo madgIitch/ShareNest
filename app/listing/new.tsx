@@ -1,5 +1,32 @@
+import { ActivityIndicator, View } from "react-native";
+
 import { ListingWizard } from "../../src/components/listing/ListingWizard";
+import { useMyProperties } from "../../src/hooks/useProperties";
+import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
+import { useAuth } from "../../src/providers/AuthProvider";
+import { colors } from "../../src/theme";
 
 export default function NewListingScreen() {
-  return <ListingWizard />;
+  const { session } = useAuth();
+  const userId = session?.user?.id;
+  const { data: isSuper = false, isLoading: loadingTier } = useIsSuperfriendz();
+  const { data: myProperties = [], isLoading: loadingProps } = useMyProperties(userId);
+
+  if (loadingTier || loadingProps) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const existingProperty = !isSuper && myProperties.length > 0 ? myProperties[0] : null;
+
+  return (
+    <ListingWizard
+      startAtStep={existingProperty ? 6 : 1}
+      existingProperty={existingProperty}
+      existingCityName={existingProperty?.city?.name ?? null}
+    />
+  );
 }

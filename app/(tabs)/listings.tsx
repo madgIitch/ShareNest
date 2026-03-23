@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+﻿import { router } from "expo-router";
 import { useState } from "react";
 import {
   FlatList,
@@ -11,9 +11,9 @@ import {
 
 import { EmptyState } from "../../src/components/ui/EmptyState";
 import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
-import { SuperfriEndzGate } from "../../src/components/ui/SuperfriEndzGate";
 import { TagBadge } from "../../src/components/ui/TagBadge";
 import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
+import { useMyProperties } from "../../src/hooks/useProperties";
 import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
@@ -28,23 +28,19 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "rented", label: "Archivados" },
 ];
 
-const FREE_LISTING_LIMIT = 1;
-
 export default function MyListingsScreen() {
   const { session } = useAuth();
   const [tab, setTab] = useState<Tab>("active");
   const { data: listings, isLoading } = useMyListings(session?.user?.id);
+  const { data: myProperties = [] } = useMyProperties(session?.user?.id);
   const updateStatus = useUpdateListingStatus();
   const { data: isSuper = false } = useIsSuperfriendz();
 
-  const activeCount = (listings ?? []).filter((l) => l.status === "active").length;
-  const atFreeLimit = !isSuper && activeCount >= FREE_LISTING_LIMIT;
-
+  const freeHasOneProperty = !isSuper && myProperties.length >= 1;
   const filtered = (listings ?? []).filter((l) => l.status === tab);
 
   return (
     <View style={styles.screen}>
-      {/* Tab selector */}
       <View style={styles.tabs}>
         {TABS.map((t) => {
           const count = (listings ?? []).filter((l) => l.status === t.key).length;
@@ -87,7 +83,7 @@ export default function MyListingsScreen() {
           )}
           ListEmptyComponent={
             <EmptyState
-              icon={tab === "active" ? "📋" : tab === "paused" ? "⏸️" : "🏠"}
+              icon={tab === "active" ? "[]" : tab === "paused" ? "||" : "H"}
               title={
                 tab === "active"
                   ? "No tienes anuncios activos"
@@ -106,23 +102,23 @@ export default function MyListingsScreen() {
         />
       )}
 
-      {/* Free plan limit banner */}
-      {atFreeLimit && (
+      {freeHasOneProperty && (
         <View style={styles.limitBanner}>
-          <SuperfriEndzGate ctaLabel="Publicar más anuncios — Superfriendz" />
+          <Text style={styles.limitInfoTitle}>Plan free: 1 piso</Text>
+          <Text style={styles.limitInfoText}>
+            Puedes crear todos los listings que quieras dentro de tu piso actual.
+          </Text>
         </View>
       )}
 
-      {/* FAB */}
       <Pressable
-        style={[styles.fab, atFreeLimit && styles.fabLocked]}
+        style={styles.fab}
         onPress={() => {
-          if (atFreeLimit) return;
           router.push("/listing/new");
         }}
-        accessibilityLabel={atFreeLimit ? "Límite del plan gratuito alcanzado" : "Nuevo anuncio"}
+        accessibilityLabel="Nuevo anuncio"
       >
-        <Text style={styles.fabText}>{atFreeLimit ? "🔒" : "＋"}</Text>
+        <Text style={styles.fabText}>+</Text>
       </Pressable>
     </View>
   );
@@ -148,14 +144,14 @@ function MyListingRow({
         <Image source={{ uri: cover }} style={styles.thumb} />
       ) : (
         <View style={styles.thumbPlaceholder}>
-          <Text style={{ fontSize: 22 }}>🏠</Text>
+          <Text style={{ fontSize: 22 }}>H</Text>
         </View>
       )}
 
       <View style={styles.rowInfo}>
         <Text style={styles.rowTitle} numberOfLines={1}>{listing.title}</Text>
-        <Text style={styles.rowCity}>📍 {listing.city}</Text>
-        <Text style={styles.rowPrice}>€{listing.price}/mes</Text>
+        <Text style={styles.rowCity}>{listing.city}</Text>
+        <Text style={styles.rowPrice}>EUR {listing.price}/mes</Text>
         <View style={styles.rowTags}>
           <TagBadge
             label={listing.type === "offer" ? "Ofrezco" : "Busco"}
@@ -166,13 +162,11 @@ function MyListingRow({
 
       <View style={styles.rowActions}>
         <Pressable style={styles.actionBtn} onPress={onEdit}>
-          <Text style={styles.actionBtnText}>✏️</Text>
+          <Text style={styles.actionBtnText}>E</Text>
         </Pressable>
         {canToggle && (
           <Pressable style={styles.actionBtn} onPress={onToggleStatus}>
-            <Text style={styles.actionBtnText}>
-              {listing.status === "active" ? "⏸" : "▶"}
-            </Text>
+            <Text style={styles.actionBtnText}>{listing.status === "active" ? "||" : ">"}</Text>
           </Pressable>
         )}
       </View>
@@ -268,7 +262,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionBtnText: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: "700",
   },
   fab: {
     position: "absolute",
@@ -286,7 +281,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  fabLocked: { backgroundColor: colors.gray300 },
   fabText: { color: colors.white, fontSize: 28, lineHeight: 32 },
-  limitBanner: { padding: spacing[4], paddingBottom: 0 },
+  limitBanner: {
+    margin: spacing[4],
+    marginBottom: 0,
+    padding: spacing[3],
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.purple + "44",
+    backgroundColor: colors.purpleLight,
+  },
+  limitInfoTitle: { color: colors.purple, fontWeight: "700", fontSize: fontSize.sm },
+  limitInfoText: { color: colors.purple, fontSize: fontSize.xs, marginTop: 2 },
 });

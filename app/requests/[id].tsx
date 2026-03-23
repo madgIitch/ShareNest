@@ -13,6 +13,8 @@ import {
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../src/components/ui/TagBadge";
 import { useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
+import type { OfferTerms } from "../../src/hooks/useRequests";
+import { supabase } from "../../src/lib/supabase";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 
 export default function RequestDetailScreen() {
@@ -30,24 +32,47 @@ export default function RequestDetailScreen() {
 
   const requester = request.requester;
   const listing = request.listing;
-  const isPending = request.status === "pending";
+  const canOffer = request.status === "pending";
+  const isClosed = request.status === "denied" || request.status === "assigned";
 
-  const handleDecision = (status: "accepted" | "denied") => {
-    const label = status === "accepted" ? "Aceptar" : "Denegar";
-    const msg =
-      status === "accepted"
-        ? "Se abrirá un chat con el solicitante."
-        : "Se notificará al solicitante que su solicitud ha sido denegada.";
+  const openChatForRequest = async () => {
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("request_id", request.id)
+      .maybeSingle();
+    if (error) {
+      Alert.alert("Error", error.message);
+      return;
+    }
+    const conv = data as { id: string } | null;
+    if (!conv?.id) {
+      Alert.alert("Chat no disponible", "Aun no hay una conversacion vinculada a esta solicitud.");
+      return;
+    }
+    router.push(`/conversation/${conv.id}`);
+  };
 
-    Alert.alert(label, msg, [
+  const buildDefaultTerms = (): OfferTerms => ({
+    price: listing?.price ?? null,
+    available_from: listing?.available_from ?? null,
+    min_stay_months: listing?.min_stay_months ?? null,
+    bills_mode: "extra",
+  });
+
+  const handleOffer = () => {
+    Alert.alert("Ofrecer habitacion", "Se enviara una oferta formal y se abrira el chat para confirmacion final.", [
       { text: "Cancelar", style: "cancel" },
       {
-        text: label,
-        style: status === "denied" ? "destructive" : "default",
+        text: "Enviar oferta",
         onPress: async () => {
           try {
-            const conv = await updateStatus.mutateAsync({ request, status });
-            if (status === "accepted" && conv) {
+            const conv = (await updateStatus.mutateAsync({
+              request,
+              status: "offered",
+              offerTerms: buildDefaultTerms(),
+            })) as { id: string } | null;
+            if (conv?.id) {
               router.replace(`/conversation/${conv.id}`);
             } else {
               router.back();
@@ -60,30 +85,43 @@ export default function RequestDetailScreen() {
     ]);
   };
 
+  const handleDeny = () => {
+    Alert.alert("Rechazar solicitud", "El solicitante recibira una actualizacion en su estado.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Rechazar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await updateStatus.mutateAsync({ request, status: "denied" });
+            router.back();
+          } catch (err) {
+            Alert.alert("Error", (err as Error).message);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {/* Status banner */}
-      {!isPending && (
-        <View style={[
-          styles.statusBanner,
-          request.status === "accepted" ? styles.bannerAccepted : styles.bannerDenied,
-        ]}>
-          <Text style={[
-            styles.statusBannerText,
-            request.status === "accepted" ? styles.bannerTextAccepted : styles.bannerTextDenied,
-          ]}>
-            {request.status === "accepted" ? "✓ Solicitud aceptada" : "✕ Solicitud denegada"}
+      {request.status !== "pending" && (
+        <View style={[styles.statusBanner, request.status === "denied" ? styles.bannerDenied : styles.bannerActive]}>
+          <Text style={[styles.statusBannerText, request.status === "denied" ? styles.bannerTextDenied : styles.bannerTextActive]}>
+            {request.status === "offered"
+              ? "Oferta enviada"
+              : request.status === "accepted"
+                ? "Oferta aceptada"
+                : request.status === "assigned"
+                  ? "Habitacion asignada"
+                  : "Solicitud denegada"}
           </Text>
         </View>
       )}
 
-      {/* Requester profile */}
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>Solicitante</Text>
-        <Pressable
-          style={styles.profileRow}
-          onPress={() => requester && router.push(`/profile/${requester.id}`)}
-        >
+        <Pressable style={styles.profileRow} onPress={() => requester && router.push(`/profile/${requester.id}`)}>
           <UserAvatar
             avatarUrl={requester?.avatar_url}
             name={requester?.full_name}
@@ -92,86 +130,65 @@ export default function RequestDetailScreen() {
           />
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{requester?.full_name ?? "Usuario"}</Text>
-            {requester?.city && (
-              <Text style={styles.profileCity}>📍 {requester.city}</Text>
-            )}
-            {requester?.verified_at && (
-              <TagBadge label="✓ Número verificado" variant="primary" />
-            )}
+            {requester?.city && <Text style={styles.profileCity}>{requester.city}</Text>}
+            {requester?.verified_at && <TagBadge label="Numero verificado" variant="primary" />}
           </View>
         </Pressable>
-        {requester?.bio && (
-          <Text style={styles.bio}>{requester.bio}</Text>
-        )}
+        {requester?.bio && <Text style={styles.bio}>{requester.bio}</Text>}
       </View>
 
-      {/* Listing reference */}
       {listing && (
-        <Pressable
-          style={styles.listingCard}
-          onPress={() => router.push(`/listing/${listing.id}`)}
-        >
+        <Pressable style={styles.listingCard} onPress={() => router.push(`/listing/${listing.id}`)}>
           {(listing.images as string[])[0] ? (
-            <Image
-              source={{ uri: (listing.images as string[])[0] }}
-              style={styles.listingThumb}
-            />
+            <Image source={{ uri: (listing.images as string[])[0] }} style={styles.listingThumb} />
           ) : (
             <View style={[styles.listingThumb, styles.listingThumbPlaceholder]}>
-              <Text style={{ fontSize: 20 }}>🏠</Text>
+              <Text style={{ fontSize: 20 }}>[]</Text>
             </View>
           )}
           <View style={styles.listingInfo}>
-            <Text style={styles.listingTitle} numberOfLines={2}>{listing.title}</Text>
-            <Text style={styles.listingCity}>📍 {listing.city}</Text>
-            <Text style={styles.listingPrice}>€{listing.price}/mes</Text>
+            <Text style={styles.listingTitle} numberOfLines={2}>
+              {listing.title}
+            </Text>
+            <Text style={styles.listingCity}>{listing.city}</Text>
+            <Text style={styles.listingPrice}>{listing.price} €/mes</Text>
           </View>
         </Pressable>
       )}
 
-      {/* Message */}
       {request.message && (
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Mensaje</Text>
           <Text style={styles.message}>"{request.message}"</Text>
-          <Text style={styles.date}>
-            {new Date(request.created_at).toLocaleDateString("es-ES", {
-              day: "numeric", month: "long", year: "numeric",
-            })}
-          </Text>
         </View>
       )}
 
-      {/* Actions */}
-      {isPending && (
+      {canOffer && (
         <View style={styles.actions}>
           <Pressable
             style={[styles.btn, styles.acceptBtn]}
-            onPress={() => handleDecision("accepted")}
+            onPress={handleOffer}
             disabled={updateStatus.isPending}
           >
-            {updateStatus.isPending
-              ? <ActivityIndicator color={colors.white} />
-              : <Text style={styles.acceptBtnText}>✓ Aceptar solicitud</Text>
-            }
+            {updateStatus.isPending ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.acceptBtnText}>Ofrecer habitacion</Text>
+            )}
           </Pressable>
           <Pressable
             style={[styles.btn, styles.denyBtn]}
-            onPress={() => handleDecision("denied")}
+            onPress={handleDeny}
             disabled={updateStatus.isPending}
           >
-            <Text style={styles.denyBtnText}>✕ Denegar</Text>
+            <Text style={styles.denyBtnText}>Rechazar</Text>
           </Pressable>
         </View>
       )}
 
-      {/* If accepted → go to chat */}
-      {request.status === "accepted" && (
-        <Pressable
-          style={[styles.btn, styles.acceptBtn]}
-          onPress={() => router.push("/messages")}
-        >
-          <Text style={styles.acceptBtnText}>💬 Ir al chat</Text>
+      {!canOffer && !isClosed && (
+        <Pressable style={[styles.btn, styles.acceptBtn]} onPress={() => void openChatForRequest()}>
+          <Text style={styles.acceptBtnText}>Ir al chat</Text>
         </Pressable>
       )}
     </ScrollView>
@@ -188,10 +205,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[3],
     alignItems: "center",
   },
-  bannerAccepted: { backgroundColor: colors.primaryLight },
+  bannerActive: { backgroundColor: colors.purpleLight },
   bannerDenied: { backgroundColor: colors.errorLight },
   statusBannerText: { fontWeight: "700", fontSize: fontSize.sm },
-  bannerTextAccepted: { color: colors.primaryDark },
+  bannerTextActive: { color: colors.purple },
   bannerTextDenied: { color: colors.error },
 
   card: {
@@ -246,7 +263,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     lineHeight: 22,
   },
-  date: { fontSize: fontSize.xs, color: colors.textTertiary },
 
   actions: { gap: spacing[2] },
   btn: {
@@ -254,8 +270,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[4],
     alignItems: "center",
   },
-  acceptBtn: { backgroundColor: colors.primary },
+  acceptBtn: { backgroundColor: colors.text },
   acceptBtnText: { color: colors.white, fontWeight: "700", fontSize: fontSize.md },
   denyBtn: { backgroundColor: colors.errorLight },
   denyBtnText: { color: colors.error, fontWeight: "700", fontSize: fontSize.md },
 });
+

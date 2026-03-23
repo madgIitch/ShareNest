@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useState } from "react";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
   ActivityIndicator,
   Alert,
@@ -19,14 +20,20 @@ import {
 import { CitySelector } from "../ui/CitySelector";
 import { DistrictSelector } from "../ui/DistrictSelector";
 import { MiniMapView } from "../ui/MiniMapView";
-import { locationService, type City, type Place } from "../../services/locationService";
+import { supabase } from "../../lib/supabase";
+import { type City, type Place } from "../../services/locationService";
 import { useCreateListing, useUpdateListing } from "../../hooks/useListings";
+import { useMyProperties } from "../../hooks/useProperties";
+import { useIsSuperfriendz } from "../../hooks/useSubscription";
 import { pickListingImages, uploadAllListingImages, MAX_IMAGES } from "../../lib/listing-images";
 import { useAuth } from "../../providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../theme";
 import type { Database, BedType, ContractType } from "../../types/database";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
+type PropertyInsert = Database["public"]["Tables"]["properties"]["Insert"];
+type PropertyUpdate = Database["public"]["Tables"]["properties"]["Update"];
+type PropertyRow = Database["public"]["Tables"]["properties"]["Row"];
 
 // ─── Phase / step config ──────────────────────────────────────────────────────
 
@@ -44,14 +51,15 @@ const phaseLabel = (step: number) => {
 
 // ─── Form data ────────────────────────────────────────────────────────────────
 
+type BillState = "included" | "extra" | "none";
 type BillsConfig = {
-  agua: boolean;
-  luz: boolean;
-  gas: boolean;
-  internet: boolean;
-  limpieza: boolean;
-  comunidad: boolean;
-  calefaccion: boolean;
+  agua: BillState;
+  luz: BillState;
+  gas: BillState;
+  internet: BillState;
+  limpieza: BillState;
+  comunidad: BillState;
+  calefaccion: BillState;
 };
 
 type FormData = {
@@ -120,13 +128,13 @@ const EMPTY_FORM: FormData = {
   has_parking: false,
   has_ac: false,
   bills: {
-    agua: false,
-    luz: false,
-    gas: false,
-    internet: false,
-    limpieza: false,
-    comunidad: false,
-    calefaccion: false,
+    agua: "extra",
+    luz: "extra",
+    gas: "extra",
+    internet: "extra",
+    limpieza: "extra",
+    comunidad: "extra",
+    calefaccion: "extra",
   },
   no_smokers: false,
   pets_ok: false,
@@ -172,11 +180,41 @@ function listingToForm(l: Listing): FormData {
   };
 }
 
+const BILL_LABELS: Record<keyof BillsConfig, string> = {
+  agua: "Agua",
+  luz: "Luz",
+  gas: "Gas",
+  internet: "Internet",
+  limpieza: "Limpieza",
+  comunidad: "Comunidad",
+  calefaccion: "Calefacción",
+};
+
+function toIsoDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function fromIsoDate(value: string) {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+function formatDateForUI(value: string) {
+  const d = fromIsoDate(value);
+  return d.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 type Props = {
   initial?: Listing;
   startAtStep?: number; // for "add second room" flow starting at step 6
+  existingProperty?: PropertyRow | null;
+  existingCityName?: string | null;
 };
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
@@ -355,15 +393,29 @@ function Step4Bills({ form, set }: { form: FormData; set: (k: keyof FormData, v:
       {billItems.map(({ key, label }) => (
         <View key={key} style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>{label}</Text>
-          <View style={styles.billToggleRight}>
-            <Text style={[styles.billToggleLabel, form.bills[key] && styles.billToggleLabelActive]}>
-              {form.bills[key] ? "Incluido" : "Aparte"}
-            </Text>
-            <Switch
-              value={form.bills[key]}
-              onValueChange={(v) => set("bills", { ...form.bills, [key]: v })}
-              trackColor={{ true: colors.primary }}
-            />
+          <View style={styles.billOptions}>
+            {(
+              [
+                { value: "included", label: "Incluido" },
+                { value: "extra", label: "Aparte" },
+                { value: "none", label: "No hay" },
+              ] as { value: BillState; label: string }[]
+            ).map((opt) => (
+              <Pressable
+                key={opt.value}
+                style={[styles.billOption, form.bills[key] === opt.value && styles.billOptionActive]}
+                onPress={() => set("bills", { ...form.bills, [key]: opt.value })}
+              >
+                <Text
+                  style={[
+                    styles.billOptionText,
+                    form.bills[key] === opt.value && styles.billOptionTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
       ))}
@@ -459,6 +511,7 @@ function Step7RoomPhotos({
 }
 
 function Step8Price({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const minStayOptions = [
     { value: "1", label: "1 mes" },
     { value: "3", label: "3 meses" },
@@ -471,6 +524,14 @@ function Step8Price({ form, set }: { form: FormData; set: (k: keyof FormData, v:
     { key: "temporary", label: "Temporal" },
     { key: "flexible", label: "Flexible" },
   ];
+
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === "android") setShowDatePicker(false);
+    if (event.type === "set" && selectedDate) {
+      set("available_from", toIsoDate(selectedDate));
+    }
+  };
+
   return (
     <>
       <Text style={styles.stepTitle}>Precio y disponibilidad</Text>
@@ -491,11 +552,27 @@ function Step8Price({ form, set }: { form: FormData; set: (k: keyof FormData, v:
       </View>
 
       <Label>Disponible desde</Label>
-      <Input
-        value={form.available_from}
-        onChangeText={(v) => set("available_from", v)}
-        placeholder="1 de enero de 2026"
-      />
+      <Pressable style={styles.dateField} onPress={() => setShowDatePicker(true)}>
+        <Text style={[styles.dateFieldText, !form.available_from && styles.dateFieldTextPlaceholder]}>
+          {form.available_from ? formatDateForUI(form.available_from) : "Seleccionar fecha"}
+        </Text>
+      </Pressable>
+      {showDatePicker && (
+        <View style={styles.datePickerWrap}>
+          <DateTimePicker
+            value={form.available_from ? fromIsoDate(form.available_from) : new Date()}
+            mode="date"
+            display={Platform.OS === "ios" ? "inline" : "calendar"}
+            onChange={onDateChange}
+            minimumDate={new Date()}
+          />
+          {Platform.OS === "ios" && (
+            <Pressable style={styles.dateDoneBtn} onPress={() => setShowDatePicker(false)}>
+              <Text style={styles.dateDoneBtnText}>Listo</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <Label>Estancia mínima</Label>
       <View style={styles.chipRow}>
@@ -547,11 +624,9 @@ function Step9Review({
     { label: "Dirección confirmada", done: !!form.city },
     { label: `Fotos del piso (${photos.length})`, done: photos.length >= 2 },
     { label: "Precio definido", done: !!form.price },
-    { label: "Gastos configurados", done: true },
+    { label: "Gastos configurados", done: Object.values(form.bills).every(Boolean) },
     { label: "Normas añadidas", done: true },
   ];
-
-  const allDone = checklist.every((c) => c.done);
 
   return (
     <>
@@ -580,16 +655,16 @@ function Step9Review({
                 <Text style={styles.previewTagText}>{form.min_stay_months} meses mín.</Text>
               </View>
             )}
-            {form.bills.agua && (
-              <View style={styles.previewTag}>
-                <Text style={styles.previewTagText}>Agua incl.</Text>
-              </View>
-            )}
-            {form.bills.luz && (
-              <View style={styles.previewTag}>
-                <Text style={styles.previewTagText}>Luz incl.</Text>
-              </View>
-            )}
+            {Object.entries(form.bills)
+              .filter(([, state]) => state === "included")
+              .slice(0, 3)
+              .map(([key]) => (
+                <View key={key} style={styles.previewTag}>
+                  <Text style={styles.previewTagText}>
+                    {BILL_LABELS[key as keyof BillsConfig]} incl.
+                  </Text>
+                </View>
+              ))}
           </View>
         </View>
       </View>
@@ -669,14 +744,53 @@ function PhotoList({
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
-export function ListingWizard({ initial, startAtStep = 1 }: Props) {
+export function ListingWizard({ initial, startAtStep = 1, existingProperty = null, existingCityName = null }: Props) {
   const { session } = useAuth();
   const userId = session?.user?.id ?? "";
   const isEditing = !!initial;
+  const { data: isSuper = false, isLoading: isSuperLoading } = useIsSuperfriendz();
+  const { data: myProperties = [] } = useMyProperties(userId || undefined);
 
   const [step, setStep] = useState(startAtStep);
-  const [form, setForm] = useState<FormData>(initial ? listingToForm(initial) : EMPTY_FORM);
-  const [photoUris, setPhotoUris] = useState<string[]>(initial?.images ?? []);
+  const [form, setForm] = useState<FormData>(() => {
+    if (initial) return listingToForm(initial);
+    if (!existingProperty) return EMPTY_FORM;
+
+    const billsRaw = (existingProperty.bills_config ?? {}) as Partial<BillsConfig>;
+    const existingBills: BillsConfig = {
+      agua: billsRaw.agua ?? "extra",
+      luz: billsRaw.luz ?? "extra",
+      gas: billsRaw.gas ?? "extra",
+      internet: billsRaw.internet ?? "extra",
+      limpieza: billsRaw.limpieza ?? "extra",
+      comunidad: billsRaw.comunidad ?? "extra",
+      calefaccion: billsRaw.calefaccion ?? "extra",
+    };
+    const rules = existingProperty.house_rules ?? [];
+
+    return {
+      ...EMPTY_FORM,
+      street: existingProperty.address ?? "",
+      street_number: existingProperty.street_number ?? "",
+      city: existingCityName ?? "",
+      city_id: existingProperty.city_id,
+      district: "",
+      place_id: existingProperty.place_id,
+      lat: existingProperty.lat,
+      lng: existingProperty.lng,
+      postal_code: existingProperty.postal_code ?? "",
+      total_m2: existingProperty.total_m2 != null ? String(existingProperty.total_m2) : "",
+      total_rooms: existingProperty.total_rooms != null ? String(existingProperty.total_rooms) : "",
+      floor: existingProperty.floor ?? "",
+      has_elevator: existingProperty.has_elevator,
+      bills: existingBills,
+      no_smokers: rules.includes("no_fumadores"),
+      pets_ok: rules.includes("mascotas_ok"),
+      quiet_hours: rules.includes("silencio"),
+      no_parties: rules.includes("sin_fiestas"),
+    };
+  });
+  const [photoUris, setPhotoUris] = useState<string[]>(initial?.images ?? (existingProperty?.images as string[] | undefined) ?? []);
   const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>([]);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -781,12 +895,69 @@ export function ListingWizard({ initial, startAtStep = 1 }: Props) {
         form.no_parties && "sin_fiestas",
       ].filter(Boolean) as string[];
 
+      const propertyPayload: PropertyInsert = {
+        owner_id: userId,
+        address: form.street.trim() || `${form.city} ${form.district}`.trim(),
+        street_number: form.street_number.trim() || null,
+        city_id: form.city_id,
+        place_id: form.place_id,
+        lat: form.lat,
+        lng: form.lng,
+        postal_code: form.postal_code.trim() || null,
+        floor: form.floor.trim() || null,
+        has_elevator: form.has_elevator,
+        total_m2: form.total_m2 ? Number(form.total_m2) : null,
+        total_rooms: form.total_rooms ? Number(form.total_rooms) : null,
+        images: photoUris,
+        bills_config: form.bills,
+        house_rules: houseRules,
+      };
+
+      let propertyId: string | null = initial?.property_id ?? existingProperty?.id ?? null;
+      const canEditPropertyBlock = isEditing || startAtStep <= 5;
+
+      if (!propertyId && !isSuper) {
+        if (isSuperLoading) throw new Error("Cargando tu plan. Intenta de nuevo en unos segundos.");
+        if ((myProperties ?? []).length >= 1) {
+          throw new Error("En plan free solo puedes tener 1 piso. Crea nuevas habitaciones dentro de tu piso actual.");
+        }
+      }
+
+      if (propertyId && canEditPropertyBlock) {
+        const propertyUpdates: PropertyUpdate = {
+          address: propertyPayload.address,
+          street_number: propertyPayload.street_number,
+          floor: propertyPayload.floor,
+          has_elevator: propertyPayload.has_elevator,
+          total_m2: propertyPayload.total_m2,
+          total_rooms: propertyPayload.total_rooms,
+          images: propertyPayload.images,
+          bills_config: propertyPayload.bills_config,
+          house_rules: propertyPayload.house_rules,
+        };
+        const { error: propertyUpdateError } = await supabase
+          .from("properties")
+          .update(propertyUpdates)
+          .eq("id", propertyId)
+          .eq("owner_id", userId);
+        if (propertyUpdateError) throw propertyUpdateError;
+      } else {
+        const { data: property, error: propertyInsertError } = await supabase
+          .from("properties")
+          .insert(propertyPayload)
+          .select("id")
+          .single();
+        if (propertyInsertError) throw propertyInsertError;
+        propertyId = property.id;
+      }
+
       const payload = {
         owner_id: userId,
+        property_id: propertyId,
         type: "offer" as const,
         title: form.title.trim(),
         description: form.description.trim() || null,
-        city: form.city,
+        city: form.city || existingCityName || "Ciudad",
         city_id: form.city_id,
         district: form.district.trim() || null,
         place_id: form.place_id,
@@ -1061,9 +1232,21 @@ const styles = StyleSheet.create({
     marginTop: spacing[2],
   },
   toggleLabel: { fontSize: fontSize.md, color: colors.text, flex: 1 },
-  billToggleRight: { flexDirection: "row", alignItems: "center", gap: spacing[2] },
-  billToggleLabel: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
-  billToggleLabelActive: { color: colors.primary },
+  billOptions: { flexDirection: "row", alignItems: "center", gap: spacing[1] },
+  billOption: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 4,
+    backgroundColor: colors.surface,
+  },
+  billOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  billOptionText: { fontSize: 11, color: colors.textSecondary, fontWeight: "600" },
+  billOptionTextActive: { color: colors.primary },
 
   // Price input
   priceInputWrap: {
@@ -1085,6 +1268,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[2],
   },
   priceSuffix: { fontSize: fontSize.md, color: colors.textSecondary },
+  dateField: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[3],
+    backgroundColor: colors.surface,
+  },
+  dateFieldText: { fontSize: fontSize.md, color: colors.text, fontWeight: "600" },
+  dateFieldTextPlaceholder: { color: colors.textSecondary, fontWeight: "400" },
+  datePickerWrap: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: spacing[2],
+    overflow: "hidden",
+  },
+  dateDoneBtn: {
+    alignSelf: "flex-end",
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    marginBottom: spacing[1],
+    marginRight: spacing[1],
+  },
+  dateDoneBtnText: { fontSize: fontSize.sm, color: colors.primary, fontWeight: "700" },
 
   // Location link
   locationLink: { marginTop: spacing[2], alignSelf: "flex-start" },

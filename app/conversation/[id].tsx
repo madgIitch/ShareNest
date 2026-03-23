@@ -1,7 +1,8 @@
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -17,15 +18,32 @@ import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import {
   useConversation,
   useConversationMessages,
-  useSendMessage,
   useMarkRead,
+  useSendMessage,
 } from "../../src/hooks/useConversations";
-import { useAuth } from "../../src/providers/AuthProvider";
+import { useListing } from "../../src/hooks/useListings";
+import { useAcceptOffer, useConfirmAssignment, useRequest } from "../../src/hooks/useRequests";
+import type { OfferTerms } from "../../src/hooks/useRequests";
 import { supabase } from "../../src/lib/supabase";
+import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import type { Database } from "../../src/types/database";
 
 type Message = Database["public"]["Tables"]["messages"]["Row"];
+
+function getBillsLabel(mode: OfferTerms["bills_mode"] | string | null | undefined) {
+  if (mode === "included") return "Incluidos";
+  if (mode === "none") return "No hay";
+  return "Aparte";
+}
+
+function getStatusLabel(status: string) {
+  if (status === "offered") return "Oferta enviada";
+  if (status === "accepted") return "Oferta aceptada";
+  if (status === "assigned") return "Habitacion asignada";
+  if (status === "denied") return "Solicitud denegada";
+  return "Solicitud pendiente";
+}
 
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,30 +52,51 @@ export default function ConversationScreen() {
 
   const { data: conv } = useConversation(id);
   const { data: messages = [], isLoading } = useConversationMessages(id);
+  const { data: request } = useRequest(conv?.request_id ?? undefined);
+  const { data: listing } = useListing(conv?.listing_id ?? undefined);
+
   const sendMessage = useSendMessage();
   const markRead = useMarkRead();
+  const acceptOffer = useAcceptOffer();
+  const confirmAssignment = useConfirmAssignment();
 
   const [input, setInput] = useState("");
   const [otherIsTyping, setOtherIsTyping] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Determine the other participant
-  const other = conv
-    ? conv.participant_a === myId
-      ? conv.profile_b
-      : conv.profile_a
-    : null;
+  const other = conv ? (conv.participant_a === myId ? conv.profile_b : conv.profile_a) : null;
+  const isOwnerInRequest = request?.owner_id === myId;
+  const isRequesterInRequest = request?.requester_id === myId;
 
-  // Mark messages as read on open
+  const offerTerms = (request?.offer_terms ?? null) as OfferTerms | null;
+
+  const hasConfirmed = request
+    ? isOwnerInRequest
+      ? !!request.owner_confirmed_at
+      : isRequesterInRequest
+        ? !!request.requester_confirmed_at
+        : false
+    : false;
+
+  const canAcceptOffer = !!request
+    && request.status === "offered"
+    && isRequesterInRequest
+    && listing?.status !== "rented";
+
+  const canConfirmAssignment = !!request
+    && (request.status === "accepted" || request.status === "assigned")
+    && (isOwnerInRequest || isRequesterInRequest)
+    && !hasConfirmed
+    && listing?.status !== "rented";
+
+  const isReadOnly = listing?.status === "rented";
+
   useEffect(() => {
-    if (id && myId) {
-      void markRead.mutateAsync({ conversationId: id, myId });
-    }
+    if (id && myId) void markRead.mutateAsync({ conversationId: id, myId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, myId]);
 
-  // Typing indicator via broadcast
   useEffect(() => {
     if (!id) return;
 
@@ -93,14 +132,44 @@ export default function ConversationScreen() {
     setInput("");
     try {
       await sendMessage.mutateAsync({ conversationId: id, senderId: myId, content });
-      // Mark own sent message as triggering a read refresh
       void markRead.mutateAsync({ conversationId: id, myId });
     } catch {
-      setInput(content); // restore on error
+      setInput(content);
     }
   };
 
-  // Scroll to bottom when new messages arrive
+  const handleAcceptOffer = async () => {
+    if (!request) return;
+    try {
+      const convId = await acceptOffer.mutateAsync(request.id);
+      if (convId && convId !== id) {
+        router.replace(`/conversation/${convId}`);
+      }
+    } catch (err) {
+      Alert.alert("Error", (err as Error).message);
+    }
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!request) return;
+    try {
+      const result = await confirmAssignment.mutateAsync(request.id);
+      if (result?.assignment_completed) {
+        Alert.alert("Asignacion completada", "La habitacion ha quedado asignada y el household ya esta creado.", [
+          {
+            text: "Ir al household",
+            onPress: () => router.push("/(tabs)/household"),
+          },
+          { text: "Cerrar", style: "cancel" },
+        ]);
+      } else {
+        Alert.alert("Confirmacion registrada", "Falta la confirmacion de la otra parte.");
+      }
+    } catch (err) {
+      Alert.alert("Error", (err as Error).message);
+    }
+  };
+
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -121,7 +190,6 @@ export default function ConversationScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={88}
     >
-      {/* Other user header */}
       {other && (
         <View style={styles.header}>
           <UserAvatar
@@ -134,14 +202,70 @@ export default function ConversationScreen() {
             <Text style={styles.headerName}>{other.full_name ?? "Usuario"}</Text>
             {conv?.listing && (
               <Text style={styles.headerListing} numberOfLines={1}>
-                🏠 {conv.listing.title}
+                {conv.listing.title}
               </Text>
             )}
           </View>
         </View>
       )}
 
-      {/* Messages */}
+      {request && (
+        <View style={styles.statusBanner}>
+          <Text style={styles.statusBannerText}>{getStatusLabel(request.status)}</Text>
+          <Text style={styles.statusBannerSub}>
+            Confirmaciones: buscador {request.requester_confirmed_at ? "ok" : "pendiente"} · propietario {request.owner_confirmed_at ? "ok" : "pendiente"}
+          </Text>
+        </View>
+      )}
+
+      {!!request && !!offerTerms && (
+        <View style={styles.offerCard}>
+          <Text style={styles.offerCardTitle}>Oferta de habitacion</Text>
+          <View style={styles.offerGrid}>
+            <View style={styles.offerCell}>
+              <Text style={styles.offerKey}>Precio</Text>
+              <Text style={styles.offerVal}>{offerTerms.price ? `${offerTerms.price} €/mes` : "-"}</Text>
+            </View>
+            <View style={styles.offerCell}>
+              <Text style={styles.offerKey}>Disponible desde</Text>
+              <Text style={styles.offerVal}>{offerTerms.available_from ?? "-"}</Text>
+            </View>
+            <View style={styles.offerCell}>
+              <Text style={styles.offerKey}>Estancia minima</Text>
+              <Text style={styles.offerVal}>
+                {offerTerms.min_stay_months ? `${offerTerms.min_stay_months} meses` : "Flexible"}
+              </Text>
+            </View>
+            <View style={styles.offerCell}>
+              <Text style={styles.offerKey}>Gastos</Text>
+              <Text style={styles.offerVal}>{getBillsLabel(offerTerms.bills_mode)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.offerActions}>
+            {canAcceptOffer && (
+              <Pressable
+                style={[styles.primaryBtn, acceptOffer.isPending && styles.btnDisabled]}
+                onPress={handleAcceptOffer}
+                disabled={acceptOffer.isPending}
+              >
+                <Text style={styles.primaryBtnText}>Aceptar oferta</Text>
+              </Pressable>
+            )}
+
+            {canConfirmAssignment && (
+              <Pressable
+                style={[styles.secondaryBtn, confirmAssignment.isPending && styles.btnDisabled]}
+                onPress={handleConfirmAssignment}
+                disabled={confirmAssignment.isPending}
+              >
+                <Text style={styles.secondaryBtnText}>Confirmar asignacion</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -157,30 +281,30 @@ export default function ConversationScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyChat}>
-            <Text style={styles.emptyChatText}>
-              ¡Solicitud aceptada! Empieza la conversación.
-            </Text>
+            <Text style={styles.emptyChatText}>Este chat aun no tiene mensajes.</Text>
           </View>
         }
-        onContentSizeChange={() =>
-          flatListRef.current?.scrollToEnd({ animated: false })
-        }
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      {/* Typing indicator */}
       {otherIsTyping && (
         <View style={styles.typingRow}>
-          <Text style={styles.typingText}>
-            {other?.full_name ?? "El otro usuario"} está escribiendo...
+          <Text style={styles.typingText}>{other?.full_name ?? "El otro usuario"} esta escribiendo...</Text>
+        </View>
+      )}
+
+      {isReadOnly && (
+        <View style={styles.readOnlyBar}>
+          <Text style={styles.readOnlyText}>
+            Conversacion en solo lectura: esta habitacion ya esta alquilada.
           </Text>
         </View>
       )}
 
-      {/* Input bar */}
       <View style={styles.inputBar}>
         <TextInput
           style={styles.input}
-          placeholder="Escribe un mensaje..."
+          placeholder={isReadOnly ? "Chat bloqueado por asignacion confirmada" : "Escribe un mensaje..."}
           placeholderTextColor={colors.textTertiary}
           value={input}
           onChangeText={(t) => {
@@ -190,16 +314,18 @@ export default function ConversationScreen() {
           multiline
           maxLength={1000}
           returnKeyType="default"
+          editable={!isReadOnly}
         />
         <Pressable
-          style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, (!input.trim() || isReadOnly) && styles.sendBtnDisabled]}
           onPress={handleSend}
-          disabled={!input.trim() || sendMessage.isPending}
+          disabled={isReadOnly || !input.trim() || sendMessage.isPending}
         >
-          {sendMessage.isPending
-            ? <ActivityIndicator size="small" color={colors.white} />
-            : <Text style={styles.sendBtnText}>↑</Text>
-          }
+          {sendMessage.isPending ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Text style={styles.sendBtnText}>+</Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -224,17 +350,64 @@ const styles = StyleSheet.create({
   headerName: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
   headerListing: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 1 },
 
-  messageList: {
-    flexGrow: 1,
-    paddingVertical: spacing[3],
+  statusBanner: {
+    backgroundColor: colors.purpleLight,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.purple + "33",
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    gap: 2,
   },
+  statusBannerText: { color: colors.purple, fontSize: fontSize.sm, fontWeight: "700" },
+  statusBannerSub: { color: colors.textSecondary, fontSize: fontSize.xs },
 
+  offerCard: {
+    margin: spacing[3],
+    marginBottom: spacing[2],
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.purple + "55",
+    borderRadius: radius.xl,
+    padding: spacing[3],
+    gap: spacing[2],
+  },
+  offerCardTitle: { color: colors.text, fontWeight: "800", fontSize: fontSize.md },
+  offerGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing[2] },
+  offerCell: {
+    width: "48%",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing[2],
+    gap: 2,
+  },
+  offerKey: { color: colors.textTertiary, fontSize: fontSize.xs, fontWeight: "600" },
+  offerVal: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
+  offerActions: { flexDirection: "row", gap: spacing[2], marginTop: spacing[1] },
+  primaryBtn: {
+    flex: 1,
+    backgroundColor: colors.verify,
+    borderRadius: radius.full,
+    paddingVertical: spacing[2],
+    alignItems: "center",
+  },
+  primaryBtnText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
+  secondaryBtn: {
+    flex: 1,
+    backgroundColor: colors.text,
+    borderRadius: radius.full,
+    paddingVertical: spacing[2],
+    alignItems: "center",
+  },
+  secondaryBtnText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
+  btnDisabled: { opacity: 0.6 },
+
+  messageList: { flexGrow: 1, paddingVertical: spacing[2] },
   emptyChat: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing[8],
-    gap: spacing[2],
   },
   emptyChatText: {
     fontSize: fontSize.sm,
@@ -243,15 +416,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  typingRow: {
+  typingRow: { paddingHorizontal: spacing[4], paddingBottom: spacing[1] },
+  typingText: { fontSize: fontSize.xs, color: colors.textTertiary, fontStyle: "italic" },
+
+  readOnlyBar: {
+    backgroundColor: colors.warningLight,
+    borderTopWidth: 1,
+    borderTopColor: colors.warning + "66",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.warning + "66",
     paddingHorizontal: spacing[4],
-    paddingBottom: spacing[1],
+    paddingVertical: spacing[2],
   },
-  typingText: {
-    fontSize: fontSize.xs,
-    color: colors.textTertiary,
-    fontStyle: "italic",
-  },
+  readOnlyText: { fontSize: fontSize.xs, color: colors.warning, fontWeight: "700" },
 
   inputBar: {
     flexDirection: "row",
@@ -281,13 +458,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  sendBtnDisabled: {
-    backgroundColor: colors.gray300,
-  },
-  sendBtnText: {
-    color: colors.white,
-    fontSize: 20,
-    fontWeight: "700",
-    lineHeight: 24,
-  },
+  sendBtnDisabled: { backgroundColor: colors.gray300 },
+  sendBtnText: { color: colors.white, fontSize: 18, fontWeight: "700", lineHeight: 22 },
 });
+
