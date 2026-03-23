@@ -38,6 +38,11 @@ export const colors = {
   textSecondary: "#6b7280",
   textTertiary: "#9ca3af",
 
+  // Purple – Superfriendz
+  purple: "#7c3aed",
+  purpleLight: "#ede9fe",
+  purpleDark: "#6d28d9",
+
   // Misc
   white: "#ffffff",
   black: "#000000",

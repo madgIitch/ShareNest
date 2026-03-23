@@ -1,9 +1,11 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export type ListingType = "offer" | "search";
-export type ListingStatus = "active" | "paused" | "rented";
-export type RequestStatus = "pending" | "accepted" | "denied";
+export type ListingStatus = "active" | "paused" | "rented" | "draft";
+export type RequestStatus = "pending" | "accepted" | "denied" | "invited";
 export type ConnectionStatus = "pending" | "accepted";
+export type ContractType = "long_term" | "temporary" | "flexible";
+export type BedType = "single" | "double" | "bunk";
 
 export type Database = {
   public: {
@@ -23,6 +25,25 @@ export type Database = {
           notif_requests: boolean;
           notif_friendz: boolean;
           created_at: string;
+          // Lifestyle fields
+          birth_year: number | null;
+          occupation: string | null;
+          languages: string[] | null;
+          photos: string[] | null;
+          schedule: "madrugador" | "nocturno" | "flexible" | null;
+          cleanliness: number | null; // 1-5
+          noise_level: number | null; // 1-5
+          has_pets: boolean | null;
+          smokes: boolean | null;
+          works_from_home: boolean | null;
+          guests_frequency: "nunca" | "a veces" | "frecuente" | null;
+          // Search preferences
+          looking_for: "room" | "flat" | "both" | null;
+          budget_min: number | null;
+          budget_max: number | null;
+          move_in_date: string | null;
+          preferred_cities: string[] | null;
+          flatmate_prefs: Json | null;
         };
         Insert: {
           id: string;
@@ -38,6 +59,23 @@ export type Database = {
           notif_requests?: boolean;
           notif_friendz?: boolean;
           created_at?: string;
+          birth_year?: number | null;
+          occupation?: string | null;
+          languages?: string[] | null;
+          photos?: string[] | null;
+          schedule?: "madrugador" | "nocturno" | "flexible" | null;
+          cleanliness?: number | null;
+          noise_level?: number | null;
+          has_pets?: boolean | null;
+          smokes?: boolean | null;
+          works_from_home?: boolean | null;
+          guests_frequency?: "nunca" | "a veces" | "frecuente" | null;
+          looking_for?: "room" | "flat" | "both" | null;
+          budget_min?: number | null;
+          budget_max?: number | null;
+          move_in_date?: string | null;
+          preferred_cities?: string[] | null;
+          flatmate_prefs?: Json | null;
         };
         Update: {
           username?: string | null;
@@ -51,6 +89,77 @@ export type Database = {
           notif_messages?: boolean;
           notif_requests?: boolean;
           notif_friendz?: boolean;
+          birth_year?: number | null;
+          occupation?: string | null;
+          languages?: string[] | null;
+          photos?: string[] | null;
+          schedule?: "madrugador" | "nocturno" | "flexible" | null;
+          cleanliness?: number | null;
+          noise_level?: number | null;
+          has_pets?: boolean | null;
+          smokes?: boolean | null;
+          works_from_home?: boolean | null;
+          guests_frequency?: "nunca" | "a veces" | "frecuente" | null;
+          looking_for?: "room" | "flat" | "both" | null;
+          budget_min?: number | null;
+          budget_max?: number | null;
+          move_in_date?: string | null;
+          preferred_cities?: string[] | null;
+          flatmate_prefs?: Json | null;
+        };
+        Relationships: [];
+      };
+      properties: {
+        Row: {
+          id: string;
+          owner_id: string;
+          address: string;
+          street_number: string | null;
+          city_id: string | null;
+          place_id: string | null;
+          lat: number | null;
+          lng: number | null;
+          postal_code: string | null;
+          floor: string | null;
+          has_elevator: boolean;
+          total_m2: number | null;
+          total_rooms: number | null;
+          images: Json; // common area photos
+          bills_config: Json; // { agua, luz, gas, internet, limpieza, comunidad, calefaccion }
+          house_rules: string[] | null;
+          household_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          address: string;
+          street_number?: string | null;
+          city_id?: string | null;
+          place_id?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          postal_code?: string | null;
+          floor?: string | null;
+          has_elevator?: boolean;
+          total_m2?: number | null;
+          total_rooms?: number | null;
+          images?: Json;
+          bills_config?: Json;
+          house_rules?: string[] | null;
+          household_id?: string | null;
+        };
+        Update: {
+          address?: string;
+          street_number?: string | null;
+          floor?: string | null;
+          has_elevator?: boolean;
+          total_m2?: number | null;
+          total_rooms?: number | null;
+          images?: Json;
+          bills_config?: Json;
+          house_rules?: string[] | null;
+          household_id?: string | null;
         };
         Relationships: [];
       };
@@ -58,6 +167,7 @@ export type Database = {
         Row: {
           id: string;
           owner_id: string;
+          property_id: string | null; // new — links to properties table
           type: ListingType;
           title: string;
           description: string | null;
@@ -69,8 +179,8 @@ export type Database = {
           street_number: string | null;
           postal_code: string | null;
           price: number;
-          size_m2: number | null;
-          rooms: number | null;
+          size_m2: number | null; // m² of the room
+          rooms: number | null;   // number of roommates
           available_from: string | null;
           is_furnished: boolean;
           pets_allowed: boolean;
@@ -81,10 +191,18 @@ export type Database = {
           images: string[];
           created_at: string;
           updated_at: string;
+          // New fields
+          min_stay_months: number | null;
+          contract_type: ContractType | null;
+          bed_type: BedType | null;
+          has_private_bath: boolean | null;
+          has_wardrobe: boolean | null;
+          has_desk: boolean | null;
         };
         Insert: {
           id?: string;
           owner_id: string;
+          property_id?: string | null;
           type?: ListingType;
           title: string;
           description?: string | null;
@@ -106,8 +224,15 @@ export type Database = {
           lng?: number | null;
           status?: ListingStatus;
           images?: string[];
+          min_stay_months?: number | null;
+          contract_type?: ContractType | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean | null;
+          has_wardrobe?: boolean | null;
+          has_desk?: boolean | null;
         };
         Update: {
+          property_id?: string | null;
           type?: ListingType;
           title?: string;
           description?: string | null;
@@ -129,6 +254,12 @@ export type Database = {
           lng?: number | null;
           status?: ListingStatus;
           images?: string[];
+          min_stay_months?: number | null;
+          contract_type?: ContractType | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean | null;
+          has_wardrobe?: boolean | null;
+          has_desk?: boolean | null;
         };
         Relationships: [];
       };
@@ -140,6 +271,8 @@ export type Database = {
           owner_id: string;
           status: RequestStatus;
           message: string | null;
+          presentation_message: string | null; // new — shown in candidates view
+          is_boosted: boolean;                  // new — true if Superfriendz active at send time
           created_at: string;
         };
         Insert: {
@@ -149,9 +282,12 @@ export type Database = {
           owner_id: string;
           status?: RequestStatus;
           message?: string | null;
+          presentation_message?: string | null;
+          is_boosted?: boolean;
         };
         Update: {
           status?: RequestStatus;
+          presentation_message?: string | null;
         };
         Relationships: [];
       };
@@ -319,7 +455,14 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      active_requests_count: {
+        Row: {
+          requester_id: string;
+          active_count: number;
+        };
+      };
+    };
     Functions: {
       get_mutual_friends: {
         Args: { p_user_a: string; p_user_b: string };

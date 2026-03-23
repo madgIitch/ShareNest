@@ -18,101 +18,677 @@ import {
 
 import { CitySelector } from "../ui/CitySelector";
 import { DistrictSelector } from "../ui/DistrictSelector";
+import { MiniMapView } from "../ui/MiniMapView";
 import { locationService, type City, type Place } from "../../services/locationService";
-import { PriceTag } from "../ui/PriceTag";
-import { TagBadge } from "../ui/TagBadge";
-import { useCreateListing } from "../../hooks/useListings";
-import { useUpdateListing } from "../../hooks/useListings";
+import { useCreateListing, useUpdateListing } from "../../hooks/useListings";
 import { pickListingImages, uploadAllListingImages, MAX_IMAGES } from "../../lib/listing-images";
 import { useAuth } from "../../providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../theme";
-import type { Database } from "../../types/database";
+import type { Database, BedType, ContractType } from "../../types/database";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 
-type FormData = {
-  type: "offer" | "search";
-  title: string;
-  description: string;
-  city: string;
-  city_id: string | null;
-  district: string;
-  place_id: string | null;
-  price: string;
-  size_m2: string;
-  rooms: string;
-  available_from: string;
-  is_furnished: boolean;
-  pets_allowed: boolean;
-  smokers_allowed: boolean;
-  lat: number | null;
-  lng: number | null;
+// ─── Phase / step config ──────────────────────────────────────────────────────
+
+const TOTAL_STEPS = 9;
+const phaseColor = (step: number) => {
+  if (step <= 5) return colors.verify;   // Azul — datos del piso
+  if (step <= 8) return colors.purple;   // Morado — habitación
+  return colors.success;                 // Verde — publicar
+};
+const phaseLabel = (step: number) => {
+  if (step <= 5) return "El piso";
+  if (step <= 8) return "La habitación";
+  return "Publicar";
 };
 
-type Props = {
-  initial?: Listing;
+// ─── Form data ────────────────────────────────────────────────────────────────
+
+type BillsConfig = {
+  agua: boolean;
+  luz: boolean;
+  gas: boolean;
+  internet: boolean;
+  limpieza: boolean;
+  comunidad: boolean;
+  calefaccion: boolean;
+};
+
+type FormData = {
+  // Step 1 — Dirección
+  street: string;
+  street_number: string;
+  city: string;
+  city_id: string | null;
+  postal_code: string;
+  district: string;
+  place_id: string | null;
+  lat: number | null;
+  lng: number | null;
+
+  // Step 2 — El piso
+  total_m2: string;
+  total_rooms: string;
+  floor: string;
+  has_elevator: boolean;
+  is_furnished: boolean;
+  has_balcony: boolean;
+  has_parking: boolean;
+  has_ac: boolean;
+
+  // Step 4 — Gastos
+  bills: BillsConfig;
+
+  // Step 5 — Normas
+  no_smokers: boolean;
+  pets_ok: boolean;
+  quiet_hours: boolean;
+  no_parties: boolean;
+
+  // Step 6 — Habitación
+  title: string;
+  size_m2: string;
+  bed_type: BedType;
+  description: string;
+  private_bath: boolean;
+  wardrobe: boolean;
+  desk: boolean;
+
+  // Step 8 — Precio
+  price: string;
+  available_from: string;
+  min_stay_months: string;
+  contract_type: ContractType;
 };
 
 const EMPTY_FORM: FormData = {
-  type: "offer",
-  title: "",
-  description: "",
+  street: "",
+  street_number: "",
   city: "",
   city_id: null,
+  postal_code: "",
   district: "",
   place_id: null,
-  price: "",
-  size_m2: "",
-  rooms: "",
-  available_from: "",
-  is_furnished: false,
-  pets_allowed: false,
-  smokers_allowed: false,
   lat: null,
   lng: null,
+  total_m2: "",
+  total_rooms: "",
+  floor: "",
+  has_elevator: false,
+  is_furnished: false,
+  has_balcony: false,
+  has_parking: false,
+  has_ac: false,
+  bills: {
+    agua: false,
+    luz: false,
+    gas: false,
+    internet: false,
+    limpieza: false,
+    comunidad: false,
+    calefaccion: false,
+  },
+  no_smokers: false,
+  pets_ok: false,
+  quiet_hours: false,
+  no_parties: false,
+  title: "",
+  size_m2: "",
+  bed_type: "double",
+  description: "",
+  private_bath: false,
+  wardrobe: false,
+  desk: false,
+  price: "",
+  available_from: "",
+  min_stay_months: "6",
+  contract_type: "long_term",
 };
 
 function listingToForm(l: Listing): FormData {
   return {
-    type: l.type,
-    title: l.title,
-    description: l.description ?? "",
+    ...EMPTY_FORM,
+    street: l.street ?? "",
+    street_number: l.street_number ?? "",
     city: l.city,
     city_id: l.city_id ?? null,
+    postal_code: l.postal_code ?? "",
     district: l.district ?? "",
     place_id: l.place_id ?? null,
-    price: l.price.toString(),
-    size_m2: l.size_m2?.toString() ?? "",
-    rooms: l.rooms?.toString() ?? "",
-    available_from: l.available_from ?? "",
-    is_furnished: l.is_furnished,
-    pets_allowed: l.pets_allowed,
-    smokers_allowed: l.smokers_allowed,
     lat: l.lat ?? null,
     lng: l.lng ?? null,
+    is_furnished: l.is_furnished,
+    title: l.title,
+    size_m2: l.size_m2?.toString() ?? "",
+    bed_type: (l.bed_type as BedType) ?? "double",
+    description: l.description ?? "",
+    private_bath: l.has_private_bath ?? false,
+    wardrobe: l.has_wardrobe ?? false,
+    desk: l.has_desk ?? false,
+    price: l.price.toString(),
+    available_from: l.available_from ?? "",
+    min_stay_months: l.min_stay_months?.toString() ?? "6",
+    contract_type: (l.contract_type as ContractType) ?? "long_term",
   };
 }
 
-export function ListingWizard({ initial }: Props) {
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+type Props = {
+  initial?: Listing;
+  startAtStep?: number; // for "add second room" flow starting at step 6
+};
+
+// ─── Shared sub-components ────────────────────────────────────────────────────
+
+function Label({ children }: { children: string }) {
+  return <Text style={styles.label}>{children}</Text>;
+}
+
+function Input({ value, onChangeText, placeholder, keyboardType, multiline, numberOfLines }: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  keyboardType?: "default" | "numeric" | "email-address";
+  multiline?: boolean;
+  numberOfLines?: number;
+}) {
+  return (
+    <TextInput
+      style={[styles.input, multiline && styles.textarea]}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={colors.gray400}
+      keyboardType={keyboardType}
+      multiline={multiline}
+      numberOfLines={numberOfLines}
+      textAlignVertical={multiline ? "top" : "center"}
+    />
+  );
+}
+
+function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <View style={styles.toggleRow}>
+      <Text style={styles.toggleLabel}>{label}</Text>
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} />
+    </View>
+  );
+}
+
+// ─── Step components ──────────────────────────────────────────────────────────
+
+function Step1Address({
+  form, set, onCitySelect, onDistrictSelect, onDetectLocation, locating,
+}: {
+  form: FormData;
+  set: (k: keyof FormData, v: unknown) => void;
+  onCitySelect: (c: City) => void;
+  onDistrictSelect: (p: Place) => void;
+  onDetectLocation: () => void;
+  locating: boolean;
+}) {
+  return (
+    <>
+      <Text style={styles.stepTitle}>¿Dónde está el piso?</Text>
+      <Text style={styles.stepSubtitle}>Esta dirección es privada hasta la asignación.</Text>
+
+      <Label>Dirección</Label>
+      <Input
+        value={form.street}
+        onChangeText={(v) => set("street", v)}
+        placeholder="Calle del Pez, 14"
+      />
+
+      <Label>Ciudad *</Label>
+      <CitySelector value={form.city} onSelect={onCitySelect} />
+      <Pressable style={styles.locationLink} onPress={onDetectLocation} disabled={locating}>
+        <Text style={styles.locationLinkText}>
+          {locating ? "Detectando..." : "📍 Usar mi ubicación"}
+        </Text>
+      </Pressable>
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Label>Código postal</Label>
+          <Input
+            value={form.postal_code}
+            onChangeText={(v) => set("postal_code", v)}
+            placeholder="28004"
+            keyboardType="numeric"
+          />
+        </View>
+        <View style={{ width: spacing[3] }} />
+        <View style={{ flex: 1 }}>
+          <Label>Barrio</Label>
+          {form.city_id ? (
+            <DistrictSelector cityId={form.city_id} value={form.district} onSelect={onDistrictSelect} />
+          ) : (
+            <Input value={form.district} onChangeText={(v) => set("district", v)} placeholder="Malasaña" />
+          )}
+        </View>
+      </View>
+
+      {form.lat != null && form.lng != null && (
+        <View style={{ marginTop: spacing[3] }}>
+          <Text style={styles.label}>Confirmar en el mapa</Text>
+          <MiniMapView lat={form.lat} lng={form.lng} privacyLevel={3} height={180} />
+        </View>
+      )}
+    </>
+  );
+}
+
+function Step2Piso({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+  const floors = ["Bajo", "1º", "2º", "3º", "4º+", "Ático"];
+  return (
+    <>
+      <Text style={styles.stepTitle}>Características del piso</Text>
+      <Text style={styles.stepSubtitle}>Info compartida entre todas tus habitaciones.</Text>
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Label>Tamaño total (m²)</Label>
+          <Input value={form.total_m2} onChangeText={(v) => set("total_m2", v)} placeholder="65" keyboardType="numeric" />
+        </View>
+        <View style={{ width: spacing[3] }} />
+        <View style={{ flex: 1 }}>
+          <Label>Nº habitaciones</Label>
+          <Input value={form.total_rooms} onChangeText={(v) => set("total_rooms", v)} placeholder="3" keyboardType="numeric" />
+        </View>
+      </View>
+
+      <Label>Planta</Label>
+      <View style={styles.chipRow}>
+        {floors.map((f) => (
+          <Pressable
+            key={f}
+            style={[styles.chip, form.floor === f && styles.chipActive]}
+            onPress={() => set("floor", f)}
+          >
+            <Text style={[styles.chipText, form.floor === f && styles.chipTextActive]}>{f}</Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <ToggleRow label="Ascensor" value={form.has_elevator} onChange={(v) => set("has_elevator", v)} />
+      <ToggleRow label="Amueblado" value={form.is_furnished} onChange={(v) => set("is_furnished", v)} />
+      <ToggleRow label="Balcón / terraza" value={form.has_balcony} onChange={(v) => set("has_balcony", v)} />
+      <ToggleRow label="Parking" value={form.has_parking} onChange={(v) => set("has_parking", v)} />
+      <ToggleRow label="Aire acondicionado" value={form.has_ac} onChange={(v) => set("has_ac", v)} />
+    </>
+  );
+}
+
+function Step3CommonPhotos({
+  photos, onAdd, onRemove, onMove,
+}: {
+  photos: string[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onMove: (i: number, d: -1 | 1) => void;
+}) {
+  return (
+    <>
+      <Text style={styles.stepTitle}>Fotos del piso</Text>
+      <Text style={styles.stepSubtitle}>Salón, cocina, baño, zonas comunes. Mínimo 2.</Text>
+      <PhotoList photos={photos} onAdd={onAdd} onRemove={onRemove} onMove={onMove} />
+    </>
+  );
+}
+
+function Step4Bills({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+  const billItems: { key: keyof BillsConfig; label: string }[] = [
+    { key: "agua", label: "Agua" },
+    { key: "luz", label: "Luz" },
+    { key: "gas", label: "Gas" },
+    { key: "internet", label: "Internet" },
+    { key: "limpieza", label: "Limpieza" },
+    { key: "comunidad", label: "Comunidad" },
+    { key: "calefaccion", label: "Calefacción" },
+  ];
+  return (
+    <>
+      <Text style={styles.stepTitle}>¿Qué está incluido?</Text>
+      <Text style={styles.stepSubtitle}>Los buscadores lo verán antes de solicitar.</Text>
+      {billItems.map(({ key, label }) => (
+        <View key={key} style={styles.toggleRow}>
+          <Text style={styles.toggleLabel}>{label}</Text>
+          <View style={styles.billToggleRight}>
+            <Text style={[styles.billToggleLabel, form.bills[key] && styles.billToggleLabelActive]}>
+              {form.bills[key] ? "Incluido" : "Aparte"}
+            </Text>
+            <Switch
+              value={form.bills[key]}
+              onValueChange={(v) => set("bills", { ...form.bills, [key]: v })}
+              trackColor={{ true: colors.primary }}
+            />
+          </View>
+        </View>
+      ))}
+    </>
+  );
+}
+
+function Step5Rules({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+  return (
+    <>
+      <Text style={styles.stepTitle}>Normas de la casa</Text>
+      <Text style={styles.stepSubtitle}>Selecciona las que apliquen.</Text>
+      <ToggleRow label="🚭 No fumadores" value={form.no_smokers} onChange={(v) => set("no_smokers", v)} />
+      <ToggleRow label="🐾 Mascotas OK" value={form.pets_ok} onChange={(v) => set("pets_ok", v)} />
+      <ToggleRow label="🌙 Horas de silencio" value={form.quiet_hours} onChange={(v) => set("quiet_hours", v)} />
+      <ToggleRow label="🎉 Sin fiestas" value={!form.no_parties} onChange={(v) => set("no_parties", !v)} />
+    </>
+  );
+}
+
+function Step6Room({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+  const bedTypes: { key: BedType; label: string }[] = [
+    { key: "single", label: "Individual" },
+    { key: "double", label: "Doble" },
+    { key: "bunk", label: "Litera" },
+  ];
+  return (
+    <>
+      <Text style={styles.stepTitle}>Cuéntanos la habitación</Text>
+      <Text style={styles.stepSubtitle}>Piso en {form.city || "tu ciudad"}</Text>
+
+      <Label>Título del anuncio *</Label>
+      <Input
+        value={form.title}
+        onChangeText={(v) => set("title", v)}
+        placeholder="Habitación luminosa con balcón"
+        multiline={false}
+      />
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Label>Tamaño (m²)</Label>
+          <Input value={form.size_m2} onChangeText={(v) => set("size_m2", v)} placeholder="14" keyboardType="numeric" />
+        </View>
+        <View style={{ width: spacing[3] }} />
+        <View style={{ flex: 1 }}>
+          <Label>Tipo de cama</Label>
+          <View style={styles.chipRow}>
+            {bedTypes.map(({ key, label }) => (
+              <Pressable
+                key={key}
+                style={[styles.chip, form.bed_type === key && styles.chipActive]}
+                onPress={() => set("bed_type", key)}
+              >
+                <Text style={[styles.chipText, form.bed_type === key && styles.chipTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <Label>Descripción</Label>
+      <Input
+        value={form.description}
+        onChangeText={(v) => set("description", v)}
+        placeholder="Luminosa, exterior, da a la calle..."
+        multiline
+        numberOfLines={3}
+      />
+
+      <ToggleRow label="Baño privado" value={form.private_bath} onChange={(v) => set("private_bath", v)} />
+      <ToggleRow label="Armario incluido" value={form.wardrobe} onChange={(v) => set("wardrobe", v)} />
+      <ToggleRow label="Escritorio" value={form.desk} onChange={(v) => set("desk", v)} />
+    </>
+  );
+}
+
+function Step7RoomPhotos({
+  photos, onAdd, onRemove, onMove,
+}: {
+  photos: string[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onMove: (i: number, d: -1 | 1) => void;
+}) {
+  return (
+    <>
+      <Text style={styles.stepTitle}>Fotos de la habitación</Text>
+      <Text style={styles.stepSubtitle}>Mínimo 1 foto de la habitación.</Text>
+      <PhotoList photos={photos} onAdd={onAdd} onRemove={onRemove} onMove={onMove} />
+    </>
+  );
+}
+
+function Step8Price({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
+  const minStayOptions = [
+    { value: "1", label: "1 mes" },
+    { value: "3", label: "3 meses" },
+    { value: "6", label: "6 meses" },
+    { value: "12", label: "1 año" },
+    { value: "0", label: "Sin mín." },
+  ];
+  const contractOptions: { key: ContractType; label: string }[] = [
+    { key: "long_term", label: "Largo plazo" },
+    { key: "temporary", label: "Temporal" },
+    { key: "flexible", label: "Flexible" },
+  ];
+  return (
+    <>
+      <Text style={styles.stepTitle}>Precio y disponibilidad</Text>
+      <Text style={styles.stepSubtitle}>Puedes cambiarlo en cualquier momento.</Text>
+
+      <Label>Precio mensual</Label>
+      <View style={styles.priceInputWrap}>
+        <Text style={styles.pricePrefix}>€</Text>
+        <TextInput
+          style={styles.priceInput}
+          value={form.price}
+          onChangeText={(v) => set("price", v)}
+          keyboardType="numeric"
+          placeholder="750"
+          placeholderTextColor={colors.gray400}
+        />
+        <Text style={styles.priceSuffix}>/mes</Text>
+      </View>
+
+      <Label>Disponible desde</Label>
+      <Input
+        value={form.available_from}
+        onChangeText={(v) => set("available_from", v)}
+        placeholder="1 de enero de 2026"
+      />
+
+      <Label>Estancia mínima</Label>
+      <View style={styles.chipRow}>
+        {minStayOptions.map(({ value, label }) => (
+          <Pressable
+            key={value}
+            style={[styles.chip, form.min_stay_months === value && styles.chipActive]}
+            onPress={() => set("min_stay_months", value)}
+          >
+            <Text style={[styles.chipText, form.min_stay_months === value && styles.chipTextActive]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Label>Tipo de contrato</Label>
+      <View style={styles.chipRow}>
+        {contractOptions.map(({ key, label }) => (
+          <Pressable
+            key={key}
+            style={[styles.chip, form.contract_type === key && styles.chipActive]}
+            onPress={() => set("contract_type", key)}
+          >
+            <Text style={[styles.chipText, form.contract_type === key && styles.chipTextActive]}>
+              {label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
+function Step9Review({
+  form,
+  photos,
+  onPublish,
+  onDraft,
+  submitting,
+}: {
+  form: FormData;
+  photos: string[];
+  onPublish: () => void;
+  onDraft: () => void;
+  submitting: boolean;
+}) {
+  const checklist = [
+    { label: "Dirección confirmada", done: !!form.city },
+    { label: `Fotos del piso (${photos.length})`, done: photos.length >= 2 },
+    { label: "Precio definido", done: !!form.price },
+    { label: "Gastos configurados", done: true },
+    { label: "Normas añadidas", done: true },
+  ];
+
+  const allDone = checklist.every((c) => c.done);
+
+  return (
+    <>
+      <Text style={styles.stepTitle}>¿Todo correcto?</Text>
+      <Text style={styles.stepSubtitle}>Así lo verán los buscadores.</Text>
+
+      {/* Preview card */}
+      <View style={styles.previewCard}>
+        {photos[0] ? (
+          <Image source={{ uri: photos[0] }} style={styles.previewImage} />
+        ) : (
+          <View style={styles.previewImagePlaceholder}>
+            <Text style={{ fontSize: 36 }}>🏠</Text>
+          </View>
+        )}
+        <View style={styles.previewBody}>
+          <Text style={styles.previewTitle} numberOfLines={1}>
+            {form.title || "Título del anuncio"}
+          </Text>
+          <Text style={styles.previewMeta}>
+            {form.price ? `${form.price} €/mes` : "—"} · {form.city || "Ciudad"} · {form.size_m2 ? `${form.size_m2} m²` : "—"}
+          </Text>
+          <View style={styles.previewTags}>
+            {form.min_stay_months && form.min_stay_months !== "0" && (
+              <View style={styles.previewTag}>
+                <Text style={styles.previewTagText}>{form.min_stay_months} meses mín.</Text>
+              </View>
+            )}
+            {form.bills.agua && (
+              <View style={styles.previewTag}>
+                <Text style={styles.previewTagText}>Agua incl.</Text>
+              </View>
+            )}
+            {form.bills.luz && (
+              <View style={styles.previewTag}>
+                <Text style={styles.previewTagText}>Luz incl.</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Checklist */}
+      <View style={styles.checklist}>
+        <Text style={styles.checklistTitle}>CHECKLIST DE PUBLICACIÓN</Text>
+        {checklist.map(({ label, done }) => (
+          <View key={label} style={styles.checklistItem}>
+            <Text style={[styles.checklistIcon, done ? styles.checkDone : styles.checkMissing]}>
+              {done ? "✓" : "○"}
+            </Text>
+            <Text style={[styles.checklistLabel, !done && styles.checklistLabelMissing]}>
+              {label}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Privacy callout */}
+      <View style={styles.privacyCallout}>
+        <Text style={styles.privacyCalloutIcon}>△</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privacyCalloutTitle}>Dirección privada hasta asignación</Text>
+          <Text style={styles.privacyCalloutText}>
+            Los buscadores verán la zona, no la calle.
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+}
+
+// ─── Photo list shared component ──────────────────────────────────────────────
+
+function PhotoList({
+  photos, onAdd, onRemove, onMove,
+}: {
+  photos: string[];
+  onAdd: () => void;
+  onRemove: (i: number) => void;
+  onMove: (i: number, d: -1 | 1) => void;
+}) {
+  return (
+    <>
+      {photos.map((uri, i) => (
+        <View key={uri + i} style={styles.photoRow}>
+          <Image source={{ uri }} style={styles.photoThumb} />
+          <View style={styles.photoInfo}>
+            <Text style={styles.photoIndex}>{i === 0 ? "Portada" : `Foto ${i + 1}`}</Text>
+          </View>
+          <View style={styles.photoActions}>
+            <Pressable onPress={() => onMove(i, -1)} disabled={i === 0} style={styles.photoBtn}>
+              <Text style={[styles.photoBtnText, i === 0 && styles.photoBtnDisabled]}>↑</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => onMove(i, 1)}
+              disabled={i === photos.length - 1}
+              style={styles.photoBtn}
+            >
+              <Text style={[styles.photoBtnText, i === photos.length - 1 && styles.photoBtnDisabled]}>↓</Text>
+            </Pressable>
+            <Pressable onPress={() => onRemove(i)} style={[styles.photoBtn, styles.photoBtnRemove]}>
+              <Text style={styles.photoBtnRemoveText}>✕</Text>
+            </Pressable>
+          </View>
+        </View>
+      ))}
+      {photos.length < MAX_IMAGES && (
+        <Pressable style={styles.addPhotoBtn} onPress={onAdd}>
+          <Text style={styles.addPhotoBtnText}>＋ Añadir fotos ({photos.length}/{MAX_IMAGES})</Text>
+        </Pressable>
+      )}
+    </>
+  );
+}
+
+// ─── Main wizard ──────────────────────────────────────────────────────────────
+
+export function ListingWizard({ initial, startAtStep = 1 }: Props) {
   const { session } = useAuth();
   const userId = session?.user?.id ?? "";
   const isEditing = !!initial;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(startAtStep);
   const [form, setForm] = useState<FormData>(initial ? listingToForm(initial) : EMPTY_FORM);
-  // Durante el wizard: URIs locales. Al enviar se suben.
   const [photoUris, setPhotoUris] = useState<string[]>(initial?.images ?? []);
+  const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>([]);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const createListing = useCreateListing();
   const updateListing = useUpdateListing();
 
-  const set = (key: keyof FormData, value: string | boolean) => {
+  const set = (key: keyof FormData, value: unknown) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  // --- City / District selection ---
+  // ── City / District selection ──
   const handleCitySelect = (city: City) => {
     setForm((f) => ({
       ...f,
@@ -135,7 +711,6 @@ export function ListingWizard({ initial }: Props) {
     }));
   };
 
-  // --- Geocoding ---
   const handleDetectLocation = async () => {
     try {
       setLocating(true);
@@ -155,92 +730,95 @@ export function ListingWizard({ initial }: Props) {
     }
   };
 
-  // --- Fotos ---
+  // ── Photos ──
   const handleAddPhotos = async () => {
-    if (photoUris.length >= MAX_IMAGES) {
-      Alert.alert("Límite alcanzado", `Máximo ${MAX_IMAGES} fotos.`);
-      return;
+    if (photoUris.length >= MAX_IMAGES) return;
+    const uris = await pickListingImages();
+    setPhotoUris((prev) => [...prev, ...uris].slice(0, MAX_IMAGES));
+  };
+
+  const handleAddRoomPhotos = async () => {
+    if (roomPhotoUris.length >= MAX_IMAGES) return;
+    const uris = await pickListingImages();
+    setRoomPhotoUris((prev) => [...prev, ...uris].slice(0, MAX_IMAGES));
+  };
+
+  // ── Validation ──
+  const validateStep = (): string | null => {
+    if (step === 1 && !form.city.trim()) return "La ciudad es obligatoria.";
+    if (step === 6 && !form.title.trim()) return "El título es obligatorio.";
+    if (step === 8 && (!form.price.trim() || isNaN(Number(form.price)))) {
+      return "El precio debe ser un número.";
     }
-    const newUris = await pickListingImages();
-    setPhotoUris((prev) => [...prev, ...newUris].slice(0, MAX_IMAGES));
-  };
-
-  const handleRemovePhoto = (index: number) => {
-    setPhotoUris((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleMovePhoto = (index: number, dir: -1 | 1) => {
-    const next = index + dir;
-    if (next < 0 || next >= photoUris.length) return;
-    setPhotoUris((prev) => {
-      const arr = [...prev];
-      [arr[index], arr[next]] = [arr[next], arr[index]];
-      return arr;
-    });
-  };
-
-  // --- Validación por paso ---
-  const validateStep1 = () => {
-    if (!form.title.trim()) return "El título es obligatorio.";
-    if (!form.city.trim()) return "La ciudad es obligatoria.";
-    if (!form.price.trim() || isNaN(Number(form.price))) return "El precio debe ser un número.";
     return null;
   };
 
   const goNext = () => {
-    if (step === 1) {
-      const err = validateStep1();
-      if (err) { Alert.alert("Datos incompletos", err); return; }
-    }
-    setStep((s) => s + 1);
+    const err = validateStep();
+    if (err) { Alert.alert("Datos incompletos", err); return; }
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS));
   };
 
-  const goBack = () => setStep((s) => s - 1);
+  const goBack = () => setStep((s) => Math.max(s - 1, 1));
 
-  // --- Submit ---
-  const handleSubmit = async () => {
+  // ── Submit ──
+  const handleSubmit = async (asDraft = false) => {
     try {
       setSubmitting(true);
       const folder = initial?.id ?? `${Date.now().toString(36)}`;
 
-      // Subir sólo URIs locales (las que no son ya http)
       const localUris = photoUris.filter((u) => !u.startsWith("http"));
       const existingUrls = photoUris.filter((u) => u.startsWith("http"));
-
       const uploadedUrls = localUris.length > 0
         ? await uploadAllListingImages(userId, folder, localUris)
         : [];
+      const allImages = [...existingUrls, ...uploadedUrls, ...roomPhotoUris];
 
-      // Reconstruir array manteniendo orden: existentes primero, luego nuevas
-      const allImages = [...existingUrls, ...uploadedUrls];
+      const houseRules: string[] = [
+        form.no_smokers && "no_fumadores",
+        form.pets_ok && "mascotas_ok",
+        form.quiet_hours && "silencio",
+        form.no_parties && "sin_fiestas",
+      ].filter(Boolean) as string[];
 
       const payload = {
         owner_id: userId,
-        type: form.type,
+        type: "offer" as const,
         title: form.title.trim(),
         description: form.description.trim() || null,
         city: form.city,
         city_id: form.city_id,
         district: form.district.trim() || null,
         place_id: form.place_id,
+        street: form.street.trim() || null,
+        street_number: form.street_number.trim() || null,
+        postal_code: form.postal_code.trim() || null,
         price: Number(form.price),
         size_m2: form.size_m2 ? Number(form.size_m2) : null,
-        rooms: form.rooms ? Number(form.rooms) : null,
+        rooms: form.total_rooms ? Number(form.total_rooms) : null,
         available_from: form.available_from.trim() || null,
         is_furnished: form.is_furnished,
-        pets_allowed: form.pets_allowed,
-        smokers_allowed: form.smokers_allowed,
+        pets_allowed: form.pets_ok,
+        smokers_allowed: !form.no_smokers,
         lat: form.lat,
         lng: form.lng,
         images: allImages,
+        status: asDraft ? ("draft" as const) : ("active" as const),
+        // New fields (gracefully ignored if column doesn't exist yet)
+        min_stay_months: form.min_stay_months ? Number(form.min_stay_months) : null,
+        contract_type: form.contract_type,
+        bed_type: form.bed_type,
+        has_private_bath: form.private_bath,
+        has_wardrobe: form.wardrobe,
+        has_desk: form.desk,
       };
 
       if (isEditing && initial) {
         await updateListing.mutateAsync({ id: initial.id, updates: payload });
         router.replace(`/listing/${initial.id}`);
       } else {
-        const id = await createListing.mutateAsync(payload);
-        router.replace(`/listing/${id}`);
+        const newId = await createListing.mutateAsync(payload);
+        router.replace(`/listing/${newId}`);
       }
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
@@ -249,21 +827,39 @@ export function ListingWizard({ initial }: Props) {
     }
   };
 
+  // ── Phase color ──
+  const pc = phaseColor(step);
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Progress bar */}
-      <View style={styles.progressBar}>
-        {[1, 2, 3].map((s) => (
-          <View key={s} style={[styles.progressStep, s <= step && styles.progressStepActive]} />
-        ))}
+      <View style={styles.progressWrap}>
+        <View style={styles.progressBar}>
+          {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.progressSegment,
+                i < step && { backgroundColor: pc },
+              ]}
+            />
+          ))}
+        </View>
+        <View style={styles.progressMeta}>
+          <View style={[styles.phasePill, { backgroundColor: pc + "22", borderColor: pc + "55" }]}>
+            <Text style={[styles.phaseText, { color: pc }]}>{phaseLabel(step)}</Text>
+          </View>
+          <Text style={styles.stepCounter}>{step} / {TOTAL_STEPS}</Text>
+        </View>
       </View>
 
+      {/* Step content */}
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {step === 1 && (
-          <Step1
+          <Step1Address
             form={form}
             set={set}
             onCitySelect={handleCitySelect}
@@ -272,333 +868,156 @@ export function ListingWizard({ initial }: Props) {
             locating={locating}
           />
         )}
-        {step === 2 && <Step2 photos={photoUris} onAdd={handleAddPhotos} onRemove={handleRemovePhoto} onMove={handleMovePhoto} />}
-        {step === 3 && <Step3 form={form} set={set} photos={photoUris} />}
+        {step === 2 && <Step2Piso form={form} set={set} />}
+        {step === 3 && (
+          <Step3CommonPhotos
+            photos={photoUris}
+            onAdd={handleAddPhotos}
+            onRemove={(i) => setPhotoUris((p) => p.filter((_, idx) => idx !== i))}
+            onMove={(i, d) => setPhotoUris((p) => {
+              const arr = [...p];
+              const next = i + d;
+              if (next < 0 || next >= arr.length) return arr;
+              [arr[i], arr[next]] = [arr[next], arr[i]];
+              return arr;
+            })}
+          />
+        )}
+        {step === 4 && <Step4Bills form={form} set={set} />}
+        {step === 5 && <Step5Rules form={form} set={set} />}
+        {step === 6 && <Step6Room form={form} set={set} />}
+        {step === 7 && (
+          <Step7RoomPhotos
+            photos={roomPhotoUris}
+            onAdd={handleAddRoomPhotos}
+            onRemove={(i) => setRoomPhotoUris((p) => p.filter((_, idx) => idx !== i))}
+            onMove={(i, d) => setRoomPhotoUris((p) => {
+              const arr = [...p];
+              const next = i + d;
+              if (next < 0 || next >= arr.length) return arr;
+              [arr[i], arr[next]] = [arr[next], arr[i]];
+              return arr;
+            })}
+          />
+        )}
+        {step === 8 && <Step8Price form={form} set={set} />}
+        {step === 9 && (
+          <Step9Review
+            form={form}
+            photos={[...photoUris, ...roomPhotoUris]}
+            onPublish={() => handleSubmit(false)}
+            onDraft={() => handleSubmit(true)}
+            submitting={submitting}
+          />
+        )}
       </ScrollView>
 
-      {/* Navegación */}
+      {/* Navigation */}
       <View style={styles.nav}>
         {step > 1 ? (
           <Pressable style={styles.backBtn} onPress={goBack}>
             <Text style={styles.backBtnText}>← Atrás</Text>
           </Pressable>
         ) : (
-          <View />
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backBtnText}>✕ Cancelar</Text>
+          </Pressable>
         )}
 
-        {step < 3 ? (
-          <Pressable style={styles.nextBtn} onPress={goNext}>
+        {step < 9 ? (
+          <Pressable style={[styles.nextBtn, { backgroundColor: pc }]} onPress={goNext}>
             <Text style={styles.nextBtnText}>Siguiente →</Text>
           </Pressable>
         ) : (
-          <Pressable
-            style={[styles.nextBtn, submitting && styles.btnDisabled]}
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting
-              ? <ActivityIndicator color={colors.white} />
-              : <Text style={styles.nextBtnText}>{isEditing ? "Guardar cambios" : "Publicar"}</Text>
-            }
-          </Pressable>
+          <View style={styles.publishRow}>
+            <Pressable style={styles.draftBtn} onPress={() => handleSubmit(true)} disabled={submitting}>
+              <Text style={styles.draftBtnText}>Guardar borrador</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.nextBtn, { backgroundColor: colors.success }, submitting && styles.btnDisabled]}
+              onPress={() => handleSubmit(false)}
+              disabled={submitting}
+            >
+              {submitting
+                ? <ActivityIndicator color={colors.white} />
+                : <Text style={styles.nextBtnText}>Publicar anuncio</Text>
+              }
+            </Pressable>
+          </View>
         )}
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-// ─── Step 1: Lo básico ────────────────────────────────────────────────────────
-
-function Step1({
-  form,
-  set,
-  onCitySelect,
-  onDistrictSelect,
-  onDetectLocation,
-  locating,
-}: {
-  form: FormData;
-  set: (k: keyof FormData, v: string | boolean) => void;
-  onCitySelect: (city: City) => void;
-  onDistrictSelect: (place: Place) => void;
-  onDetectLocation: () => void;
-  locating: boolean;
-}) {
-  return (
-    <>
-      <Text style={styles.stepTitle}>Lo básico</Text>
-
-      {/* Tipo */}
-      <Text style={styles.label}>Tipo de anuncio</Text>
-      <View style={styles.typeToggle}>
-        <Pressable
-          style={[styles.typeBtn, form.type === "offer" && styles.typeBtnActive]}
-          onPress={() => set("type", "offer")}
-        >
-          <Text style={[styles.typeBtnText, form.type === "offer" && styles.typeBtnTextActive]}>
-            🏠 Ofrezco habitación
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.typeBtn, form.type === "search" && styles.typeBtnActive]}
-          onPress={() => set("type", "search")}
-        >
-          <Text style={[styles.typeBtnText, form.type === "search" && styles.typeBtnTextActive]}>
-            🔍 Busco habitación
-          </Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.label}>Título *</Text>
-      <TextInput
-        style={styles.input}
-        value={form.title}
-        onChangeText={(v) => set("title", v)}
-        placeholder="Ej: Habitación luminosa en Gràcia"
-        maxLength={80}
-      />
-
-      <Text style={styles.label}>Descripción</Text>
-      <TextInput
-        style={[styles.input, styles.textarea]}
-        value={form.description}
-        onChangeText={(v) => set("description", v)}
-        placeholder="Describe el espacio, los compañeros, el ambiente..."
-        multiline
-        numberOfLines={4}
-      />
-
-      <Text style={styles.label}>Ciudad *</Text>
-      <CitySelector value={form.city} onSelect={onCitySelect} />
-      <Pressable style={styles.locationBtn} onPress={onDetectLocation} disabled={locating}>
-        <Text style={styles.locationBtnText}>
-          {locating ? "Detectando..." : "📍 Usar mi ubicación"}
-        </Text>
-      </Pressable>
-
-      <Text style={styles.label}>Barrio / Distrito</Text>
-      {form.city_id ? (
-        <DistrictSelector
-          cityId={form.city_id}
-          value={form.district}
-          onSelect={onDistrictSelect}
-        />
-      ) : (
-        <TextInput
-          style={styles.input}
-          value={form.district}
-          onChangeText={(v) => set("district", v)}
-          placeholder="Selecciona primero una ciudad"
-          editable={false}
-        />
-      )}
-
-      <Text style={styles.label}>Precio (€/mes) *</Text>
-      <TextInput
-        style={styles.input}
-        value={form.price}
-        onChangeText={(v) => set("price", v)}
-        keyboardType="numeric"
-        placeholder="650"
-      />
-
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>m²</Text>
-          <TextInput
-            style={styles.input}
-            value={form.size_m2}
-            onChangeText={(v) => set("size_m2", v)}
-            keyboardType="numeric"
-            placeholder="20"
-          />
-        </View>
-        <View style={{ width: spacing[3] }} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>Habitaciones</Text>
-          <TextInput
-            style={styles.input}
-            value={form.rooms}
-            onChangeText={(v) => set("rooms", v)}
-            keyboardType="numeric"
-            placeholder="3"
-          />
-        </View>
-      </View>
-
-      <Text style={styles.label}>Disponible desde</Text>
-      <TextInput
-        style={styles.input}
-        value={form.available_from}
-        onChangeText={(v) => set("available_from", v)}
-        placeholder="2026-04-01"
-      />
-    </>
-  );
-}
-
-// ─── Step 2: Fotos ────────────────────────────────────────────────────────────
-
-function Step2({
-  photos,
-  onAdd,
-  onRemove,
-  onMove,
-}: {
-  photos: string[];
-  onAdd: () => void;
-  onRemove: (i: number) => void;
-  onMove: (i: number, dir: -1 | 1) => void;
-}) {
-  return (
-    <>
-      <Text style={styles.stepTitle}>Fotos</Text>
-      <Text style={styles.stepSubtitle}>Hasta {MAX_IMAGES} fotos. La primera será la portada.</Text>
-
-      {photos.map((uri, i) => (
-        <View key={uri + i} style={styles.photoRow}>
-          <Image source={{ uri }} style={styles.photoThumb} />
-          <View style={styles.photoInfo}>
-            <Text style={styles.photoIndex}>{i === 0 ? "Portada" : `Foto ${i + 1}`}</Text>
-          </View>
-          <View style={styles.photoActions}>
-            <Pressable onPress={() => onMove(i, -1)} disabled={i === 0} style={styles.photoBtn}>
-              <Text style={[styles.photoBtnText, i === 0 && styles.photoBtnDisabled]}>↑</Text>
-            </Pressable>
-            <Pressable onPress={() => onMove(i, 1)} disabled={i === photos.length - 1} style={styles.photoBtn}>
-              <Text style={[styles.photoBtnText, i === photos.length - 1 && styles.photoBtnDisabled]}>↓</Text>
-            </Pressable>
-            <Pressable onPress={() => onRemove(i)} style={[styles.photoBtn, styles.photoBtnRemove]}>
-              <Text style={styles.photoBtnRemoveText}>✕</Text>
-            </Pressable>
-          </View>
-        </View>
-      ))}
-
-      {photos.length < MAX_IMAGES && (
-        <Pressable style={styles.addPhotoBtn} onPress={onAdd}>
-          <Text style={styles.addPhotoBtnText}>＋ Añadir fotos ({photos.length}/{MAX_IMAGES})</Text>
-        </Pressable>
-      )}
-
-      {photos.length === 0 && (
-        <Text style={styles.photoHint}>
-          Sin fotos el anuncio tendrá menos visibilidad. ¡Añade al menos una!
-        </Text>
-      )}
-    </>
-  );
-}
-
-// ─── Step 3: Preferencias + Preview ──────────────────────────────────────────
-
-function Step3({
-  form,
-  set,
-  photos,
-}: {
-  form: FormData;
-  set: (k: keyof FormData, v: string | boolean) => void;
-  photos: string[];
-}) {
-  return (
-    <>
-      <Text style={styles.stepTitle}>Preferencias</Text>
-
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>🛋️ Amueblado</Text>
-        <Switch
-          value={form.is_furnished}
-          onValueChange={(v) => set("is_furnished", v)}
-          trackColor={{ true: colors.primary }}
-        />
-      </View>
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>🐾 Mascotas permitidas</Text>
-        <Switch
-          value={form.pets_allowed}
-          onValueChange={(v) => set("pets_allowed", v)}
-          trackColor={{ true: colors.primary }}
-        />
-      </View>
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>🚬 Fumadores permitidos</Text>
-        <Switch
-          value={form.smokers_allowed}
-          onValueChange={(v) => set("smokers_allowed", v)}
-          trackColor={{ true: colors.primary }}
-        />
-      </View>
-
-      {/* Preview */}
-      <Text style={[styles.label, { marginTop: spacing[5] }]}>Vista previa</Text>
-      <View style={styles.preview}>
-        {photos[0] ? (
-          <Image source={{ uri: photos[0] }} style={styles.previewImage} />
-        ) : (
-          <View style={styles.previewImagePlaceholder}>
-            <Text style={{ fontSize: 36 }}>🏠</Text>
-          </View>
-        )}
-        <View style={styles.previewBody}>
-          <Text style={styles.previewCity}>📍 {form.city || "Ciudad"}</Text>
-          <Text style={styles.previewTitle} numberOfLines={2}>
-            {form.title || "Título del anuncio"}
-          </Text>
-          <View style={styles.previewTags}>
-            {form.is_furnished && <TagBadge label="Amueblado" variant="primary" />}
-            {form.pets_allowed && <TagBadge label="Mascotas OK" variant="success" />}
-            {form.smokers_allowed && <TagBadge label="Fumadores OK" variant="warning" />}
-          </View>
-          {form.price ? (
-            <PriceTag amount={Number(form.price)} size="sm" />
-          ) : null}
-        </View>
-      </View>
-    </>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // Progress
+  progressWrap: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[3],
+    paddingBottom: spacing[2],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: spacing[2],
+  },
   progressBar: {
     flexDirection: "row",
-    gap: spacing[2],
-    padding: spacing[4],
-    paddingBottom: spacing[2],
-    backgroundColor: colors.background,
+    gap: 3,
   },
-  progressStep: {
+  progressSegment: {
     flex: 1,
     height: 4,
     borderRadius: radius.full,
     backgroundColor: colors.gray200,
   },
-  progressStepActive: {
-    backgroundColor: colors.primary,
+  progressMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
+  phasePill: {
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: 3,
+  },
+  phaseText: { fontSize: fontSize.xs, fontWeight: "700" },
+  stepCounter: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
+
+  // Container
   container: {
     padding: spacing[4],
+    paddingBottom: spacing[8],
     backgroundColor: colors.background,
-    paddingBottom: spacing[6],
+    gap: spacing[1],
   },
+
+  // Step headings
   stepTitle: {
     fontSize: fontSize["2xl"],
     fontWeight: "700",
     color: colors.text,
     marginBottom: spacing[1],
+    marginTop: spacing[2],
   },
   stepSubtitle: {
     fontSize: fontSize.sm,
     color: colors.textSecondary,
-    marginBottom: spacing[4],
+    marginBottom: spacing[3],
   },
+
+  // Form elements
   label: {
     fontSize: fontSize.sm,
     fontWeight: "600",
     color: colors.gray700,
-    marginBottom: spacing[2],
+    marginBottom: spacing[1],
     marginTop: spacing[3],
   },
   input: {
@@ -611,48 +1030,66 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.surface,
   },
-  textarea: {
-    minHeight: 90,
-    textAlignVertical: "top",
-  },
-  row: {
-    flexDirection: "row",
-  },
-  typeToggle: {
-    flexDirection: "row",
-    gap: spacing[2],
-    marginBottom: spacing[1],
-  },
-  typeBtn: {
-    flex: 1,
+  textarea: { minHeight: 80, textAlignVertical: "top" },
+  row: { flexDirection: "row" },
+
+  // Chips
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing[2], marginTop: 2 },
+  chip: {
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing[3],
-    alignItems: "center",
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
     backgroundColor: colors.surface,
   },
-  typeBtnActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  typeBtnText: {
-    fontSize: fontSize.sm,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  typeBtnTextActive: {
-    color: colors.primary,
-  },
-  locationBtn: {
+  chipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  chipText: { fontSize: fontSize.sm, fontWeight: "600", color: colors.textSecondary },
+  chipTextActive: { color: colors.primary },
+
+  // Toggle
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
     marginTop: spacing[2],
-    alignSelf: "flex-start",
   },
-  locationBtnText: {
-    fontSize: fontSize.sm,
-    color: colors.primary,
-    fontWeight: "600",
+  toggleLabel: { fontSize: fontSize.md, color: colors.text, flex: 1 },
+  billToggleRight: { flexDirection: "row", alignItems: "center", gap: spacing[2] },
+  billToggleLabel: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
+  billToggleLabelActive: { color: colors.primary },
+
+  // Price input
+  priceInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing[3],
   },
+  pricePrefix: { fontSize: fontSize["2xl"], color: colors.textSecondary, fontWeight: "700" },
+  priceInput: {
+    flex: 1,
+    fontSize: 40,
+    fontWeight: "800",
+    color: colors.text,
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[2],
+  },
+  priceSuffix: { fontSize: fontSize.md, color: colors.textSecondary },
+
+  // Location link
+  locationLink: { marginTop: spacing[2], alignSelf: "flex-start" },
+  locationLinkText: { fontSize: fontSize.sm, color: colors.primary, fontWeight: "600" },
+
   // Photos
   photoRow: {
     flexDirection: "row",
@@ -664,24 +1101,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing[2],
     overflow: "hidden",
   },
-  photoThumb: {
-    width: 72,
-    height: 72,
-  },
-  photoInfo: {
-    flex: 1,
-    paddingHorizontal: spacing[3],
-  },
-  photoIndex: {
-    fontSize: fontSize.sm,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  photoActions: {
-    flexDirection: "row",
-    paddingRight: spacing[2],
-    gap: spacing[1],
-  },
+  photoThumb: { width: 72, height: 72 },
+  photoInfo: { flex: 1, paddingHorizontal: spacing[3] },
+  photoIndex: { fontSize: fontSize.sm, fontWeight: "600", color: colors.text },
+  photoActions: { flexDirection: "row", paddingRight: spacing[2], gap: spacing[1] },
   photoBtn: {
     width: 32,
     height: 32,
@@ -690,21 +1113,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: colors.gray100,
   },
-  photoBtnText: {
-    fontSize: 16,
-    color: colors.text,
-  },
-  photoBtnDisabled: {
-    color: colors.gray300,
-  },
-  photoBtnRemove: {
-    backgroundColor: colors.errorLight,
-  },
-  photoBtnRemoveText: {
-    fontSize: 14,
-    color: colors.error,
-    fontWeight: "700",
-  },
+  photoBtnText: { fontSize: 16, color: colors.text },
+  photoBtnDisabled: { color: colors.gray300 },
+  photoBtnRemove: { backgroundColor: colors.errorLight },
+  photoBtnRemoveText: { fontSize: 14, color: colors.error, fontWeight: "700" },
   addPhotoBtn: {
     borderWidth: 1.5,
     borderColor: colors.primary,
@@ -714,70 +1126,74 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: spacing[2],
   },
-  addPhotoBtnText: {
-    color: colors.primary,
-    fontWeight: "600",
-    fontSize: fontSize.md,
-  },
-  photoHint: {
-    textAlign: "center",
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-    marginTop: spacing[3],
-  },
-  // Preferences
-  toggleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  addPhotoBtnText: { color: colors.primary, fontWeight: "600", fontSize: fontSize.md },
+
+  // Review
+  previewCard: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    marginBottom: spacing[2],
-  },
-  toggleLabel: {
-    fontSize: fontSize.md,
-    color: colors.text,
-  },
-  // Preview
-  preview: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: "hidden",
+    marginTop: spacing[3],
   },
-  previewImage: {
-    width: "100%",
-    height: 140,
-  },
+  previewImage: { width: "100%", height: 140 },
   previewImagePlaceholder: {
     height: 140,
     backgroundColor: colors.primaryLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  previewBody: {
-    padding: spacing[3],
+  previewBody: { padding: spacing[3], gap: spacing[2] },
+  previewTitle: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
+  previewMeta: { fontSize: fontSize.xs, color: colors.textSecondary },
+  previewTags: { flexDirection: "row", flexWrap: "wrap", gap: spacing[1] },
+  previewTag: {
+    backgroundColor: colors.gray100,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+  },
+  previewTagText: { fontSize: 11, color: colors.textSecondary },
+
+  checklist: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing[4],
     gap: spacing[2],
+    marginTop: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  previewCity: {
+  checklistTitle: {
     fontSize: fontSize.xs,
-    color: colors.textSecondary,
-  },
-  previewTitle: {
-    fontSize: fontSize.md,
     fontWeight: "700",
-    color: colors.text,
+    color: colors.textTertiary,
+    letterSpacing: 0.5,
+    marginBottom: spacing[1],
   },
-  previewTags: {
+  checklistItem: { flexDirection: "row", alignItems: "center", gap: spacing[2] },
+  checklistIcon: { fontSize: fontSize.md, fontWeight: "700" },
+  checkDone: { color: colors.success },
+  checkMissing: { color: colors.gray300 },
+  checklistLabel: { fontSize: fontSize.sm, color: colors.text },
+  checklistLabelMissing: { color: colors.textSecondary },
+
+  privacyCallout: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing[1],
+    alignItems: "flex-start",
+    gap: spacing[3],
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.xl,
+    padding: spacing[3],
+    marginTop: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.warning + "44",
   },
+  privacyCalloutIcon: { fontSize: fontSize.lg, color: colors.warning },
+  privacyCalloutTitle: { fontSize: fontSize.sm, fontWeight: "700", color: colors.warning },
+  privacyCalloutText: { fontSize: fontSize.xs, color: colors.warning, opacity: 0.8, marginTop: 2 },
+
   // Nav
   nav: {
     flexDirection: "row",
@@ -789,29 +1205,26 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  backBtn: {
-    paddingVertical: spacing[3],
-    paddingHorizontal: spacing[4],
-  },
-  backBtnText: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-    fontWeight: "600",
-  },
+  backBtn: { paddingVertical: spacing[3], paddingHorizontal: spacing[2] },
+  backBtnText: { fontSize: fontSize.md, color: colors.textSecondary, fontWeight: "600" },
   nextBtn: {
-    backgroundColor: colors.primary,
     borderRadius: radius.full,
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[6],
-    minWidth: 120,
+    minWidth: 130,
+    alignItems: "center",
+    backgroundColor: colors.primary,
+  },
+  nextBtnText: { color: colors.white, fontWeight: "700", fontSize: fontSize.md },
+  publishRow: { flexDirection: "row", gap: spacing[2] },
+  draftBtn: {
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[4],
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
   },
-  nextBtnText: {
-    color: colors.white,
-    fontWeight: "700",
-    fontSize: fontSize.md,
-  },
-  btnDisabled: {
-    opacity: 0.6,
-  },
+  draftBtnText: { fontWeight: "600", color: colors.textSecondary, fontSize: fontSize.sm },
+  btnDisabled: { opacity: 0.6 },
 });
