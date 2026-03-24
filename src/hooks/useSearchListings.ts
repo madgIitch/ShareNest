@@ -5,6 +5,7 @@ import type { ListingFilters } from "../types/filters";
 import type { Database } from "../types/database";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
+type ListingViewRow = Listing;
 
 const PAGE_SIZE = 20;
 
@@ -44,8 +45,20 @@ export function useSearchListings(filters: ListingFilters) {
 
       const rows = (data ?? []) as Listing[];
       const hasMore = rows.length > PAGE_SIZE;
-      const items = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
-      const nextCursor = hasMore ? items[items.length - 1].created_at : null;
+      const rpcItems = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+      const nextCursor = hasMore ? rpcItems[rpcItems.length - 1].created_at : null;
+
+      if (rpcItems.length === 0) return { items: [], nextCursor };
+
+      const ids = rpcItems.map((r) => r.id);
+      const { data: hydrated, error: hydrateError } = await supabase
+        .from("listings_with_property")
+        .select("*")
+        .in("id", ids);
+      if (hydrateError) throw hydrateError;
+
+      const byId = new Map(((hydrated ?? []) as unknown as ListingViewRow[]).map((r) => [r.id, r]));
+      const items = ids.map((id) => byId.get(id)).filter((x): x is Listing => !!x);
       return { items, nextCursor };
     },
     initialPageParam: null as string | null,
@@ -63,7 +76,16 @@ export function useListingsForMap(filters: ListingFilters, enabled = true) {
         toRpcArgs(filters, null, 500),
       );
       if (error) throw error;
-      return (data ?? []) as Listing[];
+      const rows = (data ?? []) as Listing[];
+      if (rows.length === 0) return [];
+      const ids = rows.map((r) => r.id);
+      const { data: hydrated, error: hydrateError } = await supabase
+        .from("listings_with_property")
+        .select("*")
+        .in("id", ids);
+      if (hydrateError) throw hydrateError;
+      const byId = new Map(((hydrated ?? []) as unknown as ListingViewRow[]).map((r) => [r.id, r]));
+      return ids.map((id) => byId.get(id)).filter((x): x is Listing => !!x);
     },
     enabled,
   });

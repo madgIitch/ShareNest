@@ -988,8 +988,22 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         });
         const detectedPostal = resolved?.postal_code?.trim() ?? "";
         console.log("[ListingWizard] resolvePostalFromAddress result:", resolved);
-        if (!detectedPostal || seq !== geoSyncSeq.current) return;
+        if (seq !== geoSyncSeq.current) return;
+
+        if (!detectedPostal) {
+          // If city+district+street cannot resolve, reconcile by current postal code
+          // to avoid stale district/place values in the form.
+          const currentPostal = form.postal_code.replace(/\D/g, "").slice(0, 5);
+          if (currentPostal.length === 5) {
+            console.log("[ListingWizard] resolvePostalFromAddress null -> fallback syncFromPostalCode", { currentPostal });
+            syncFromPostalCode(currentPostal);
+          }
+          return;
+        }
+
         setForm((f) => ({ ...f, postal_code: detectedPostal }));
+        // Always reconcile district/place against postal result to prevent stale barrio.
+        syncFromPostalCode(detectedPostal);
       } catch {
         // Best effort.
       }

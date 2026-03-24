@@ -6,6 +6,11 @@ import type { Database, ListingStatus } from "../types/database";
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 type ListingInsert = Database["public"]["Tables"]["listings"]["Insert"];
 type ListingUpdate = Database["public"]["Tables"]["listings"]["Update"];
+type ListingViewRow = Listing & {
+  property_name?: string | null;
+  property_address?: string | null;
+  property_postal_code?: string | null;
+};
 
 // --- Queries ---
 
@@ -14,12 +19,12 @@ export function useListing(id: string | undefined) {
     queryKey: ["listing", id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("listings")
+        .from("listings_with_property")
         .select("*")
         .eq("id", id!)
         .single();
       if (error) throw error;
-      return data as Listing;
+      return data as unknown as Listing;
     },
     enabled: !!id,
   });
@@ -30,12 +35,12 @@ export function useMyListings(userId: string | undefined) {
     queryKey: ["listings", "mine", userId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("listings")
+        .from("listings_with_property")
         .select("*")
         .eq("owner_id", userId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Listing[];
+      return (data ?? []) as unknown as Listing[];
     },
     enabled: !!userId,
   });
@@ -46,7 +51,7 @@ export function useActiveListings(city?: string) {
     queryKey: ["listings", "active", city ?? "all"],
     queryFn: async () => {
       let query = supabase
-        .from("listings")
+        .from("listings_with_property")
         .select("*")
         .eq("status", "active")
         .order("created_at", { ascending: false });
@@ -55,7 +60,7 @@ export function useActiveListings(city?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as Listing[];
+      return (data ?? []) as unknown as Listing[];
     },
   });
 }
@@ -68,11 +73,11 @@ export function useListingsByIds(ids: string[]) {
     queryFn: async () => {
       if (uniqueIds.length === 0) return [];
       const { data, error } = await supabase
-        .from("listings")
+        .from("listings_with_property")
         .select("*")
         .in("id", uniqueIds);
       if (error) throw error;
-      const rows = (data ?? []) as Listing[];
+      const rows = (data ?? []) as unknown as ListingViewRow[];
       const byId = new Map(rows.map((r) => [r.id, r]));
       return uniqueIds.map((id) => byId.get(id)).filter((x): x is Listing => !!x);
     },
