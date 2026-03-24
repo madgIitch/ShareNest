@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BalanceCard } from "../../src/components/expenses/BalanceCard";
 import { ExpenseItem } from "../../src/components/expenses/ExpenseItem";
@@ -117,6 +117,14 @@ export default function WorkspaceScreen() {
   const occupied = listings.filter((l) => l.status === "rented").length;
   const free = listings.filter((l) => l.status === "active").length;
 
+  const handleOpenInvite = () => {
+    if (!activeHouseholdId) {
+      Alert.alert("Sin household", "Primero unete al piso o crea household para generar codigo.");
+      return;
+    }
+    router.push({ pathname: "/household/invite", params: { householdId: activeHouseholdId } });
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Mi espacio</Text>
@@ -132,6 +140,42 @@ export default function WorkspaceScreen() {
           </Pressable>
         ))}
       </View>
+
+      {(hasOwnerTab || hasHouseholdTab) && (
+        <View style={styles.block}>
+          <Text style={styles.sectionTitle}>Incorporar personas al piso</Text>
+
+          <Pressable style={styles.entryCard} onPress={handleOpenInvite}>
+            <View style={styles.entryIconWrap}>
+              <Text style={styles.entryIcon}>#</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.entryTitle}>Compartir codigo de invitacion</Text>
+              <Text style={styles.entrySub}>El companero introduce el codigo y entra directo al household.</Text>
+            </View>
+          </Pressable>
+
+          <Pressable style={styles.entryCard} onPress={() => router.push("/household/join")}>
+            <View style={styles.entryIconWrap}>
+              <Text style={styles.entryIcon}>+</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.entryTitle}>Unirme yo al piso</Text>
+              <Text style={styles.entrySub}>Si aun no eres miembro, entra con codigo.</Text>
+            </View>
+          </Pressable>
+
+          <Pressable style={[styles.entryCard, styles.entryCardDashed]} onPress={() => router.push("/household/create")}>
+            <View style={styles.entryIconWrap}>
+              <Text style={styles.entryIcon}>*</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.entryTitle}>Crear household sin anuncio</Text>
+              <Text style={styles.entrySub}>Solo pide direccion. Sin wizard de anuncio.</Text>
+            </View>
+          </Pressable>
+        </View>
+      )}
 
       {activeTab === "seeking" ? (
         <View style={styles.block}>
@@ -392,6 +436,28 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionTitle: { color: colors.textTertiary, fontSize: fontSize.xs, fontWeight: "700", textTransform: "uppercase" },
   link: { color: colors.verify, fontSize: fontSize.sm, fontWeight: "700" },
+  entryCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    backgroundColor: colors.gray50,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+  },
+  entryCardDashed: { borderStyle: "dashed" },
+  entryIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.gray100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  entryIcon: { color: colors.textSecondary, fontWeight: "800", fontSize: fontSize.md },
+  entryTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
+  entrySub: { color: colors.textSecondary, fontSize: fontSize.xs, marginTop: 2 },
 
   kpiRow: { flexDirection: "row", gap: spacing[2] },
   stat: {

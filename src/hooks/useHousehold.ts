@@ -44,6 +44,12 @@ export type HouseholdSummary = {
   created_at: string;
 };
 
+export type HouseholdInviteData = {
+  household_id: string;
+  household_name: string;
+  invite_code: string;
+};
+
 const HOUSEHOLD_KEY = ["household", "mine"];
 
 export function useMyHousehold() {
@@ -108,6 +114,22 @@ export function useHouseholdById(householdId: string | undefined) {
   });
 }
 
+export function useHouseholdInvite(householdId: string | undefined) {
+  return useQuery({
+    queryKey: ["household", "invite", householdId],
+    enabled: !!householdId,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_household_invite", {
+        p_household_id: householdId!,
+      } as any);
+      if (error) throw error;
+      return ((data ?? [])[0] ?? null) as HouseholdInviteData | null;
+    },
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
 export function useCreateHousehold() {
   const qc = useQueryClient();
   return useMutation({
@@ -120,6 +142,46 @@ export function useCreateHousehold() {
       return { id: data as string };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY }),
+  });
+}
+
+export function useCreateHouseholdQuick() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      name,
+      address,
+      cityId,
+      placeId,
+      streetNumber,
+      postalCode,
+      floor,
+    }: {
+      name: string;
+      address: string;
+      cityId?: string | null;
+      placeId?: string | null;
+      streetNumber?: string | null;
+      postalCode?: string | null;
+      floor?: string | null;
+    }) => {
+      const { data, error } = await supabase.rpc("create_household_quick", {
+        p_name: name,
+        p_address: address,
+        p_city_id: cityId ?? null,
+        p_place_id: placeId ?? null,
+        p_street_number: streetNumber ?? null,
+        p_postal_code: postalCode ?? null,
+        p_floor: floor ?? null,
+      } as any);
+      if (error) throw error;
+      return (data?.[0] ?? null) as { household_id: string; property_id: string } | null;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY });
+      qc.invalidateQueries({ queryKey: ["household"] });
+      qc.invalidateQueries({ queryKey: ["properties"] });
+    },
   });
 }
 
