@@ -310,7 +310,7 @@ export default function WorkspaceScreen() {
 
           <View style={styles.rowBetween}>
             <Text style={styles.sectionTitle}>Gastos</Text>
-            <Pressable onPress={() => router.push("/(tabs)/household")}>
+            <Pressable onPress={() => router.push("/(tabs)/household?add=1")}>
               <Text style={styles.link}>+ Anadir</Text>
             </Pressable>
           </View>

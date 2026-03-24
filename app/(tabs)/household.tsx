@@ -1,5 +1,5 @@
-﻿import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -34,6 +34,8 @@ import type { Database } from "../../src/types/database";
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 
 export default function HouseholdScreen() {
+  const params = useLocalSearchParams<{ add?: string }>();
+  const autoOpenAdd = params.add === "1";
   const { session } = useAuth();
   const myId = session?.user?.id ?? "";
 
@@ -57,6 +59,7 @@ export default function HouseholdScreen() {
     return (
       <OwnerHomesDashboard
         userId={myId}
+        autoOpenAdd={autoOpenAdd}
         properties={myProperties}
         listings={myListings}
         receivedRequests={receivedRequests}
@@ -65,7 +68,7 @@ export default function HouseholdScreen() {
   }
 
   if (residentMemberships.length > 0) {
-    return <ResidentHomesView memberships={residentMemberships} />;
+    return <ResidentHomesView userId={myId} memberships={residentMemberships} autoOpenAdd={autoOpenAdd} />;
   }
 
   return <EmptyHomesView />;
@@ -73,11 +76,13 @@ export default function HouseholdScreen() {
 
 function OwnerHomesDashboard({
   userId,
+  autoOpenAdd,
   properties,
   listings,
   receivedRequests,
 }: {
   userId: string;
+  autoOpenAdd?: boolean;
   properties: PropertyWithCity[];
   listings: Listing[];
   receivedRequests: RequestWithDetails[];
@@ -102,6 +107,11 @@ function OwnerHomesDashboard({
   const { data: members = [] } = useHouseholdMembers(selectedHouseholdId ?? undefined);
 
   const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    if (autoOpenAdd && selectedHouseholdId) {
+      setSheetOpen(true);
+    }
+  }, [autoOpenAdd, selectedHouseholdId]);
 
   const filteredListings = useMemo(() => {
     if (!selectedProperty) return [];
@@ -387,17 +397,138 @@ function OwnerHomesDashboard({
   );
 }
 
-function ResidentHomesView({ memberships }: { memberships: MyHouseholdMembership[] }) {
+function ResidentHomesView({
+  userId,
+  memberships,
+  autoOpenAdd,
+}: {
+  userId: string;
+  memberships: MyHouseholdMembership[];
+  autoOpenAdd?: boolean;
+}) {
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState(memberships[0]?.household_id ?? "");
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const { data: household } = useHouseholdById(selectedHouseholdId || undefined);
+  const { data: members = [] } = useHouseholdMembers(selectedHouseholdId || undefined);
+  const { data: expenses = [], isLoading: loadingExp } = useExpenses(selectedHouseholdId || undefined);
+  const { data: balancesData, isLoading: loadingBal } = useBalances(selectedHouseholdId || undefined);
+
+  useEffect(() => {
+    if (autoOpenAdd && selectedHouseholdId) {
+      setSheetOpen(true);
+    }
+  }, [autoOpenAdd, selectedHouseholdId]);
+
+  const byMonth = expenses.reduce<Record<string, typeof expenses>>((acc, e) => {
+    const key = e.date.slice(0, 7);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(e);
+    return acc;
+  }, {});
+
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.pageTitle}>Pisos donde vives</Text>
-      {memberships.map((m) => (
-        <View key={`${m.household_id}-${m.joined_at}`} style={styles.roomCard}>
-          <Text style={styles.roomTitle}>{m.households?.name ?? "Piso compartido"}</Text>
-          <Text style={styles.roomMeta}>Unido el {new Date(m.joined_at).toLocaleDateString("es-ES")}</Text>
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.pageTitle}>Mi piso</Text>
+        {memberships.length > 1 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorRow}>
+            {memberships.map((m) => {
+              const active = m.household_id === selectedHouseholdId;
+              return (
+                <Pressable
+                  key={`${m.household_id}-${m.joined_at}`}
+                  style={[styles.selectorChip, active && styles.selectorChipActive]}
+                  onPress={() => setSelectedHouseholdId(m.household_id)}
+                >
+                  <Text style={[styles.selectorChipText, active && styles.selectorChipTextActive]} numberOfLines={1}>
+                    {m.households?.name ?? "Piso compartido"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        <View style={styles.block}>
+          <Text style={styles.roomTitle}>{household?.name ?? "Piso compartido"}</Text>
+          <Text style={styles.roomMeta}>
+            Unido el{" "}
+            {new Date(
+              memberships.find((m) => m.household_id === selectedHouseholdId)?.joined_at ?? new Date().toISOString(),
+            ).toLocaleDateString("es-ES")}
+          </Text>
+
+          <View style={styles.blockHeader}>
+            <Text style={styles.blockTitle}>Balance del mes</Text>
+            <Pressable onPress={() => setSheetOpen(true)}>
+              <Text style={styles.outlineBtnText}>+ Anadir</Text>
+            </Pressable>
+          </View>
+          {loadingBal ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[3] }} />
+          ) : balancesData ? (
+            <BalanceCard data={balancesData} currentUserId={userId} />
+          ) : (
+            <Text style={styles.muted}>Todavia no hay balance calculado.</Text>
+          )}
+
+          <Text style={styles.blockTitle}>Companeros</Text>
+          {members.map((m) => (
+            <View key={m.user_id} style={styles.tenantRow}>
+              <UserAvatar
+                avatarUrl={m.profiles?.avatar_url}
+                name={m.profiles?.full_name ?? m.profiles?.username ?? "Usuario"}
+                size="xs"
+              />
+              <View style={styles.tenantTextWrap}>
+                <Text style={styles.tenantName}>
+                  {m.profiles?.full_name ?? m.profiles?.username ?? "Usuario"}
+                  {m.role === "admin" ? " (Admin)" : ""}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          <View style={styles.blockHeader}>
+            <Text style={styles.blockTitle}>Gastos</Text>
+            <Pressable onPress={() => setSheetOpen(true)}>
+              <Text style={styles.outlineBtnText}>+ Anadir</Text>
+            </Pressable>
+          </View>
+
+          {loadingExp ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[3] }} />
+          ) : expenses.length === 0 ? (
+            <Text style={styles.muted}>No hay gastos en este household.</Text>
+          ) : (
+            Object.entries(byMonth).map(([month, items]) => (
+              <View key={month} style={styles.monthGroup}>
+                <Text style={styles.monthLabel}>{formatMonth(month)}</Text>
+                {items.map((e) => (
+                  <ExpenseItem key={e.id} expense={e} currentUserId={userId} householdId={selectedHouseholdId} />
+                ))}
+              </View>
+            ))
+          )}
         </View>
-      ))}
-    </ScrollView>
+      </ScrollView>
+
+      {selectedHouseholdId && (
+        <>
+          <Pressable style={styles.fab} onPress={() => setSheetOpen(true)} accessibilityLabel="Anadir gasto del piso">
+            <Text style={styles.fabText}>+ Anadir gasto</Text>
+          </Pressable>
+          <AddExpenseSheet
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            householdId={selectedHouseholdId}
+            currentUserId={userId}
+            members={members}
+          />
+        </>
+      )}
+    </View>
   );
 }
 
