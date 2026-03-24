@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
   Image,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -64,6 +65,70 @@ function RuleTag({ label }: { label: string }) {
     <View style={styles.ruleTag}>
       <Text style={styles.ruleTagText}>{label}</Text>
     </View>
+  );
+}
+
+function ImageGalleryModal({
+  visible,
+  images,
+  initialIndex,
+  onClose,
+}: {
+  visible: boolean;
+  images: string[];
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const listRef = useRef<FlatList<string>>(null);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  useEffect(() => {
+    if (!visible) return;
+    setCurrentIndex(initialIndex);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+    });
+  }, [images, initialIndex, visible]);
+
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+    setCurrentIndex(idx);
+  }, []);
+
+  if (!visible || images.length === 0) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.galleryBackdrop}>
+        <FlatList
+          ref={listRef}
+          horizontal
+          pagingEnabled
+          data={images}
+          keyExtractor={(item, i) => `${item}-${i}`}
+          renderItem={({ item }) => (
+            <Image source={{ uri: item }} style={styles.galleryImage} resizeMode="contain" />
+          )}
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          initialScrollIndex={initialIndex}
+          getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+        />
+
+        <Pressable style={styles.galleryCloseBtn} onPress={onClose}>
+          <Text style={styles.galleryCloseBtnText}>{"\u00D7"}</Text>
+        </Pressable>
+
+        {images.length > 1 && (
+          <View style={styles.galleryCounter}>
+            <Text style={styles.galleryCounterText}>
+              {currentIndex + 1} / {images.length}
+            </Text>
+          </View>
+        )}
+      </View>
+    </Modal>
   );
 }
 
@@ -164,6 +229,9 @@ export default function ListingDetailScreen() {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryVisible, setGalleryVisible] = useState(false);
 
   const { data: myRequest } = useMyRequestForListing(id, myId);
   const { data: receivedRequests = [] } = useReceivedRequests(myId);
@@ -287,6 +355,13 @@ export default function ListingDetailScreen() {
     }
   };
 
+  const openGallery = useCallback((nextImages: string[], index: number) => {
+    if (nextImages.length === 0) return;
+    setGalleryImages(nextImages);
+    setGalleryIndex(index);
+    setGalleryVisible(true);
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
@@ -299,8 +374,10 @@ export default function ListingDetailScreen() {
               showsHorizontalScrollIndicator={false}
               data={images}
               keyExtractor={(_, i) => String(i)}
-              renderItem={({ item }) => (
-                <Image source={{ uri: item }} style={styles.heroImage} />
+              renderItem={({ item, index }) => (
+                <Pressable onPress={() => openGallery(images, index)}>
+                  <Image source={{ uri: item }} style={styles.heroImage} />
+                </Pressable>
               )}
               onScroll={onScroll}
               scrollEventThrottle={16}
@@ -409,12 +486,12 @@ export default function ListingDetailScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScrollView}>
                 <View style={styles.photosRow}>
                   {flatPhotoItems.map((item, i) => (
-                    <View key={item.url + i} style={styles.photoThumbWrap}>
+                    <Pressable key={item.url + i} style={styles.photoThumbWrap} onPress={() => openGallery(flatPhotoUrls, i)}>
                       <Image source={{ uri: item.url }} style={styles.photoThumbImg} />
                       <View style={styles.photoThumbLabel}>
                         <Text style={styles.photoThumbLabelText} numberOfLines={1}>{item.zone}</Text>
                       </View>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               </ScrollView>
@@ -428,14 +505,14 @@ export default function ListingDetailScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScrollView}>
                 <View style={styles.photosRow}>
                   {roomImages.map((uri, i) => (
-                    <View key={uri + i} style={styles.photoThumbWrap}>
+                    <Pressable key={uri + i} style={styles.photoThumbWrap} onPress={() => openGallery(roomImages, i)}>
                       <Image source={{ uri }} style={styles.photoThumbImg} />
                       <View style={[styles.photoThumbLabel, styles.photoThumbLabelRoom]}>
                         <Text style={[styles.photoThumbLabelText, styles.photoThumbLabelTextRoom]} numberOfLines={1}>
                           Habitación
                         </Text>
                       </View>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               </ScrollView>
@@ -620,6 +697,13 @@ export default function ListingDetailScreen() {
           )}
         </View>
       )}
+
+      <ImageGalleryModal
+        visible={galleryVisible}
+        images={galleryImages}
+        initialIndex={galleryIndex}
+        onClose={() => setGalleryVisible(false)}
+      />
     </View>
   );
 }
@@ -945,4 +1029,43 @@ const styles = StyleSheet.create({
   photoThumbLabelText: { color: colors.white, fontSize: 11, fontWeight: "700" },
   photoThumbLabelRoom: { backgroundColor: colors.purple + "cc" },
   photoThumbLabelTextRoom: { color: colors.white },
+  galleryBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.96)",
+    justifyContent: "center",
+  },
+  galleryImage: {
+    width: SW,
+    height: "100%",
+  },
+  galleryCloseBtn: {
+    position: "absolute",
+    top: 50,
+    right: spacing[4],
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  galleryCloseBtnText: {
+    color: colors.white,
+    fontSize: 28,
+    lineHeight: 30,
+  },
+  galleryCounter: {
+    position: "absolute",
+    bottom: spacing[6],
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  galleryCounterText: {
+    color: colors.white,
+    fontSize: fontSize.sm,
+    fontWeight: "700",
+  },
 });
