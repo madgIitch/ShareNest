@@ -22,7 +22,7 @@ import {
   useSendMessage,
 } from "../../src/hooks/useConversations";
 import { useListing } from "../../src/hooks/useListings";
-import { useAcceptOffer, useConfirmAssignment, useRequest } from "../../src/hooks/useRequests";
+import { useAcceptOffer, useConfirmAssignment, useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
 import type { OfferTerms } from "../../src/hooks/useRequests";
 import { supabase } from "../../src/lib/supabase";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -38,6 +38,7 @@ function getBillsLabel(mode: OfferTerms["bills_mode"] | string | null | undefine
 }
 
 function getStatusLabel(status: string) {
+  if (status === "invited") return "Chat aceptado";
   if (status === "offered") return "Oferta enviada";
   if (status === "accepted") return "Oferta aceptada";
   if (status === "assigned") return "Habitacion asignada";
@@ -57,6 +58,7 @@ export default function ConversationScreen() {
 
   const sendMessage = useSendMessage();
   const markRead = useMarkRead();
+  const updateRequest = useUpdateRequestStatus();
   const acceptOffer = useAcceptOffer();
   const confirmAssignment = useConfirmAssignment();
 
@@ -88,6 +90,11 @@ export default function ConversationScreen() {
     && (request.status === "accepted" || request.status === "assigned")
     && (isOwnerInRequest || isRequesterInRequest)
     && !hasConfirmed
+    && listing?.status !== "rented";
+
+  const canSendOfferFromChat = !!request
+    && (request.status === "pending" || request.status === "invited")
+    && isOwnerInRequest
     && listing?.status !== "rented";
 
   const isReadOnly = listing?.status === "rented";
@@ -145,6 +152,26 @@ export default function ConversationScreen() {
       if (convId && convId !== id) {
         router.replace(`/conversation/${convId}`);
       }
+    } catch (err) {
+      Alert.alert("Error", (err as Error).message);
+    }
+  };
+
+  const buildDefaultTerms = (): OfferTerms => ({
+    price: listing?.price ?? null,
+    available_from: listing?.available_from ?? null,
+    min_stay_months: listing?.min_stay_months ?? null,
+    bills_mode: "extra",
+  });
+
+  const handleSendOfferFromChat = async () => {
+    if (!request) return;
+    try {
+      await updateRequest.mutateAsync({
+        request,
+        status: "offered",
+        offerTerms: buildDefaultTerms(),
+      });
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
     }
@@ -215,6 +242,26 @@ export default function ConversationScreen() {
           <Text style={styles.statusBannerSub}>
             Confirmaciones: buscador {request.requester_confirmed_at ? "ok" : "pendiente"} · propietario {request.owner_confirmed_at ? "ok" : "pendiente"}
           </Text>
+        </View>
+      )}
+
+      {canSendOfferFromChat && (
+        <View style={styles.preOfferCard}>
+          <Text style={styles.preOfferTitle}>Ya puedes enviar oferta</Text>
+          <Text style={styles.preOfferText}>
+            El chat esta abierto. Cuando quieras, envia la oferta formal con precio y condiciones.
+          </Text>
+          <Pressable
+            style={[styles.secondaryBtn, updateRequest.isPending && styles.btnDisabled]}
+            onPress={handleSendOfferFromChat}
+            disabled={updateRequest.isPending}
+          >
+            {updateRequest.isPending ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text style={styles.secondaryBtnText}>Enviar oferta</Text>
+            )}
+          </Pressable>
         </View>
       )}
 
@@ -360,6 +407,18 @@ const styles = StyleSheet.create({
   },
   statusBannerText: { color: colors.purple, fontSize: fontSize.sm, fontWeight: "700" },
   statusBannerSub: { color: colors.textSecondary, fontSize: fontSize.xs },
+  preOfferCard: {
+    margin: spacing[3],
+    marginBottom: spacing[2],
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing[3],
+    gap: spacing[2],
+  },
+  preOfferTitle: { color: colors.text, fontWeight: "800", fontSize: fontSize.md },
+  preOfferText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20 },
 
   offerCard: {
     margin: spacing[3],

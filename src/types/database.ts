@@ -524,6 +524,10 @@ export type Database = {
         Args: { p_request_id: string };
         Returns: string;
       };
+      accept_request_chat: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
       deny_request: {
         Args: { p_request_id: string };
         Returns: undefined;

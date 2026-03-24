@@ -201,9 +201,18 @@ export function useUpdateRequestStatus() {
       offerTerms,
     }: {
       request: RequestWithDetails;
-      status: Extract<RequestStatus, "offered" | "denied">;
+      status: Extract<RequestStatus, "invited" | "offered" | "denied">;
       offerTerms?: OfferTerms;
     }) => {
+      if (status === "invited") {
+        const { data, error } = await supabase.rpc("accept_request_chat", {
+          p_request_id: request.id,
+        });
+        if (error) throw error;
+        if (!data) return null;
+        return { id: data as string };
+      }
+
       if (status === "offered") {
         const terms: OfferTerms = offerTerms ?? {
           price: request.listing?.price ?? null,

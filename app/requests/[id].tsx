@@ -13,7 +13,6 @@ import {
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../src/components/ui/TagBadge";
 import { useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
-import type { OfferTerms } from "../../src/hooks/useRequests";
 import { supabase } from "../../src/lib/supabase";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 
@@ -53,13 +52,6 @@ export default function RequestDetailScreen() {
     router.push(`/conversation/${conv.id}`);
   };
 
-  const buildDefaultTerms = (): OfferTerms => ({
-    price: listing?.price ?? null,
-    available_from: listing?.available_from ?? null,
-    min_stay_months: listing?.min_stay_months ?? null,
-    bills_mode: "extra",
-  });
-
   const handleAcceptChat = () => {
     Alert.alert("Aceptar chat", "Se abrira el chat con este candidato para continuar la conversacion.", [
       { text: "Cancelar", style: "cancel" },
@@ -69,8 +61,7 @@ export default function RequestDetailScreen() {
           try {
             const conv = (await updateStatus.mutateAsync({
               request,
-              status: "offered",
-              offerTerms: buildDefaultTerms(),
+              status: "invited",
             })) as { id: string } | null;
             if (conv?.id) {
               router.replace(`/conversation/${conv.id}`);
@@ -109,7 +100,9 @@ export default function RequestDetailScreen() {
         <View style={[styles.statusBanner, request.status === "denied" ? styles.bannerDenied : styles.bannerActive]}>
           <Text style={[styles.statusBannerText, request.status === "denied" ? styles.bannerTextDenied : styles.bannerTextActive]}>
             {request.status === "offered"
-              ? "Chat aceptado"
+              ? "Oferta enviada"
+              : request.status === "invited"
+                ? "Chat aceptado"
               : request.status === "accepted"
                 ? "Chat confirmado"
                 : request.status === "assigned"
