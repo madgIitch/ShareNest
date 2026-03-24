@@ -47,6 +47,32 @@ export async function uploadAvatar(userId: string, uri: string): Promise<string>
   return path;
 }
 
+export async function uploadProfilePhoto(userId: string, uri: string): Promise<string> {
+  const rawExt = uri.split(".").pop()?.split("?")[0]?.toLowerCase() ?? "jpg";
+  const ext = rawExt === "jpg" ? "jpeg" : rawExt;
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const path = `${userId}/gallery/${filename}`;
+  const contentType = `image/${ext}`;
+
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: "base64",
+  });
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  const { error } = await supabase.storage.from("avatars").upload(path, bytes, {
+    contentType,
+    upsert: false,
+  });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function resizeAvatar(userId: string, path: string): Promise<string> {
   try {
     const { data, error } = await supabase.functions.invoke("resize-avatar", {

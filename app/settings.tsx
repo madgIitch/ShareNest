@@ -1,8 +1,8 @@
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
-import { useAuth } from "../src/providers/AuthProvider";
 import { useUpdateNotifPrefs } from "../src/hooks/useNotificationPrefs";
+import { useAuth } from "../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../src/theme";
 
 export default function SettingsScreen() {
@@ -10,10 +10,10 @@ export default function SettingsScreen() {
   const updatePrefs = useUpdateNotifPrefs();
 
   const handleSignOut = async () => {
-    Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
+    Alert.alert("Cerrar sesion", "¿Seguro que quieres salir?", [
       { text: "Cancelar", style: "cancel" },
       {
-        text: "Cerrar sesión",
+        text: "Cerrar sesion",
         style: "destructive",
         onPress: async () => {
           await signOut();
@@ -31,29 +31,29 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* User card */}
       <View style={styles.userCard}>
-        {profile?.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>
-              {(profile?.full_name ?? email)[0].toUpperCase()}
-            </Text>
-          </View>
-        )}
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{profile?.full_name ?? "Sin nombre"}</Text>
-          <Text style={styles.userEmail}>{email}</Text>
-          {profile?.verified_at && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>✓ Número verificado</Text>
+        <View style={styles.avatarWrap}>
+          {profile?.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitial}>{(profile?.full_name ?? email)[0].toUpperCase()}</Text>
+            </View>
+          )}
+          {!!profile?.verified_at && (
+            <View style={styles.avatarVerifiedBadge}>
+              <Text style={styles.avatarVerifiedBadgeText}>✓</Text>
             </View>
           )}
         </View>
+
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{profile?.full_name ?? "Sin nombre"}</Text>
+          <Text style={styles.userEmail}>{email}</Text>
+          {!!profile?.verified_at && <Text style={styles.verifiedHint}>Numero verificado</Text>}
+        </View>
       </View>
 
-      {/* Account */}
       <Text style={styles.sectionHeader}>Cuenta</Text>
       <View style={styles.section}>
         <Pressable style={styles.row} onPress={() => router.push("/profile")}>
@@ -62,7 +62,6 @@ export default function SettingsScreen() {
         </Pressable>
       </View>
 
-      {/* Notification preferences */}
       <Text style={styles.sectionHeader}>Notificaciones</Text>
       <View style={styles.section}>
         <View style={styles.row}>
@@ -77,6 +76,7 @@ export default function SettingsScreen() {
             thumbColor={colors.white}
           />
         </View>
+
         <View style={[styles.row, styles.rowBorder]}>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Solicitudes</Text>
@@ -89,10 +89,11 @@ export default function SettingsScreen() {
             thumbColor={colors.white}
           />
         </View>
+
         <View style={[styles.row, styles.rowBorder]}>
           <View style={styles.rowContent}>
             <Text style={styles.rowLabel}>Friendz</Text>
-            <Text style={styles.rowSubtitle}>Nuevas solicitudes de conexión</Text>
+            <Text style={styles.rowSubtitle}>Nuevas solicitudes de conexion</Text>
           </View>
           <Switch
             value={profile?.notif_friendz ?? true}
@@ -103,10 +104,9 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      {/* Sign out */}
       <View style={styles.section}>
         <Pressable style={[styles.row, styles.rowCenter]} onPress={handleSignOut}>
-          <Text style={styles.rowLabelDanger}>Cerrar sesión</Text>
+          <Text style={styles.rowLabelDanger}>Cerrar sesion</Text>
         </Pressable>
       </View>
     </ScrollView>
@@ -130,28 +130,35 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: spacing[4],
   },
-  avatar: { width: 60, height: 60, borderRadius: 30 },
+  avatarWrap: { width: 84, height: 84 },
+  avatar: { width: 84, height: 84, borderRadius: 42 },
   avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: colors.primaryLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarInitial: { fontSize: 24, fontWeight: "700", color: colors.primary },
+  avatarInitial: { fontSize: 30, fontWeight: "700", color: colors.primary },
+  avatarVerifiedBadge: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.verify,
+    borderWidth: 2,
+    borderColor: colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarVerifiedBadgeText: { color: colors.white, fontSize: 12, fontWeight: "800" },
   userInfo: { flex: 1, gap: 2 },
   userName: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
   userEmail: { fontSize: fontSize.sm, color: colors.textSecondary },
-  badge: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    backgroundColor: "#dcfce7",
-    borderRadius: radius.full,
-    paddingHorizontal: spacing[3],
-    paddingVertical: 2,
-  },
-  badgeText: { color: "#16a34a", fontWeight: "700", fontSize: fontSize.xs },
+  verifiedHint: { marginTop: 4, color: colors.verify, fontWeight: "700", fontSize: fontSize.xs },
 
   sectionHeader: {
     fontSize: fontSize.xs,

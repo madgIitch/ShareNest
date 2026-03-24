@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
@@ -24,6 +25,24 @@ function guestsLabel(value: string | null | undefined) {
   return "-";
 }
 
+function cleanlinessLabel(value: number | null | undefined) {
+  if (!value) return "-";
+  if (value >= 5) return "Muy ordenado";
+  if (value >= 4) return "Bastante ordenado";
+  if (value === 3) return "Ordenado";
+  if (value === 2) return "Algo relajado";
+  return "Relajado";
+}
+
+function noiseLabel(value: number | null | undefined) {
+  if (!value) return "-";
+  if (value <= 1) return "Muy tranquilo";
+  if (value <= 2) return "Tranquilo";
+  if (value === 3) return "Moderado";
+  if (value === 4) return "Animado";
+  return "Muy animado";
+}
+
 function lookingForLabel(value: string | null | undefined) {
   if (value === "room") return "Habitacion";
   if (value === "flat") return "Piso";
@@ -31,13 +50,14 @@ function lookingForLabel(value: string | null | undefined) {
   return "-";
 }
 
-export default function AccountScreen() {
-  const { session, profile, signOut } = useAuth();
+function languagesLabel(values: string[] | null | undefined) {
+  const count = values?.length ?? 0;
+  if (count === 0) return "-";
+  return count === 1 ? "1 idioma" : `${count} idiomas`;
+}
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace("/login");
-  };
+export default function AccountScreen() {
+  const { session, profile } = useAuth();
 
   const birthYear = profile?.birth_year;
   const age = birthYear ? String(new Date().getFullYear() - birthYear) : "-";
@@ -56,7 +76,7 @@ export default function AccountScreen() {
         {!!profile?.username && <Text style={styles.username}>@{profile.username}</Text>}
 
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{age !== "-" ? `${age} anos` : "Edad sin definir"}</Text>
+          <Text style={styles.metaText}>{age !== "-" ? `${age} años` : "Edad sin definir"}</Text>
           {!!profile?.occupation && <Text style={styles.metaText}>· {profile.occupation}</Text>}
           {!!profile?.city && <Text style={styles.metaText}>· {profile.city}</Text>}
         </View>
@@ -84,12 +104,13 @@ export default function AccountScreen() {
         <Text style={styles.sectionTitle}>Estilo de vida</Text>
         <View style={styles.grid}>
           <InfoCell label="Horario" value={scheduleLabel(profile?.schedule)} />
-          <InfoCell label="Limpieza" value={profile?.cleanliness ? `${profile.cleanliness}/5` : "-"} />
-          <InfoCell label="Ruido" value={profile?.noise_level ? `${profile.noise_level}/5` : "-"} />
+          <InfoCell label="Limpieza" value={cleanlinessLabel(profile?.cleanliness)} />
+          <InfoCell label="Ruido" value={noiseLabel(profile?.noise_level)} />
           <InfoCell label="Teletrabajo" value={yesNo(profile?.works_from_home)} />
           <InfoCell label="Mascotas" value={yesNo(profile?.has_pets, "Con mascotas", "Sin mascotas")} />
           <InfoCell label="Fuma" value={yesNo(profile?.smokes, "Si", "No")} />
           <InfoCell label="Visitas" value={guestsLabel(profile?.guests_frequency)} />
+          <InfoCell label="Idiomas" value={languagesLabel(profile?.languages)} />
         </View>
       </View>
 
@@ -101,11 +122,11 @@ export default function AccountScreen() {
             label="Presupuesto"
             value={
               profile?.budget_min || profile?.budget_max
-                ? `${profile?.budget_min ?? "-"} - ${profile?.budget_max ?? "-"} €/mes`
-                : "-"
+                ? `${profile?.budget_min ?? "-"} - ${profile?.budget_max ?? "-"} EUR/mes`
+                : "No especificado"
             }
           />
-          <InfoCell label="Disponible" value={profile?.move_in_date ?? "-"} />
+          <InfoCell label="Disponible" value={profile?.move_in_date ?? "No especificado"} />
         </View>
 
         {!!profile?.preferred_cities?.length && (
@@ -137,25 +158,24 @@ export default function AccountScreen() {
 
       <View style={styles.card}>
         <Pressable style={styles.row} onPress={() => router.push("/settings")}>
-          <Text style={styles.rowLabel}>Configuracion</Text>
+          <View style={styles.rowLeft}>
+            <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+            <Text style={styles.rowLabel}>Configuracion</Text>
+          </View>
           <Text style={styles.arrow}>›</Text>
         </Pressable>
       </View>
 
-      <View style={styles.card}>
-        <Pressable style={styles.row} onPress={handleSignOut}>
-          <Text style={styles.rowLabelDanger}>Cerrar sesion</Text>
-        </Pressable>
-      </View>
     </ScrollView>
   );
 }
 
 function InfoCell({ label, value }: { label: string; value: string }) {
+  const isPlaceholder = value === "-" || value === "No especificado";
   return (
     <View style={styles.infoCell}>
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+      <Text style={[styles.infoValue, isPlaceholder && styles.infoValuePlaceholder]}>{value}</Text>
     </View>
   );
 }
@@ -183,12 +203,11 @@ const styles = StyleSheet.create({
   headerActions: { width: "100%", gap: spacing[2], marginTop: spacing[3] },
   editBtn: {
     borderRadius: radius.full,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+    backgroundColor: colors.text,
     paddingVertical: spacing[2],
     alignItems: "center",
   },
-  editBtnText: { color: colors.primary, fontWeight: "700" },
+  editBtnText: { color: colors.white, fontWeight: "700" },
   secondaryBtn: {
     borderRadius: radius.full,
     borderWidth: 1,
@@ -226,6 +245,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
   infoValue: { fontSize: fontSize.sm, color: colors.text, fontWeight: "700", marginTop: 2 },
+  infoValuePlaceholder: { color: colors.textTertiary, fontWeight: "600" },
 
   block: { marginTop: spacing[2], gap: spacing[1] },
   blockTitle: { fontSize: fontSize.xs, color: colors.textSecondary, fontWeight: "600" },
@@ -233,10 +253,10 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: radius.full,
     backgroundColor: colors.verifyLight,
-    paddingHorizontal: spacing[2],
+    paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  chipText: { color: colors.verify, fontSize: fontSize.xs, fontWeight: "700" },
+  chipText: { color: colors.verify, fontSize: 12, fontWeight: "700" },
 
   row: {
     flexDirection: "row",
@@ -244,13 +264,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing[1],
   },
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: spacing[2] },
   rowLabel: { fontSize: fontSize.md, color: colors.text },
   arrow: { fontSize: 24, color: colors.textTertiary },
-  rowLabelDanger: {
-    fontSize: fontSize.md,
-    color: colors.error,
-    fontWeight: "700",
-    textAlign: "center",
-    flex: 1,
-  },
 });

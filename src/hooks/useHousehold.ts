@@ -36,6 +36,14 @@ export type MyHouseholdMembership = {
   } | null;
 };
 
+export type HouseholdSummary = {
+  id: string;
+  name: string;
+  invite_code: string;
+  created_by: string | null;
+  created_at: string;
+};
+
 const HOUSEHOLD_KEY = ["household", "mine"];
 
 export function useMyHousehold() {
@@ -82,28 +90,33 @@ export function useMyHouseholdMemberships(userId: string | undefined) {
   });
 }
 
+export function useHouseholdById(householdId: string | undefined) {
+  return useQuery({
+    queryKey: ["household", "by-id", householdId],
+    enabled: !!householdId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("households")
+        .select("id, name, invite_code, created_by, created_at")
+        .eq("id", householdId!)
+        .single();
+      if (error) throw error;
+      return data as HouseholdSummary;
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
 export function useCreateHousehold() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ name, listingId }: { name: string; listingId?: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data, error } = await supabase
-        .from("households")
-        .insert({ name, listing_id: listingId ?? null, created_by: user.id })
-        .select("id")
-        .single();
-      if (error) throw error;
-
-      // Creator becomes admin
-      await supabase.from("household_members").insert({
-        household_id: data.id,
-        user_id: user.id,
-        role: "admin",
+      const { data, error } = await supabase.rpc("create_household", {
+        p_name: name,
+        p_listing_id: listingId ?? null,
       });
-
-      return data as { id: string };
+      if (error) throw error;
+      return { id: data as string };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY }),
   });

@@ -154,7 +154,8 @@ export default function ListingDetailScreen() {
   const deleteListing = useDeleteListing();
 
   const isOwner = myId === listing?.owner_id;
-  const privacyLevel: PrivacyLevel = isOwner ? 3 : 1;
+  // Explicit contract with MiniMapView: level 3 for owner, level 1 for public viewers.
+  const mapPrivacyLevel: PrivacyLevel = isOwner ? 3 : 1;
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
@@ -390,7 +391,7 @@ export default function ListingDetailScreen() {
               <MiniMapView
                 lat={listing.lat}
                 lng={listing.lng}
-                privacyLevel={privacyLevel}
+                privacyLevel={mapPrivacyLevel}
                 height={180}
               />
             </View>

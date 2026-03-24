@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 
-import { colors, radius } from "../../theme";
+import { colors } from "../../theme";
 
 type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
@@ -29,28 +29,34 @@ type Props = {
 
 export function UserAvatar({ avatarUrl, name, size = "md", verified = false }: Props) {
   const dim = SIZE_MAP[size];
+  const badgeSize = Math.max(16, Math.round(dim * 0.28));
+  const badgeFontSize = Math.max(9, Math.round(dim * 0.16));
   const initial = (name ?? "?")[0].toUpperCase();
 
   return (
     <View style={{ width: dim, height: dim }}>
       {avatarUrl ? (
-        <Image
-          source={{ uri: avatarUrl }}
-          style={[styles.image, { width: dim, height: dim, borderRadius: dim / 2 }]}
-        />
+        <Image source={{ uri: avatarUrl }} style={[styles.image, { width: dim, height: dim, borderRadius: dim / 2 }]} />
       ) : (
-        <View
-          style={[
-            styles.placeholder,
-            { width: dim, height: dim, borderRadius: dim / 2 },
-          ]}
-        >
+        <View style={[styles.placeholder, { width: dim, height: dim, borderRadius: dim / 2 }]}>
           <Text style={[styles.initial, { fontSize: FONT_MAP[size] }]}>{initial}</Text>
         </View>
       )}
+
       {verified && (
-        <View style={[styles.badge, { right: -2, bottom: -2 }]}>
-          <Text style={styles.badgeText}>✓</Text>
+        <View
+          style={[
+            styles.badge,
+            {
+              right: 0,
+              bottom: 0,
+              width: badgeSize,
+              height: badgeSize,
+              borderRadius: badgeSize / 2,
+            },
+          ]}
+        >
+          <Text style={[styles.badgeText, { fontSize: badgeFontSize }]}>✓</Text>
         </View>
       )}
     </View>
@@ -73,17 +79,13 @@ const styles = StyleSheet.create({
   badge: {
     position: "absolute",
     backgroundColor: colors.verify,
-    borderRadius: radius.full,
-    width: 16,
-    height: 16,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: colors.white,
   },
   badgeText: {
-    fontSize: 8,
     color: colors.white,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });

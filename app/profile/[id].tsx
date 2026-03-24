@@ -1,26 +1,19 @@
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
-import { useProfile } from "../../src/hooks/useProfile";
-import { useMutualFriends } from "../../src/hooks/useConnections";
+import { useMutualFriends, useMyFriendz } from "../../src/hooks/useConnections";
 import { useMyListings } from "../../src/hooks/useListings";
-import { useAuth } from "../../src/providers/AuthProvider";
+import { useProfile } from "../../src/hooks/useProfile";
 import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
+import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getAge(birthYear: number | null | undefined): string {
   if (!birthYear) return "";
-  return `${new Date().getFullYear() - birthYear} años`;
+  const years = new Date().getFullYear() - birthYear;
+  if (years <= 0 || years > 120) return "";
+  return `${years} años`;
 }
 
 function scheduleLabel(v: string | null | undefined) {
@@ -44,8 +37,6 @@ function noiseLevelLabel(v: number | null | undefined) {
   return "Animado";
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
 function LifestyleItem({ icon, label, active }: { icon: string; label: string; active: boolean }) {
   return (
     <View style={styles.lifestyleItem}>
@@ -55,8 +46,6 @@ function LifestyleItem({ icon, label, active }: { icon: string; label: string; a
   );
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export default function PublicProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -64,11 +53,13 @@ export default function PublicProfileScreen() {
 
   const { data: profile, isLoading, isError } = useProfile(id);
   const { data: mutual = [] } = useMutualFriends(myId, id);
+  const { data: myFriendz = [] } = useMyFriendz(myId);
   const { data: theirListings = [] } = useMyListings(id);
   const { data: isSuper = false } = useIsSuperfriendz();
 
   const activeListings = theirListings.filter((l) => l.status === "active");
   const isOwnProfile = myId === id;
+  const bannerConnections = isOwnProfile ? myFriendz : mutual;
 
   if (isLoading) {
     return (
@@ -89,38 +80,21 @@ export default function PublicProfileScreen() {
   const age = getAge(profile.birth_year);
   const subtitleParts = [age, profile.occupation, profile.city].filter(Boolean);
 
-  // Lifestyle grid items
   const lifestyle = [
+    { icon: "Sol", label: scheduleLabel(profile.schedule) ?? "-", active: !!profile.schedule },
+    { icon: "Limp", label: cleanlinessLabel(profile.cleanliness) ?? "-", active: !!profile.cleanliness },
     {
-      icon: scheduleLabel(profile.schedule) ? "🌅" : "🌅",
-      label: scheduleLabel(profile.schedule) ?? "—",
-      active: !!profile.schedule,
-    },
-    {
-      icon: "✨",
-      label: cleanlinessLabel(profile.cleanliness) ?? "—",
-      active: !!profile.cleanliness,
-    },
-    {
-      icon: "💻",
+      icon: "WFH",
       label: profile.works_from_home ? "Teletrabajo" : "Oficina",
       active: profile.works_from_home != null,
     },
+    { icon: "Ruido", label: noiseLevelLabel(profile.noise_level) ?? "-", active: !!profile.noise_level },
     {
-      icon: "🔊",
-      label: noiseLevelLabel(profile.noise_level) ?? "—",
-      active: !!profile.noise_level,
-    },
-    {
-      icon: profile.has_pets ? "🐾" : "🚫",
+      icon: "Masc",
       label: profile.has_pets ? "Con mascotas" : "Sin mascotas",
-      active: !profile.has_pets,
+      active: profile.has_pets != null,
     },
-    {
-      icon: profile.smokes ? "🚬" : "🚭",
-      label: profile.smokes ? "Fuma" : "No fuma",
-      active: !profile.smokes,
-    },
+    { icon: "Fuma", label: profile.smokes ? "Fuma" : "No fuma", active: profile.smokes != null },
   ];
 
   const hasLifestyle = lifestyle.some((l) => l.active);
@@ -128,27 +102,18 @@ export default function PublicProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={styles.container}>
-        {/* ── Cabecera ── */}
         <View style={styles.header}>
           <View style={styles.avatarWrap}>
-            <UserAvatar
-              avatarUrl={profile.avatar_url}
-              name={profile.full_name}
-              size="xl"
-              verified={!!profile.verified_at}
-            />
+            <UserAvatar avatarUrl={profile.avatar_url} name={profile.full_name} size="xl" verified={!!profile.verified_at} />
           </View>
 
           <Text style={styles.fullName}>{profile.full_name ?? "Sin nombre"}</Text>
-          {subtitleParts.length > 0 && (
-            <Text style={styles.subtitle}>{subtitleParts.join(" · ")}</Text>
-          )}
+          {subtitleParts.length > 0 && <Text style={styles.subtitle}>{subtitleParts.join(" · ")}</Text>}
 
-          {/* Badges de fiabilidad */}
           <View style={styles.badgeRow}>
-            {profile.verified_at && (
+            {!!profile.verified_at && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>✓ Verificado</Text>
+                <Text style={styles.badgeText}>Verificado</Text>
               </View>
             )}
             {isSuper && (
@@ -162,32 +127,43 @@ export default function PublicProfileScreen() {
           </View>
         </View>
 
-        {/* ── Conexiones mutuas — PRIMER BLOQUE ── */}
-        {mutual.length > 0 && (
+        {bannerConnections.length > 0 && (
           <View style={styles.mutualBanner}>
             <Text style={styles.mutualCount}>
-              {mutual.length} {mutual.length === 1 ? "amigo en común" : "amigos en común"}
+              {isOwnProfile
+                ? `${bannerConnections.length} ${bannerConnections.length === 1 ? "conexion" : "conexiones"}`
+                : `${bannerConnections.length} ${bannerConnections.length === 1 ? "amigo en comun" : "amigos en comun"}`}
             </Text>
             <Text style={styles.mutualNames} numberOfLines={1}>
-              {mutual
+              {isOwnProfile ? "Tus conexiones: " : ""}
+              {bannerConnections
                 .slice(0, 3)
                 .map((f) => f.full_name ?? f.username ?? "Usuario")
                 .join(", ")}
-              {mutual.length > 3 ? ` y ${mutual.length - 3} más` : ""}{" "}
-              os conocen
+              {bannerConnections.length > 3 ? ` y ${bannerConnections.length - 3} mas` : ""}
+              {!isOwnProfile ? " os conocen" : ""}
             </Text>
           </View>
         )}
 
-        {/* ── Bio ── */}
-        {profile.bio && (
+        {!!profile.bio && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Sobre mí</Text>
+            <Text style={styles.sectionLabel}>Sobre mi</Text>
             <Text style={styles.bio}>{profile.bio}</Text>
           </View>
         )}
 
-        {/* ── Estilo de vida ── */}
+        {!!profile.photos?.length && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Fotos</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photosRow}>
+              {profile.photos.map((uri, index) => (
+                <Image key={`${uri}-${index}`} source={{ uri }} style={styles.photoThumb} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {hasLifestyle && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Estilo de vida</Text>
@@ -201,19 +177,14 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
-        {/* ── Pisos publicados ── */}
         {activeListings.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Pisos publicados</Text>
             {activeListings.map((listing) => (
-              <Pressable
-                key={listing.id}
-                style={styles.listingCard}
-                onPress={() => router.push(`/listing/${listing.id}`)}
-              >
+              <Pressable key={listing.id} style={styles.listingCard} onPress={() => router.push(`/listing/${listing.id}`)}>
                 <Text style={styles.listingTitle} numberOfLines={1}>{listing.title}</Text>
                 <Text style={styles.listingMeta}>
-                  {listing.price} €/mes · {listing.city}
+                  {listing.price} EUR/mes · {listing.city}
                   {listing.district ? ` · ${listing.district}` : ""} · Activo
                 </Text>
               </Pressable>
@@ -221,35 +192,27 @@ export default function PublicProfileScreen() {
           </View>
         )}
 
-        {/* Bottom padding for sticky footer */}
         <View style={{ height: 80 }} />
       </ScrollView>
 
-      {/* ── CTA anclado ── */}
       {!isOwnProfile && myId && (
         <View style={styles.footer}>
           <Pressable
             style={styles.ctaBtn}
             onPress={() => {
-              if (activeListings.length > 0) {
-                router.push(`/listing/${activeListings[0].id}`);
-              }
+              if (activeListings.length > 0) router.push(`/listing/${activeListings[0].id}`);
             }}
           >
-            <Text style={styles.ctaBtnText}>
-              {activeListings.length > 0 ? "Solicitar habitación" : "Enviar mensaje"}
-            </Text>
+            <Text style={styles.ctaBtnText}>{activeListings.length > 0 ? "Solicitar habitacion" : "Enviar mensaje"}</Text>
           </Pressable>
           <Pressable style={styles.moreBtn}>
-            <Text style={styles.moreBtnText}>···</Text>
+            <Text style={styles.moreBtnText}>...</Text>
           </Pressable>
         </View>
       )}
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   centered: {
@@ -266,7 +229,6 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
 
-  // Header
   header: {
     backgroundColor: colors.surface,
     borderRadius: radius["2xl"],
@@ -316,7 +278,6 @@ const styles = StyleSheet.create({
     color: colors.purple,
   },
 
-  // Mutual connections banner
   mutualBanner: {
     backgroundColor: colors.purpleLight,
     borderRadius: radius.xl,
@@ -337,7 +298,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 
-  // Section
   section: {
     backgroundColor: colors.surface,
     borderRadius: radius["2xl"],
@@ -358,8 +318,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 22,
   },
+  photosRow: { gap: spacing[2] },
+  photoThumb: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.gray100 },
 
-  // Lifestyle grid
   lifestyleGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -380,7 +341,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   lifestyleIcon: {
-    fontSize: 16,
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: colors.textSecondary,
   },
   lifestyleIconOff: {
     opacity: 0.4,
@@ -395,7 +358,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // Listing card
   listingCard: {
     backgroundColor: colors.gray50,
     borderRadius: radius.md,
@@ -414,7 +376,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // Footer CTA
   footer: {
     flexDirection: "row",
     gap: spacing[2],
@@ -447,6 +408,6 @@ const styles = StyleSheet.create({
   moreBtnText: {
     fontSize: fontSize.lg,
     color: colors.textSecondary,
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
 });

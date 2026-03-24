@@ -8,12 +8,14 @@ import {
   Text,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { EmptyState } from "../../src/components/ui/EmptyState";
 import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
 import { TagBadge } from "../../src/components/ui/TagBadge";
 import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
 import { useMyProperties } from "../../src/hooks/useProperties";
+import { useReceivedRequests } from "../../src/hooks/useRequests";
 import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
@@ -33,6 +35,7 @@ export default function MyListingsScreen() {
   const [tab, setTab] = useState<Tab>("active");
   const { data: listings, isLoading } = useMyListings(session?.user?.id);
   const { data: myProperties = [] } = useMyProperties(session?.user?.id);
+  const { data: receivedRequests = [] } = useReceivedRequests(session?.user?.id);
   const updateStatus = useUpdateListingStatus();
   const { data: isSuper = false } = useIsSuperfriendz();
 
@@ -71,6 +74,9 @@ export default function MyListingsScreen() {
           renderItem={({ item }) => (
             <MyListingRow
               listing={item}
+              pendingRequests={receivedRequests.filter(
+                (r) => r.listing_id === item.id && r.status === "pending",
+              ).length}
               onPress={() => router.push(`/listing/${item.id}`)}
               onEdit={() => router.push(`/listing/${item.id}/edit`)}
               onToggleStatus={() =>
@@ -119,6 +125,7 @@ export default function MyListingsScreen() {
         accessibilityLabel="Nuevo anuncio"
       >
         <Text style={styles.fabText}>+</Text>
+        <Text style={styles.fabLabel}>Nuevo anuncio</Text>
       </Pressable>
     </View>
   );
@@ -126,11 +133,13 @@ export default function MyListingsScreen() {
 
 function MyListingRow({
   listing,
+  pendingRequests,
   onPress,
   onEdit,
   onToggleStatus,
 }: {
   listing: Listing;
+  pendingRequests: number;
   onPress: () => void;
   onEdit: () => void;
   onToggleStatus: () => void;
@@ -157,16 +166,31 @@ function MyListingRow({
             label={listing.type === "offer" ? "Ofrezco" : "Busco"}
             variant="primary"
           />
+          {pendingRequests > 0 && (
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingBadgeText}>
+                {pendingRequests} {pendingRequests === 1 ? "solicitud" : "solicitudes"}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
       <View style={styles.rowActions}>
-        <Pressable style={styles.actionBtn} onPress={onEdit}>
-          <Text style={styles.actionBtnText}>E</Text>
+        <Pressable style={styles.actionBtn} onPress={onEdit} accessibilityLabel="Editar anuncio">
+          <Ionicons name="create-outline" size={18} color={colors.textSecondary} />
         </Pressable>
         {canToggle && (
-          <Pressable style={styles.actionBtn} onPress={onToggleStatus}>
-            <Text style={styles.actionBtnText}>{listing.status === "active" ? "||" : ">"}</Text>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={onToggleStatus}
+            accessibilityLabel={listing.status === "active" ? "Pausar anuncio" : "Activar anuncio"}
+          >
+            <Ionicons
+              name={listing.status === "active" ? "pause" : "play"}
+              size={18}
+              color={colors.textSecondary}
+            />
           </Pressable>
         )}
       </View>
@@ -214,11 +238,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
   },
   thumb: {
-    width: 88,
+    width: 120,
     height: 88,
   },
   thumbPlaceholder: {
-    width: 88,
+    width: 120,
     height: 88,
     backgroundColor: colors.primaryLight,
     justifyContent: "center",
@@ -247,6 +271,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing[1],
     marginTop: 2,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  pendingBadge: {
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.warning + "55",
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+  },
+  pendingBadgeText: {
+    color: colors.warning,
+    fontSize: fontSize.xs,
+    fontWeight: "700",
   },
   rowActions: {
     padding: spacing[2],
@@ -261,18 +300,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  actionBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
   fab: {
     position: "absolute",
     bottom: spacing[6],
     right: spacing[5],
-    width: 56,
-    height: 56,
+    minHeight: 56,
     borderRadius: 28,
+    paddingHorizontal: spacing[4],
     backgroundColor: colors.primary,
+    flexDirection: "row",
+    gap: spacing[2],
     justifyContent: "center",
     alignItems: "center",
     shadowColor: colors.black,
@@ -281,7 +318,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  fabText: { color: colors.white, fontSize: 28, lineHeight: 32 },
+  fabText: { color: colors.white, fontSize: 24, lineHeight: 28, fontWeight: "700" },
+  fabLabel: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
   limitBanner: {
     margin: spacing[4],
     marginBottom: 0,

@@ -281,3 +281,75 @@ L.marker([${lat}, ${lng}], { icon: icon, interactive: false }).addTo(map);
 </body>
 </html>`;
 }
+
+/**
+ * HTML para mini mapa editable.
+ * Emite postMessage con:
+ *   { type: 'PIN_MOVE', lat: number, lng: number }
+ */
+export function buildEditableMiniMapHTML(
+  lat: number,
+  lng: number,
+  zoom = 16,
+): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<link rel="stylesheet" href="${LEAFLET_CSS}"/>
+<script src="${LEAFLET_JS}"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#map{width:100%;height:100%;background:${C_BG}}
+.leaflet-control-attribution{display:none}
+.mp{
+  width:16px;height:16px;
+  background:${C_PIN};
+  border:3px solid ${C_WHITE};
+  border-radius:50%;
+  box-shadow:0 2px 6px rgba(52,120,246,0.35);
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+function rn(data){
+  if(window.ReactNativeWebView){
+    window.ReactNativeWebView.postMessage(JSON.stringify(data));
+  }
+}
+
+var map = L.map('map', { zoomControl:true }).setView([${lat}, ${lng}], ${zoom});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  subdomains:'abcd', maxZoom:20,
+  attribution:'&copy; OpenStreetMap &copy; CARTO'
+}).addTo(map);
+
+var icon = L.divIcon({
+  html:'<div class="mp"></div>',
+  className:'',
+  iconSize:[16,16],
+  iconAnchor:[8,8]
+});
+
+var marker = L.marker([${lat}, ${lng}], { icon: icon, draggable: true }).addTo(map);
+
+function emit(lat,lng){
+  rn({ type:'PIN_MOVE', lat:lat, lng:lng });
+}
+
+marker.on('dragend', function(e){
+  var p = e.target.getLatLng();
+  emit(p.lat, p.lng);
+});
+
+map.on('click', function(e){
+  marker.setLatLng(e.latlng);
+  emit(e.latlng.lat, e.latlng.lng);
+});
+<\/script>
+</body>
+</html>`;
+}

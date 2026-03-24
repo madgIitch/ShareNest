@@ -508,6 +508,10 @@ export type Database = {
         Args: { p_code: string };
         Returns: string;
       };
+      create_household: {
+        Args: { p_name: string; p_listing_id?: string | null };
+        Returns: string;
+      };
       my_household: {
         Args: Record<string, never>;
         Returns: { id: string; name: string; invite_code: string; listing_id: string | null; created_by: string; created_at: string; member_role: string }[];

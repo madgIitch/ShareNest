@@ -2,9 +2,11 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -15,13 +17,16 @@ import { BalanceCard } from "../../src/components/expenses/BalanceCard";
 import { ExpenseItem } from "../../src/components/expenses/ExpenseItem";
 import { useBalances, useExpenses } from "../../src/hooks/useExpenses";
 import {
+  useCreateHousehold,
+  useHouseholdById,
   useHouseholdMembers,
   useMyHouseholdMemberships,
   type MyHouseholdMembership,
 } from "../../src/hooks/useHousehold";
 import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
-import { useMyProperties, type PropertyWithCity } from "../../src/hooks/useProperties";
-import { useReceivedRequests } from "../../src/hooks/useRequests";
+import { useMyProperties, useUpdateProperty, type PropertyWithCity } from "../../src/hooks/useProperties";
+import { useReceivedRequests, type RequestWithDetails } from "../../src/hooks/useRequests";
+import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import type { Database } from "../../src/types/database";
@@ -75,11 +80,13 @@ function OwnerHomesDashboard({
   userId: string;
   properties: PropertyWithCity[];
   listings: Listing[];
-  receivedRequests: Array<{ listing_id: string; status: string }>;
+  receivedRequests: RequestWithDetails[];
 }) {
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id ?? "");
   const [sheetOpen, setSheetOpen] = useState(false);
   const updateStatus = useUpdateListingStatus();
+  const createHousehold = useCreateHousehold();
+  const updateProperty = useUpdateProperty();
 
   const selectedProperty = useMemo(
     () => properties.find((p) => p.id === selectedPropertyId) ?? properties[0],
@@ -88,6 +95,7 @@ function OwnerHomesDashboard({
 
   const selectedHouseholdId =
     (selectedProperty as unknown as { household_id?: string | null })?.household_id ?? null;
+  const { data: selectedHousehold } = useHouseholdById(selectedHouseholdId ?? undefined);
 
   const { data: expenses = [], isLoading: loadingExp, refetch } = useExpenses(selectedHouseholdId ?? undefined);
   const { data: balancesData, isLoading: loadingBal } = useBalances(selectedHouseholdId ?? undefined);
@@ -112,6 +120,26 @@ function OwnerHomesDashboard({
     .filter((l) => l.status === "rented")
     .reduce((sum, l) => sum + Number(l.price ?? 0), 0);
 
+  const occupantByListing = useMemo(() => {
+    const out: Record<string, { name: string; avatarUrl: string | null; priority: number }> = {};
+    const score = (status: string) => (status === "assigned" ? 2 : status === "accepted" ? 1 : 0);
+
+    for (const req of receivedRequests) {
+      if (!req.listing_id || !req.requester) continue;
+      const priority = score(req.status);
+      if (priority === 0) continue;
+      const current = out[req.listing_id];
+      if (current && current.priority >= priority) continue;
+      out[req.listing_id] = {
+        name: req.requester.full_name?.trim() || "Inquilino",
+        avatarUrl: req.requester.avatar_url,
+        priority,
+      };
+    }
+
+    return out;
+  }, [receivedRequests]);
+
   const byMonth = expenses.reduce<Record<string, typeof expenses>>((acc, e) => {
     const key = e.date.slice(0, 7);
     if (!acc[key]) acc[key] = [];
@@ -123,6 +151,39 @@ function OwnerHomesDashboard({
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
+  };
+
+  const handleAddMeToFloor = async () => {
+    if (!selectedProperty?.id) return;
+    if (selectedHouseholdId) {
+      Alert.alert("Ya existe convivencia", "Este piso ya tiene un hogar asociado.");
+      return;
+    }
+    try {
+      const name = selectedProperty.address?.trim() || "Piso compartido";
+      const created = await createHousehold.mutateAsync({ name });
+      await updateProperty.mutateAsync({
+        id: selectedProperty.id,
+        ownerId: userId,
+        updates: { household_id: created.id },
+      });
+      Alert.alert("Listo", "Ya estas dentro del piso. Ahora puedes invitar a alguien.");
+    } catch (err) {
+      Alert.alert("Error", (err as Error).message);
+    }
+  };
+
+  const handleInviteToFloor = async () => {
+    if (!selectedHousehold?.invite_code) {
+      Alert.alert("Sin codigo", "Primero anadete al piso para generar el codigo de invitacion.");
+      return;
+    }
+    const message = `Unete a mi piso en ShareNest con este codigo: ${selectedHousehold.invite_code}`;
+    try {
+      await Share.share({ message });
+    } catch (err) {
+      Alert.alert("Error", (err as Error).message);
+    }
   };
 
   return (
@@ -143,7 +204,7 @@ function OwnerHomesDashboard({
                 onPress={() => setSelectedPropertyId(p.id)}
               >
                 <Text style={[styles.selectorChipText, active && styles.selectorChipTextActive]} numberOfLines={1}>
-                  {p.address}
+                  Piso: {p.address}
                 </Text>
               </Pressable>
             );
@@ -154,6 +215,9 @@ function OwnerHomesDashboard({
           <View style={{ flex: 1 }}>
             <Text style={styles.propertyTitle}>{selectedProperty?.address ?? "Piso"}</Text>
             <Text style={styles.propertyMeta}>{selectedProperty?.city?.name ?? "Ciudad"}</Text>
+            {!selectedHouseholdId && (
+              <Text style={styles.propertyHint}>Sin convivencia activa. Anadete para invitar companeros.</Text>
+            )}
           </View>
           <View style={styles.propertyHeaderActions}>
             <Pressable
@@ -167,6 +231,28 @@ function OwnerHomesDashboard({
               <Text style={styles.outlineBtnText}>+ Habitacion</Text>
             </Pressable>
           </View>
+        </View>
+
+        <View style={styles.ownerFloorActions}>
+          {!selectedHouseholdId && (
+            <Pressable
+              style={[styles.primaryBtn, (createHousehold.isPending || updateProperty.isPending) && styles.outlineBtnDisabled]}
+              onPress={handleAddMeToFloor}
+              disabled={createHousehold.isPending || updateProperty.isPending}
+            >
+              <Text style={styles.primaryBtnText}>
+                {createHousehold.isPending || updateProperty.isPending ? "Anadiendo..." : "Anadirme al piso"}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable style={styles.outlineBtnWide} onPress={handleInviteToFloor}>
+            <View style={styles.inviteBtnContent}>
+              <View style={styles.inviteIcon}>
+                <Text style={styles.inviteIconText}>+</Text>
+              </View>
+              <Text style={styles.inviteBtnText}>Invitar a alguien al piso</Text>
+            </View>
+          </Pressable>
         </View>
 
         <View style={styles.metricsRow}>
@@ -202,12 +288,30 @@ function OwnerHomesDashboard({
                       {listing.status === "rented" ? "Ocupada" : listing.status === "active" ? "Libre" : "Borrador"}
                     </Text>
                   </View>
+                  {listing.status === "rented" && occupantByListing[listing.id] && (
+                    <View style={styles.tenantRow}>
+                      <UserAvatar
+                        avatarUrl={occupantByListing[listing.id].avatarUrl}
+                        name={occupantByListing[listing.id].name}
+                        size="xs"
+                      />
+                      <View style={styles.tenantTextWrap}>
+                        <Text style={styles.tenantLabel}>Inquilino actual</Text>
+                        <Text style={styles.tenantName}>{occupantByListing[listing.id].name}</Text>
+                      </View>
+                    </View>
+                  )}
                   <View style={styles.roomActions}>
                     <Pressable style={styles.roomBtn} onPress={() => router.push(`/listing/${listing.id}/edit`)}>
                       <Text style={styles.roomBtnText}>Editar</Text>
                     </Pressable>
-                    <Pressable style={styles.roomBtn} onPress={() => router.push(`/listing/${listing.id}/candidates`)}>
-                      <Text style={styles.roomBtnText}>Candidatos {pendingForRoom > 0 ? `(${pendingForRoom})` : ""}</Text>
+                    <Pressable style={styles.roomBtnPrimary} onPress={() => router.push(`/listing/${listing.id}/candidates`)}>
+                      <Text style={styles.roomBtnPrimaryText}>Candidatos</Text>
+                      {pendingForRoom > 0 && (
+                        <View style={styles.roomBtnBadge}>
+                          <Text style={styles.roomBtnBadgeText}>{pendingForRoom}</Text>
+                        </View>
+                      )}
                     </Pressable>
                     {listing.status === "rented" && (
                       <Pressable
@@ -261,8 +365,8 @@ function OwnerHomesDashboard({
 
       {selectedHouseholdId && (
         <>
-          <Pressable style={styles.fab} onPress={() => setSheetOpen(true)} accessibilityLabel="Anadir gasto">
-            <Text style={styles.fabText}>+</Text>
+          <Pressable style={styles.fab} onPress={() => setSheetOpen(true)} accessibilityLabel="Anadir gasto del piso">
+            <Text style={styles.fabText}>+ Anadir gasto</Text>
           </Pressable>
           <AddExpenseSheet
             visible={sheetOpen}
@@ -370,6 +474,8 @@ const styles = StyleSheet.create({
   },
   propertyTitle: { fontSize: fontSize.lg, fontWeight: "800", color: colors.text },
   propertyMeta: { color: colors.textSecondary, marginTop: 2 },
+  propertyHint: { color: colors.textSecondary, marginTop: 6, fontSize: fontSize.xs },
+  ownerFloorActions: { marginTop: -spacing[1], marginBottom: spacing[1], gap: spacing[2] },
 
   metricsRow: { flexDirection: "row", gap: spacing[2] },
   stat: {
@@ -430,6 +536,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   roomBtnText: { fontSize: fontSize.xs, fontWeight: "700", color: colors.text },
+  roomBtnPrimary: {
+    borderWidth: 1,
+    borderColor: colors.text,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.text,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+  },
+  roomBtnPrimaryText: { fontSize: fontSize.xs, fontWeight: "700", color: colors.white },
+  roomBtnBadge: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: colors.warning,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roomBtnBadgeText: { color: colors.white, fontSize: 11, fontWeight: "800" },
+  tenantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+    paddingTop: spacing[1],
+  },
+  tenantTextWrap: { flex: 1 },
+  tenantLabel: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
+  tenantName: { fontSize: fontSize.sm, color: colors.text, fontWeight: "700" },
 
   monthGroup: { gap: spacing[2] },
   monthLabel: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "700" },
@@ -457,6 +594,35 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   outlineBtnText: { color: colors.primary, fontWeight: "700", fontSize: fontSize.sm },
+  outlineBtnWide: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+  },
+  inviteBtnContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+  },
+  inviteIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inviteIconText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 12,
+  },
+  inviteBtnText: { color: colors.primary, fontWeight: "800", fontSize: fontSize.sm },
 
   emptyState: {
     flexGrow: 1,
@@ -471,13 +637,13 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: spacing[5],
     bottom: spacing[6],
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    minHeight: 48,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[4],
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,
   },
-  fabText: { color: colors.white, fontSize: 28, lineHeight: 30, fontWeight: "700" },
+  fabText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "800" },
 });

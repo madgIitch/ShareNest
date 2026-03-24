@@ -17,7 +17,7 @@ import {
 
 import { useMyFriendz } from "../src/hooks/useConnections";
 import { useUpdateProfile } from "../src/hooks/useProfile";
-import { pickAvatar, resizeAvatar, uploadAvatar } from "../src/lib/avatar";
+import { pickAvatar, resizeAvatar, uploadAvatar, uploadProfilePhoto } from "../src/lib/avatar";
 import { normalizePhoneNumber } from "../src/lib/phone";
 import { useAuth } from "../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../src/theme";
@@ -26,6 +26,7 @@ type NullableBool = boolean | null;
 type LookingFor = "room" | "flat" | "both" | null;
 type Schedule = "madrugador" | "nocturno" | "flexible" | null;
 type GuestsFreq = "nunca" | "a veces" | "frecuente" | null;
+const PROFILE_AVATAR_SIZE = 84;
 
 const SCHEDULE_OPTIONS: { label: string; value: Exclude<Schedule, null> }[] = [
   { label: "Madrugador", value: "madrugador" },
@@ -67,14 +68,6 @@ function fromIsoDate(value: string | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
-function parseCsv(input: string): string[] | null {
-  const arr = input
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return arr.length > 0 ? arr : null;
-}
-
 function parseNumberOrNull(v: string): number | null {
   const n = Number(v);
   return Number.isFinite(n) && v.trim() !== "" ? n : null;
@@ -104,9 +97,9 @@ function BoolChoice({
   onChange: (v: NullableBool) => void;
 }) {
   return (
-    <View style={styles.rowBetween}>
+    <View style={styles.boolChoiceBlock}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.chipRowCompact}>
+      <View style={styles.chipRow}>
         <Chip label="Si" active={value === true} onPress={() => onChange(true)} />
         <Chip label="No" active={value === false} onPress={() => onChange(false)} />
       </View>
@@ -129,7 +122,8 @@ export default function ProfileScreen() {
   const [occupation, setOccupation] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [languages, setLanguages] = useState<string[]>([]);
-  const [preferredCitiesText, setPreferredCitiesText] = useState("");
+  const [preferredCities, setPreferredCities] = useState<string[]>([]);
+  const [preferredCityDraft, setPreferredCityDraft] = useState("");
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [moveInDate, setMoveInDate] = useState<string | null>(null);
@@ -147,6 +141,8 @@ export default function ProfileScreen() {
 
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -158,7 +154,8 @@ export default function ProfileScreen() {
     setOccupation(profile.occupation ?? "");
     setBirthYear(profile.birth_year ? String(profile.birth_year) : "");
     setLanguages(profile.languages ?? []);
-    setPreferredCitiesText((profile.preferred_cities ?? []).join(", "));
+    setPreferredCities(profile.preferred_cities ?? []);
+    setPreferredCityDraft("");
     setBudgetMin(profile.budget_min != null ? String(profile.budget_min) : "");
     setBudgetMax(profile.budget_max != null ? String(profile.budget_max) : "");
     setMoveInDate(profile.move_in_date ?? null);
@@ -172,6 +169,7 @@ export default function ProfileScreen() {
     setGuestsFrequency(profile.guests_frequency ?? null);
 
     setLookingFor(profile.looking_for ?? null);
+    setAdditionalPhotos(profile.photos ?? []);
   }, [profile]);
 
   const avatarSource = avatarUri
@@ -254,6 +252,28 @@ export default function ProfileScreen() {
     router.push({ pathname: "/verify-phone", params: { phone: normalized } });
   };
 
+  const handleAddAdditionalPhoto = async () => {
+    if (additionalPhotos.length >= 6) {
+      Alert.alert("Limite alcanzado", "Puedes anadir hasta 6 fotos adicionales.");
+      return;
+    }
+    try {
+      setUploadingPhoto(true);
+      const asset = await pickAvatar();
+      if (!asset) return;
+      const url = await uploadProfilePhoto(userId, asset.uri);
+      setAdditionalPhotos((prev) => [...prev, url]);
+    } catch (error) {
+      Alert.alert("Error al subir foto", (error as Error).message);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemoveAdditionalPhoto = (index: number) => {
+    setAdditionalPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
     if (Platform.OS === "android") setShowDatePicker(false);
     if (event.type === "set" && selectedDate) setMoveInDate(toIsoDate(selectedDate));
@@ -288,7 +308,8 @@ export default function ProfileScreen() {
           budget_min: parseNumberOrNull(budgetMin),
           budget_max: parseNumberOrNull(budgetMax),
           move_in_date: moveInDate,
-          preferred_cities: parseCsv(preferredCitiesText),
+          preferred_cities: preferredCities.length > 0 ? preferredCities : null,
+          photos: additionalPhotos.length > 0 ? additionalPhotos : null,
         },
       });
       await refreshProfile();
@@ -302,6 +323,21 @@ export default function ProfileScreen() {
 
   const toggleLanguage = (lang: string) => {
     setLanguages((prev) => (prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]));
+  };
+
+  const addPreferredCity = () => {
+    const city = preferredCityDraft.trim();
+    if (!city) return;
+    setPreferredCities((prev) => {
+      const exists = prev.some((c) => c.toLowerCase() === city.toLowerCase());
+      if (exists) return prev;
+      return [...prev, city];
+    });
+    setPreferredCityDraft("");
+  };
+
+  const removePreferredCity = (city: string) => {
+    setPreferredCities((prev) => prev.filter((c) => c !== city));
   };
 
   return (
@@ -332,16 +368,22 @@ export default function ProfileScreen() {
                     <ActivityIndicator color={colors.white} />
                   </View>
                 )}
+                {isVerified && !uploadingAvatar && (
+                  <View style={styles.avatarVerifiedBadge}>
+                    <Text style={styles.avatarVerifiedBadgeText}>✓</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.linkText}>Cambiar foto</Text>
             </Pressable>
 
             <View style={{ gap: spacing[2], alignItems: "flex-end" }}>
-              <View style={[styles.verifyBadge, isVerified ? styles.verifyBadgeOk : styles.verifyBadgePending]}>
+              <Pressable
+                style={[styles.verifyBadge, isVerified ? styles.verifyBadgeOk : styles.verifyBadgePending]}
+                onPress={!isVerified ? handleVerifyPhone : undefined}
+                disabled={isVerified}
+              >
                 <Text style={styles.verifyBadgeText}>{isVerified ? "Verificado" : "Sin verificar"}</Text>
-              </View>
-              <Pressable style={styles.verifyBtn} onPress={handleVerifyPhone}>
-                <Text style={styles.verifyBtnText}>{isVerified ? "Actualizar telefono" : "Verificar telefono"}</Text>
               </Pressable>
             </View>
           </View>
@@ -392,6 +434,36 @@ export default function ProfileScreen() {
                 onPress={() => toggleLanguage(lang)}
               />
             ))}
+          </View>
+
+          <Text style={styles.fieldLabel}>Fotos adicionales</Text>
+          <View style={styles.galleryGrid}>
+            {additionalPhotos.map((uri, index) => (
+              <View key={`${uri}-${index}`} style={styles.galleryItem}>
+                <Image source={{ uri }} style={styles.galleryImage} />
+                <Pressable
+                  style={styles.galleryRemove}
+                  onPress={() => handleRemoveAdditionalPhoto(index)}
+                  accessibilityLabel="Eliminar foto"
+                >
+                  <Text style={styles.galleryRemoveText}>×</Text>
+                </Pressable>
+              </View>
+            ))}
+
+            {additionalPhotos.length < 6 && (
+              <Pressable
+                style={[styles.galleryAdd, uploadingPhoto && styles.saveButtonDisabled]}
+                onPress={handleAddAdditionalPhoto}
+                disabled={uploadingPhoto}
+              >
+                {uploadingPhoto ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={styles.galleryAddText}>+ Foto</Text>
+                )}
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -446,24 +518,30 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          <View style={styles.twoCols}>
-            <View style={{ flex: 1 }}>
-              <LabeledInput
-                label="Presupuesto minimo"
+          <Text style={styles.fieldLabel}>Presupuesto mensual</Text>
+          <View style={styles.budgetRangeRow}>
+            <View style={styles.budgetInputWrap}>
+              <TextInput
+                style={styles.budgetInput}
                 value={budgetMin}
                 onChangeText={setBudgetMin}
                 placeholder="500"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
               />
+              <Text style={styles.budgetEuro}>€</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <LabeledInput
-                label="Presupuesto maximo"
+            <Text style={styles.budgetDash}>–</Text>
+            <View style={styles.budgetInputWrap}>
+              <TextInput
+                style={styles.budgetInput}
                 value={budgetMax}
                 onChangeText={setBudgetMax}
                 placeholder="800"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="numeric"
               />
+              <Text style={styles.budgetEuro}>€</Text>
             </View>
           </View>
 
@@ -487,33 +565,45 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          <LabeledInput
-            label="Ciudades preferidas (coma separada)"
-            value={preferredCitiesText}
-            onChangeText={setPreferredCitiesText}
-            placeholder="Madrid, Barcelona"
+          <Text style={styles.fieldLabel}>Ciudades preferidas</Text>
+          {preferredCities.length > 0 && (
+            <View style={styles.selectedLanguagesRow}>
+              {preferredCities.map((city) => (
+                <Pressable key={city} style={styles.selectedLanguageChip} onPress={() => removePreferredCity(city)}>
+                  <Text style={styles.selectedLanguageText}>{city} ×</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          <TextInput
+            style={styles.input}
+            value={preferredCityDraft}
+            onChangeText={setPreferredCityDraft}
+            placeholder="Escribe una ciudad y pulsa Enter"
+            placeholderTextColor={colors.textTertiary}
+            onSubmitEditing={addPreferredCity}
+            returnKeyType="done"
           />
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Preview publico</Text>
+          <Text style={styles.previewHint}>Simulacion visual de como se vera tu perfil. No es interactivo.</Text>
           <View style={styles.previewCard}>
             <View style={styles.rowBetween}>
               <Text style={styles.previewName}>{fullName || "Tu nombre"}</Text>
-              <Text style={styles.previewMeta}>{birthYear ? `${new Date().getFullYear() - Number(birthYear)} anos` : "Edad"}</Text>
+              <Text style={styles.previewMeta}>{birthYear ? `${new Date().getFullYear() - Number(birthYear)} años` : "Edad"}</Text>
             </View>
             <Text style={styles.previewSub}>{occupation || "Profesion"} · {city || "Ciudad"}</Text>
 
-            <View style={styles.mutualBlock}>
-              <Text style={styles.mutualTitle}>
-                {friendz.length > 0 ? `${Math.min(friendz.length, 3)} amigos en comun` : "Sin conexiones en comun"}
-              </Text>
-              <Text style={styles.mutualText} numberOfLines={1}>
-                {friendz.length > 0
-                  ? friendz.slice(0, 3).map((f) => f.full_name ?? "Usuario").join(", ")
-                  : "Este bloque se mostrara al evaluar confianza."}
-              </Text>
-            </View>
+            {friendz.length > 0 && (
+              <View style={styles.mutualBlock}>
+                <Text style={styles.mutualTitle}>{`${Math.min(friendz.length, 3)} amigos en comun`}</Text>
+                <Text style={styles.mutualText} numberOfLines={1}>
+                  {friendz.slice(0, 3).map((f) => f.full_name ?? "Usuario").join(", ")}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.previewGrid}>
               <PreviewItem title="Horario" value={schedule ?? "-"} />
@@ -524,15 +614,25 @@ export default function ProfileScreen() {
               <PreviewItem title="Fuma" value={smokes == null ? "-" : smokes ? "Si" : "No"} />
             </View>
 
-            <Pressable style={styles.previewCta}>
+            {additionalPhotos.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.previewPhotosRow}>
+                {additionalPhotos.slice(0, 5).map((uri, index) => (
+                  <Image key={`${uri}-${index}`} source={{ uri }} style={styles.previewPhoto} />
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.previewCta}>
               <Text style={styles.previewCtaText}>{previewCta}</Text>
-            </Pressable>
+            </View>
           </View>
         </View>
 
-        <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
-          <Text style={styles.saveButtonText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
-        </Pressable>
+        <View style={styles.actionSection}>
+          <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
+            <Text style={styles.saveButtonText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -633,28 +733,42 @@ const styles = StyleSheet.create({
     marginBottom: spacing[2],
   },
   avatarWrapper: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: PROFILE_AVATAR_SIZE,
+    height: PROFILE_AVATAR_SIZE,
+    borderRadius: PROFILE_AVATAR_SIZE / 2,
     overflow: "hidden",
     backgroundColor: colors.gray200,
     marginBottom: spacing[1],
   },
-  avatar: { width: 92, height: 92 },
+  avatar: { width: PROFILE_AVATAR_SIZE, height: PROFILE_AVATAR_SIZE },
   avatarPlaceholder: {
-    width: 92,
-    height: 92,
+    width: PROFILE_AVATAR_SIZE,
+    height: PROFILE_AVATAR_SIZE,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: colors.purpleLight,
   },
-  avatarInitial: { fontSize: 34, fontWeight: "800", color: colors.purple },
+  avatarInitial: { fontSize: 30, fontWeight: "800", color: colors.purple },
   avatarOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "center",
     alignItems: "center",
   },
+  avatarVerifiedBadge: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.verify,
+    borderWidth: 2,
+    borderColor: colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarVerifiedBadgeText: { color: colors.white, fontSize: 12, fontWeight: "800" },
   linkText: { fontSize: fontSize.xs, color: colors.primary, fontWeight: "600", textAlign: "center" },
 
   verifyBadge: {
@@ -665,13 +779,6 @@ const styles = StyleSheet.create({
   verifyBadgeOk: { backgroundColor: colors.successLight },
   verifyBadgePending: { backgroundColor: colors.warningLight },
   verifyBadgeText: { fontSize: fontSize.xs, fontWeight: "700", color: colors.text },
-  verifyBtn: {
-    backgroundColor: colors.verify,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-  },
-  verifyBtnText: { color: colors.white, fontSize: fontSize.xs, fontWeight: "700" },
 
   fieldLabel: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: "600", marginBottom: 6 },
   input: {
@@ -687,6 +794,30 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 90 },
   twoCols: { flexDirection: "row", gap: spacing[2] },
+  budgetRangeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
+  budgetInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing[3],
+  },
+  budgetInput: {
+    flex: 1,
+    paddingVertical: spacing[3],
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  budgetEuro: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: "600" },
+  budgetDash: { color: colors.textSecondary, fontSize: fontSize.md, fontWeight: "700" },
 
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing[2], marginBottom: spacing[2] },
   chipRowCompact: { flexDirection: "row", gap: spacing[1] },
@@ -704,13 +835,40 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
-    backgroundColor: colors.surface,
+    backgroundColor: colors.gray50,
   },
-  chipActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  chipActive: { borderColor: colors.text, backgroundColor: colors.text },
   chipText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: "600" },
-  chipTextActive: { color: colors.primary },
+  chipTextActive: { color: colors.white },
+  galleryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing[2], marginBottom: spacing[2] },
+  galleryItem: { width: 72, height: 72, borderRadius: radius.md, overflow: "hidden", position: "relative" },
+  galleryImage: { width: 72, height: 72 },
+  galleryRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  galleryRemoveText: { color: colors.white, fontSize: 12, fontWeight: "700", lineHeight: 14 },
+  galleryAdd: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: "dashed",
+    backgroundColor: colors.gray50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  galleryAddText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: "700" },
 
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing[2] },
+  boolChoiceBlock: { marginBottom: spacing[1] },
 
   dateField: {
     borderWidth: 1,
@@ -740,6 +898,7 @@ const styles = StyleSheet.create({
     padding: spacing[3],
     gap: spacing[2],
   },
+  previewHint: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: -spacing[1], marginBottom: spacing[1] },
   previewName: { fontSize: fontSize.lg, fontWeight: "800", color: colors.text },
   previewMeta: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: "600" },
   previewSub: { fontSize: fontSize.sm, color: colors.textSecondary },
@@ -763,15 +922,25 @@ const styles = StyleSheet.create({
   },
   previewItemTitle: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
   previewItemValue: { fontSize: fontSize.sm, color: colors.text, fontWeight: "700" },
+  previewPhotosRow: { gap: spacing[2] },
+  previewPhoto: { width: 72, height: 72, borderRadius: radius.md },
   previewCta: {
-    backgroundColor: colors.text,
+    backgroundColor: colors.gray100,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.full,
     paddingVertical: spacing[3],
     alignItems: "center",
     marginTop: spacing[1],
   },
-  previewCtaText: { color: colors.white, fontWeight: "700", fontSize: fontSize.md },
+  previewCtaText: { color: colors.textSecondary, fontWeight: "700", fontSize: fontSize.md },
 
+  actionSection: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing[3],
+    marginTop: spacing[1],
+  },
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.full,
