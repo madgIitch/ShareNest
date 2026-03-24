@@ -9,7 +9,7 @@ import { useAuth } from "../../src/providers/AuthProvider";
 import { colors } from "../../src/theme";
 
 export default function NewListingScreen() {
-  const { propertyId } = useLocalSearchParams<{ propertyId?: string }>();
+  const { propertyId } = useLocalSearchParams<{ propertyId?: string | string[] }>();
   const { session } = useAuth();
   const userId = session?.user?.id;
   const { data: isSuper = false, isLoading: loadingTier } = useIsSuperfriendz();
@@ -24,7 +24,8 @@ export default function NewListingScreen() {
     );
   }
 
-  const forcedProperty = propertyId ? myProperties.find((p) => p.id === propertyId) ?? null : null;
+  const normalizedPropertyId = Array.isArray(propertyId) ? propertyId[0] : propertyId;
+  const forcedProperty = normalizedPropertyId ? myProperties.find((p) => p.id === normalizedPropertyId) ?? null : null;
   const existingProperty = forcedProperty ?? (!isSuper && myProperties.length > 0 ? myProperties[0] : null);
   const hasRoomsInSelectedProperty = !!existingProperty
     && myListings.some((l) => l.property_id === existingProperty.id);

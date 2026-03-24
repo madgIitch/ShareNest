@@ -1,6 +1,6 @@
 ﻿import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
   ActivityIndicator,
@@ -754,7 +754,81 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
 
   const [step, setStep] = useState(startAtStep);
   const [form, setForm] = useState<FormData>(() => {
-    if (initial) return listingToForm(initial);
+    console.log("[ListingWizard] init props:", {
+      mode: initial ? "edit" : "create",
+      startAtStep,
+      initialId: initial?.id ?? null,
+      initialPropertyId: initial?.property_id ?? null,
+      initialCity: initial?.city ?? null,
+      initialCityId: initial?.city_id ?? null,
+      initialDistrict: initial?.district ?? null,
+      initialPostalCode: initial?.postal_code ?? null,
+      existingPropertyId: existingProperty?.id ?? null,
+      existingPropertyAddress: existingProperty?.address ?? null,
+      existingPropertyCityId: existingProperty?.city_id ?? null,
+      existingPropertyPlaceId: existingProperty?.place_id ?? null,
+      existingPropertyPostalCode: existingProperty?.postal_code ?? null,
+      existingCityName,
+    });
+
+    if (initial) {
+      const base = listingToForm(initial);
+      console.log("[ListingWizard] base form from listing:", {
+        street: base.street,
+        city: base.city,
+        city_id: base.city_id,
+        district: base.district,
+        place_id: base.place_id,
+        postal_code: base.postal_code,
+      });
+      if (!existingProperty) return base;
+
+      const billsRaw = (existingProperty.bills_config ?? {}) as Partial<BillsConfig>;
+      const existingBills: BillsConfig = {
+        agua: billsRaw.agua ?? "extra",
+        luz: billsRaw.luz ?? "extra",
+        gas: billsRaw.gas ?? "extra",
+        internet: billsRaw.internet ?? "extra",
+        limpieza: billsRaw.limpieza ?? "extra",
+        comunidad: billsRaw.comunidad ?? "extra",
+        calefaccion: billsRaw.calefaccion ?? "extra",
+      };
+      const rules = existingProperty.house_rules ?? [];
+      const baseCity = base.city?.trim() ?? "";
+      const shouldUsePropertyCity = !baseCity || baseCity.toLowerCase() === "ciudad";
+
+      const merged = {
+        ...base,
+        street: existingProperty.address ?? base.street,
+        street_number: existingProperty.street_number ?? base.street_number,
+        city: shouldUsePropertyCity ? (existingCityName ?? base.city) : base.city,
+        city_id: base.city_id ?? existingProperty.city_id,
+        place_id: base.place_id ?? existingProperty.place_id,
+        lat: base.lat ?? existingProperty.lat,
+        lng: base.lng ?? existingProperty.lng,
+        postal_code: base.postal_code || existingProperty.postal_code || "",
+        total_m2: existingProperty.total_m2 != null ? String(existingProperty.total_m2) : base.total_m2,
+        total_rooms: existingProperty.total_rooms != null ? String(existingProperty.total_rooms) : base.total_rooms,
+        floor: existingProperty.floor ?? base.floor,
+        has_elevator: existingProperty.has_elevator,
+        bills: existingBills,
+        no_smokers: rules.includes("no_fumadores"),
+        pets_ok: rules.includes("mascotas_ok"),
+        quiet_hours: rules.includes("silencio"),
+        no_parties: rules.includes("sin_fiestas"),
+      };
+      console.log("[ListingWizard] merged form (listing + property):", {
+        street: merged.street,
+        city: merged.city,
+        city_id: merged.city_id,
+        district: merged.district,
+        place_id: merged.place_id,
+        postal_code: merged.postal_code,
+        lat: merged.lat,
+        lng: merged.lng,
+      });
+      return merged;
+    }
     if (!existingProperty) return EMPTY_FORM;
 
     const billsRaw = (existingProperty.bills_config ?? {}) as Partial<BillsConfig>;
@@ -769,7 +843,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     };
     const rules = existingProperty.house_rules ?? [];
 
-    return {
+    const fromProperty = {
       ...EMPTY_FORM,
       street: existingProperty.address ?? "",
       street_number: existingProperty.street_number ?? "",
@@ -790,19 +864,72 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       quiet_hours: rules.includes("silencio"),
       no_parties: rules.includes("sin_fiestas"),
     };
+    console.log("[ListingWizard] form from existingProperty:", {
+      street: fromProperty.street,
+      city: fromProperty.city,
+      city_id: fromProperty.city_id,
+      district: fromProperty.district,
+      place_id: fromProperty.place_id,
+      postal_code: fromProperty.postal_code,
+      lat: fromProperty.lat,
+      lng: fromProperty.lng,
+    });
+    return fromProperty;
   });
   const [photoUris, setPhotoUris] = useState<string[]>(initial?.images ?? (existingProperty?.images as string[] | undefined) ?? []);
   const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>([]);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const geoSyncSeq = useRef(0);
+  const lastCityDistrictSyncKey = useRef("");
+  const didAutoHydrateFromPostalRef = useRef(false);
 
   const createListing = useCreateListing();
   const updateListing = useUpdateListing();
 
   const set = (key: keyof FormData, value: unknown) => {
+    console.log("[ListingWizard] set()", { key, value });
     setForm((f) => ({ ...f, [key]: value }));
   };
+
+  useEffect(() => {
+    console.log("[ListingWizard] props changed after mount:", {
+      initialId: initial?.id ?? null,
+      initialPropertyId: initial?.property_id ?? null,
+      existingPropertyId: existingProperty?.id ?? null,
+      existingCityName,
+    });
+  }, [initial?.id, initial?.property_id, existingProperty?.id, existingCityName]);
+
+  useEffect(() => {
+    console.log("[ListingWizard] form snapshot:", {
+      step,
+      street: form.street,
+      city: form.city,
+      city_id: form.city_id,
+      district: form.district,
+      place_id: form.place_id,
+      postal_code: form.postal_code,
+      lat: form.lat,
+      lng: form.lng,
+      total_m2: form.total_m2,
+      total_rooms: form.total_rooms,
+      floor: form.floor,
+    });
+  }, [
+    step,
+    form.street,
+    form.city,
+    form.city_id,
+    form.district,
+    form.place_id,
+    form.postal_code,
+    form.lat,
+    form.lng,
+    form.total_m2,
+    form.total_rooms,
+    form.floor,
+  ]);
 
   // ── City / District selection ──
   const handleCitySelect = (city: City) => {
@@ -820,6 +947,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
   const pickCityFromName = async (rawCity: string) => {
     const cityName = rawCity.trim();
     if (!cityName) return null;
+    console.log("[ListingWizard] pickCityFromName input:", cityName);
     const cities = await locationService.getCities(cityName, { limit: 8 });
     const normalize = (s: string) =>
       s
@@ -828,29 +956,38 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         .replace(/[\u0300-\u036f]/g, "")
         .trim();
     const target = normalize(cityName);
-    return (
+    const picked = (
       cities.find((c) => normalize(c.name) === target)
       ?? cities.find((c) => normalize(c.name).includes(target))
       ?? cities[0]
       ?? null
     );
+    console.log("[ListingWizard] pickCityFromName result:", picked);
+    return picked;
   };
 
-  const syncPostalFromCityAndDistrict = (cityName: string, districtName: string, streetName: string) => {
+  const syncPostalFromCityAndDistrict = (
+    cityName: string,
+    districtName: string,
+    streetName: string,
+    fallbackCoords?: { lat?: number | null; lon?: number | null },
+  ) => {
     const city = cityName.trim();
     const district = districtName.trim();
     if (!city || !district) return;
     const seq = ++geoSyncSeq.current;
+    console.log("[ListingWizard] syncPostalFromCityAndDistrict start:", { seq, city, district, streetName });
     void (async () => {
       try {
-        const query = [streetName.trim(), district, city].filter(Boolean).join(", ");
-        const [geoPoint] = await Location.geocodeAsync(query);
-        if (!geoPoint || seq !== geoSyncSeq.current) return;
-        const [rev] = await Location.reverseGeocodeAsync({
-          latitude: geoPoint.latitude,
-          longitude: geoPoint.longitude,
+        const resolved = await locationService.resolvePostalFromAddress({
+          city,
+          district,
+          street: streetName,
+          lat: fallbackCoords?.lat ?? null,
+          lon: fallbackCoords?.lon ?? null,
         });
-        const detectedPostal = rev?.postalCode?.trim();
+        const detectedPostal = resolved?.postal_code?.trim() ?? "";
+        console.log("[ListingWizard] resolvePostalFromAddress result:", resolved);
         if (!detectedPostal || seq !== geoSyncSeq.current) return;
         setForm((f) => ({ ...f, postal_code: detectedPostal }));
       } catch {
@@ -861,26 +998,23 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
 
   const syncFromPostalCode = (rawPostal: string) => {
     const postal = rawPostal.replace(/\D/g, "").slice(0, 5);
+    console.log("[ListingWizard] syncFromPostalCode input:", rawPostal, "normalized:", postal);
     set("postal_code", postal);
     if (postal.length !== 5) return;
 
     const seq = ++geoSyncSeq.current;
+    console.log("[ListingWizard] syncFromPostalCode start:", { seq, postal, cityHint: form.city?.trim() || "Espana" });
     void (async () => {
       try {
-        const query = [postal, form.city?.trim() || "Espana"].filter(Boolean).join(", ");
-        const [geoPoint] = await Location.geocodeAsync(query);
-        if (!geoPoint || seq !== geoSyncSeq.current) return;
+        const resolved = await locationService.resolvePostalCode(postal, form.city?.trim() || null);
+        if (!resolved || seq !== geoSyncSeq.current) return;
+        console.log("[ListingWizard] postal resolved by edge:", resolved);
 
-        const [rev] = await Location.reverseGeocodeAsync({
-          latitude: geoPoint.latitude,
-          longitude: geoPoint.longitude,
-        });
-        if (!rev || seq !== geoSyncSeq.current) return;
-
-        const inferredCityName = rev.city?.trim() || form.city?.trim() || "";
-        const inferredDistrict = rev.district?.trim() || rev.subregion?.trim() || "";
+        const inferredCityName = resolved.city?.trim() || form.city?.trim() || "";
+        const inferredDistrict = resolved.district?.trim() || "";
         const matchedCity = inferredCityName ? await pickCityFromName(inferredCityName) : null;
         if (seq !== geoSyncSeq.current) return;
+        console.log("[ListingWizard] postal inferred:", { inferredCityName, inferredDistrict, matchedCity });
 
         setForm((f) => ({
           ...f,
@@ -889,25 +1023,33 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
           city_id: matchedCity?.id ?? f.city_id,
           district: inferredDistrict || f.district,
           place_id: null,
-          lat: geoPoint.latitude ?? f.lat,
-          lng: geoPoint.longitude ?? f.lng,
+          lat: resolved.lat ?? f.lat,
+          lng: resolved.lon ?? f.lng,
         }));
 
-        if (matchedCity?.id && inferredDistrict) {
-          const places = await locationService.getPlaces(matchedCity.id, inferredDistrict, { limit: 12 });
+        if (matchedCity?.id) {
+          const places = await locationService.getPlaces(matchedCity.id, "", { limit: 200 });
           if (seq !== geoSyncSeq.current) return;
-          const normalize = (s: string) =>
-            s
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .trim();
-          const target = normalize(inferredDistrict);
-          const best =
-            places.find((p) => normalize(p.name) === target)
-            ?? places.find((p) => normalize(p.name).includes(target))
-            ?? null;
+          console.log("[ListingWizard] places loaded for city:", matchedCity.id, "count:", places.length);
+          const withCentroid = places.filter(
+            (p) => p.centroid?.lat != null && p.centroid?.lon != null,
+          );
+          const best = withCentroid.reduce<Place | null>((closest, p) => {
+            if (!p.centroid) return closest;
+            if (!closest?.centroid) return p;
+            const d1 = Math.hypot(
+              p.centroid.lat - resolved.lat,
+              p.centroid.lon - resolved.lon,
+            );
+            const d2 = Math.hypot(
+              closest.centroid.lat - resolved.lat,
+              closest.centroid.lon - resolved.lon,
+            );
+            return d1 < d2 ? p : closest;
+          }, null);
+
           if (best) {
+            console.log("[ListingWizard] closest place selected:", best);
             setForm((f) => ({
               ...f,
               district: best.name,
@@ -918,17 +1060,16 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
             }));
           }
         }
-      } catch {
-        // Best effort sync.
+      } catch (err) {
+        console.error("[ListingWizard] syncFromPostalCode error:", err);
       }
     })();
   };
 
   const handleDistrictSelect = (place: Place) => {
+    console.log("[ListingWizard] handleDistrictSelect:", place);
     const nextLat = place.centroid?.lat ?? null;
     const nextLng = place.centroid?.lon ?? null;
-    const streetForLookup = form.street.trim();
-    const cityForLookup = form.city.trim();
 
     setForm((f) => ({
       ...f,
@@ -938,8 +1079,53 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       lat: nextLat ?? f.lat,
       lng: nextLng ?? f.lng,
     }));
-    syncPostalFromCityAndDistrict(cityForLookup, place.name, streetForLookup);
+    syncPostalFromCityAndDistrict(form.city.trim(), place.name, form.street.trim(), {
+      lat: nextLat,
+      lon: nextLng,
+    });
   };
+
+  useEffect(() => {
+    const city = form.city.trim();
+    const district = form.district.trim();
+    const street = form.street.trim();
+    if (!city || !district) return;
+
+    const key = `${city}|${district}|${street}`;
+    if (lastCityDistrictSyncKey.current === key) return;
+
+    const timer = setTimeout(() => {
+      lastCityDistrictSyncKey.current = key;
+      syncPostalFromCityAndDistrict(city, district, street);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [form.city, form.district, form.street]);
+
+  // Legacy backfill on edit:
+  // If old records were saved with placeholder city ("Ciudad") or null ids,
+  // recover city/district/place from postal code once when opening edit.
+  useEffect(() => {
+    if (!isEditing) return;
+    if (didAutoHydrateFromPostalRef.current) return;
+
+    const postal = form.postal_code.trim();
+    if (postal.length !== 5) return;
+
+    const weakCity = !form.city || form.city.trim().toLowerCase() === "ciudad";
+    const missingStructuredLocation = !form.city_id || !form.place_id || !form.district.trim();
+    if (!weakCity && !missingStructuredLocation) return;
+
+    didAutoHydrateFromPostalRef.current = true;
+    console.log("[ListingWizard] auto-hydrate legacy location from postal:", {
+      postal,
+      city: form.city,
+      city_id: form.city_id,
+      district: form.district,
+      place_id: form.place_id,
+    });
+    syncFromPostalCode(postal);
+  }, [isEditing, form.postal_code, form.city, form.city_id, form.district, form.place_id]);
 
   const handleDetectLocation = async () => {
     try {
@@ -1034,29 +1220,37 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
 
       if (!propertyId && !isSuper) {
         if (isSuperLoading) throw new Error("Cargando tu plan. Intenta de nuevo en unos segundos.");
+        // Fallback robusto: si el usuario ya tiene un piso en plan free, reutilizarlo.
+        // Evita bloquear la publicacion de una nueva habitacion por falta de propertyId en memoria.
         if ((myProperties ?? []).length >= 1) {
-          throw new Error("En plan free solo puedes tener 1 piso. Crea nuevas habitaciones dentro de tu piso actual.");
+          propertyId = myProperties[0]?.id ?? null;
         }
       }
 
-      if (propertyId && canEditPropertyBlock) {
-        const propertyUpdates: PropertyUpdate = {
-          address: propertyPayload.address,
-          street_number: propertyPayload.street_number,
-          floor: propertyPayload.floor,
-          has_elevator: propertyPayload.has_elevator,
-          total_m2: propertyPayload.total_m2,
-          total_rooms: propertyPayload.total_rooms,
-          images: propertyPayload.images,
-          bills_config: propertyPayload.bills_config,
-          house_rules: propertyPayload.house_rules,
-        };
-        const { error: propertyUpdateError } = await supabase
-          .from("properties")
-          .update(propertyUpdates)
-          .eq("id", propertyId)
-          .eq("owner_id", userId);
-        if (propertyUpdateError) throw propertyUpdateError;
+      if (!propertyId && !isSuper && (myProperties ?? []).length >= 1) {
+        throw new Error("No se pudo recuperar tu piso actual. Vuelve a intentarlo desde Mis pisos.");
+      }
+
+      if (propertyId) {
+        if (canEditPropertyBlock) {
+          const propertyUpdates: PropertyUpdate = {
+            address: propertyPayload.address,
+            street_number: propertyPayload.street_number,
+            floor: propertyPayload.floor,
+            has_elevator: propertyPayload.has_elevator,
+            total_m2: propertyPayload.total_m2,
+            total_rooms: propertyPayload.total_rooms,
+            images: propertyPayload.images,
+            bills_config: propertyPayload.bills_config,
+            house_rules: propertyPayload.house_rules,
+          };
+          const { error: propertyUpdateError } = await supabase
+            .from("properties")
+            .update(propertyUpdates)
+            .eq("id", propertyId)
+            .eq("owner_id", userId);
+          if (propertyUpdateError) throw propertyUpdateError;
+        }
       } else {
         const { data: property, error: propertyInsertError } = await supabase
           .from("properties")

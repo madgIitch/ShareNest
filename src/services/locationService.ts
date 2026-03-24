@@ -7,21 +7,31 @@ const headers = {
   Authorization: `Bearer ${ANON_KEY}`,
   "Content-Type": "application/json",
 };
+const DEBUG_LOCATIONS = true;
 
 async function get<T>(path: string): Promise<T> {
+  if (DEBUG_LOCATIONS) console.log("[locationService:get] ->", path);
   const res = await fetch(`${FUNCTIONS_URL}${path}`, { headers });
-  if (!res.ok) throw new Error(`locations API error: ${res.status}`);
-  return res.json() as Promise<T>;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`locations API error: ${res.status} ${path} ${body}`);
+  }
+  const json = await res.json() as T;
+  if (DEBUG_LOCATIONS) console.log("[locationService:get] <-", path, json);
+  return json;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
+  if (DEBUG_LOCATIONS) console.log("[locationService:post] ->", path, body);
   const res = await fetch(`${FUNCTIONS_URL}${path}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`locations API error: ${res.status}`);
-  return res.json() as Promise<T>;
+  const json = await res.json() as T;
+  if (DEBUG_LOCATIONS) console.log("[locationService:post] <-", path, json);
+  return json;
 }
 
 export type City = {
@@ -40,6 +50,20 @@ export type Place = {
   centroid: { lon: number; lat: number } | null;
   bbox: { min_lon: number; min_lat: number; max_lon: number; max_lat: number } | null;
   population?: string;
+};
+
+export type PostalResolution = {
+  postal_code: string;
+  city: string;
+  district: string;
+  lat: number;
+  lon: number;
+  raw: Record<string, string> | null;
+};
+
+export type AddressPostalResolution = {
+  postal_code: string;
+  raw: Record<string, string> | null;
 };
 
 export const locationService = {
@@ -65,5 +89,32 @@ export const locationService = {
 
   async trackCitySearch(cityId: string): Promise<void> {
     await post("/cities/track", { city_id: cityId }).catch(() => {});
+  },
+
+  async resolvePostalCode(postalCode: string, cityHint?: string | null): Promise<PostalResolution | null> {
+    const clean = postalCode.replace(/\D/g, "").slice(0, 5);
+    if (clean.length !== 5) return null;
+    const params = new URLSearchParams();
+    if (cityHint?.trim()) params.set("city_hint", cityHint.trim());
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const data = await get<{ result: PostalResolution | null }>(`/postal/${clean}${qs}`);
+    return data.result;
+  },
+
+  async resolvePostalFromAddress(args: {
+    city: string;
+    district: string;
+    street?: string | null;
+    lat?: number | null;
+    lon?: number | null;
+  }): Promise<AddressPostalResolution | null> {
+    const params = new URLSearchParams();
+    params.set("city", args.city);
+    params.set("district", args.district);
+    if (args.street?.trim()) params.set("street", args.street.trim());
+    if (typeof args.lat === "number") params.set("lat", String(args.lat));
+    if (typeof args.lon === "number") params.set("lon", String(args.lon));
+    const data = await get<{ result: AddressPostalResolution | null }>(`/resolve-postal?${params.toString()}`);
+    return data.result;
   },
 };
