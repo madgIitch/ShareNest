@@ -30,13 +30,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="listings"
-        options={{
-          title: "Mis anuncios",
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="messages"
         options={{
           title: "Mensajes",
@@ -44,17 +37,10 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="friendz"
+        name="workspace"
         options={{
-          title: "Friendz",
-          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="household"
-        options={{
-          title: "Piso",
-          tabBarIcon: ({ color, size }) => <Ionicons name="business-outline" color={color} size={size} />,
+          title: "Mi espacio",
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -76,6 +62,24 @@ export default function TabsLayout() {
         options={{
           href: null,
           headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="listings"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="household"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="friendz"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

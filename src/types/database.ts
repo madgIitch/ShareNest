@@ -528,6 +528,10 @@ export type Database = {
         Args: { p_request_id: string };
         Returns: string;
       };
+      rollback_offer_to_invited: {
+        Args: { p_request_id: string; p_actor_id?: string | null };
+        Returns: string;
+      };
       deny_request: {
         Args: { p_request_id: string };
         Returns: undefined;

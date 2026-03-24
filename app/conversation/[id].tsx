@@ -22,6 +22,7 @@ import {
   useSendMessage,
 } from "../../src/hooks/useConversations";
 import { useListing } from "../../src/hooks/useListings";
+import { useProperty } from "../../src/hooks/useProperties";
 import { useAcceptOffer, useConfirmAssignment, useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
 import type { OfferTerms } from "../../src/hooks/useRequests";
 import { supabase } from "../../src/lib/supabase";
@@ -30,11 +31,39 @@ import { colors, fontSize, radius, spacing } from "../../src/theme";
 import type { Database } from "../../src/types/database";
 
 type Message = Database["public"]["Tables"]["messages"]["Row"];
+type BillsMode = "included" | "separate" | "none";
+type BillsKey = "agua" | "luz" | "gas" | "internet" | "limpieza" | "comunidad" | "calefaccion";
+
+const BILL_LABELS: Record<BillsKey, string> = {
+  agua: "Agua",
+  luz: "Luz",
+  gas: "Gas",
+  internet: "Internet",
+  limpieza: "Limpieza",
+  comunidad: "Comunidad",
+  calefaccion: "Calefacción",
+};
 
 function getBillsLabel(mode: OfferTerms["bills_mode"] | string | null | undefined) {
   if (mode === "included") return "Incluidos";
   if (mode === "none") return "No hay";
   return "Aparte";
+}
+
+function parseBillsConfig(raw: Database["public"]["Tables"]["properties"]["Row"]["bills_config"] | null | undefined) {
+  const included: string[] = [];
+  const separate: string[] = [];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { included, separate };
+  }
+  for (const key of Object.keys(BILL_LABELS) as BillsKey[]) {
+    const value = (raw as Record<string, unknown>)[key];
+    const mode: BillsMode =
+      value === true ? "included" : value === "included" || value === "separate" || value === "none" ? value : "none";
+    if (mode === "included") included.push(BILL_LABELS[key]);
+    if (mode === "separate") separate.push(BILL_LABELS[key]);
+  }
+  return { included, separate };
 }
 
 function getStatusLabel(status: string) {
@@ -46,6 +75,51 @@ function getStatusLabel(status: string) {
   return "Solicitud pendiente";
 }
 
+function getStatusSubLabel(
+  status: string,
+  isOwnerInRequest: boolean,
+  requesterConfirmedAt: string | null,
+  ownerConfirmedAt: string | null,
+) {
+  if (status === "pending") {
+    return isOwnerInRequest
+      ? "Revisa el perfil y decide si quieres iniciar la conversación."
+      : "Tu solicitud está pendiente de revisión por el propietario.";
+  }
+  if (status === "invited") {
+    return isOwnerInRequest
+      ? "Chat activo · Envía la oferta cuando estés listo."
+      : "Chat activo · El propietario te enviará una oferta cuando esté listo.";
+  }
+  if (status === "offered") {
+    return isOwnerInRequest
+      ? "Oferta enviada. Esperando respuesta del buscador."
+      : "Tienes una oferta pendiente. Revísala y decide si la aceptas.";
+  }
+  if (status === "accepted") {
+    return `Confirmaciones: buscador ${requesterConfirmedAt ? "ok" : "pendiente"} · propietario ${ownerConfirmedAt ? "ok" : "pendiente"}`;
+  }
+  if (status === "assigned") {
+    return "Asignación completada.";
+  }
+  if (status === "denied") {
+    return "Esta solicitud se cerró.";
+  }
+  return "";
+}
+
+function isSystemMessage(content: string) {
+  const text = content.trim().toLowerCase();
+  return (
+    text.startsWith("oferta enviada.") ||
+    text.startsWith("oferta retirada.") ||
+    text.startsWith("chat aceptado.") ||
+    text.startsWith("solicitud rechazada.") ||
+    text.startsWith("asignacion completada.") ||
+    text.startsWith("confirmacion registrada.")
+  );
+}
+
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -55,6 +129,7 @@ export default function ConversationScreen() {
   const { data: messages = [], isLoading } = useConversationMessages(id);
   const { data: request } = useRequest(conv?.request_id ?? undefined);
   const { data: listing } = useListing(conv?.listing_id ?? undefined);
+  const { data: property } = useProperty(listing?.property_id ?? undefined);
 
   const sendMessage = useSendMessage();
   const markRead = useMarkRead();
@@ -85,6 +160,12 @@ export default function ConversationScreen() {
     && request.status === "offered"
     && isRequesterInRequest
     && listing?.status !== "rented";
+  const canWithdrawOffer = !!request
+    && request.status === "offered"
+    && isOwnerInRequest
+    && !request.requester_confirmed_at
+    && !request.owner_confirmed_at
+    && listing?.status !== "rented";
 
   const canConfirmAssignment = !!request
     && (request.status === "accepted" || request.status === "assigned")
@@ -98,6 +179,7 @@ export default function ConversationScreen() {
     && listing?.status !== "rented";
 
   const isReadOnly = listing?.status === "rented";
+  const billBreakdown = parseBillsConfig(property?.bills_config);
 
   useEffect(() => {
     if (id && myId) void markRead.mutateAsync({ conversationId: id, myId });
@@ -166,15 +248,42 @@ export default function ConversationScreen() {
 
   const handleSendOfferFromChat = async () => {
     if (!request) return;
+    const terms = buildDefaultTerms();
+    if (!terms.price || terms.price <= 0) {
+      Alert.alert("Completa la oferta", "Define un precio válido antes de enviar la oferta formal.");
+      return;
+    }
+    if (!terms.available_from) {
+      Alert.alert("Completa la oferta", "Indica la fecha de disponibilidad antes de enviar la oferta formal.");
+      return;
+    }
     try {
       await updateRequest.mutateAsync({
         request,
         status: "offered",
-        offerTerms: buildDefaultTerms(),
+        offerTerms: terms,
       });
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
     }
+  };
+
+  const handleWithdrawOffer = async () => {
+    if (!request) return;
+    Alert.alert("Retirar oferta", "Puedes retirarla ahora y volver a enviarla con nuevos términos.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Retirar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await updateRequest.mutateAsync({ request, status: "invited" });
+          } catch (err) {
+            Alert.alert("Error", (err as Error).message);
+          }
+        },
+      },
+    ]);
   };
 
   const handleConfirmAssignment = async () => {
@@ -218,7 +327,11 @@ export default function ConversationScreen() {
       keyboardVerticalOffset={88}
     >
       {other && (
-        <View style={styles.header}>
+        <Pressable
+          style={styles.header}
+          onPress={() => router.push(`/profile/${other.id}`)}
+          accessibilityRole="button"
+        >
           <UserAvatar
             avatarUrl={other.avatar_url}
             name={other.full_name}
@@ -233,14 +346,14 @@ export default function ConversationScreen() {
               </Text>
             )}
           </View>
-        </View>
+        </Pressable>
       )}
 
       {request && (
         <View style={styles.statusBanner}>
           <Text style={styles.statusBannerText}>{getStatusLabel(request.status)}</Text>
           <Text style={styles.statusBannerSub}>
-            Confirmaciones: buscador {request.requester_confirmed_at ? "ok" : "pendiente"} · propietario {request.owner_confirmed_at ? "ok" : "pendiente"}
+            {getStatusSubLabel(request.status, isOwnerInRequest, request.requester_confirmed_at, request.owner_confirmed_at)}
           </Text>
         </View>
       )}
@@ -252,14 +365,14 @@ export default function ConversationScreen() {
             El chat esta abierto. Cuando quieras, envia la oferta formal con precio y condiciones.
           </Text>
           <Pressable
-            style={[styles.secondaryBtn, updateRequest.isPending && styles.btnDisabled]}
+            style={[styles.preOfferBtn, updateRequest.isPending && styles.btnDisabled]}
             onPress={handleSendOfferFromChat}
             disabled={updateRequest.isPending}
           >
             {updateRequest.isPending ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Text style={styles.secondaryBtnText}>Enviar oferta</Text>
+              <Text style={styles.preOfferBtnText}>Enviar oferta</Text>
             )}
           </Pressable>
         </View>
@@ -267,18 +380,18 @@ export default function ConversationScreen() {
 
       {!!request && !!offerTerms && (
         <View style={styles.offerCard}>
-          <Text style={styles.offerCardTitle}>Oferta de habitacion</Text>
+          <Text style={styles.offerCardTitle}>Oferta de habitación</Text>
           <View style={styles.offerGrid}>
             <View style={styles.offerCell}>
               <Text style={styles.offerKey}>Precio</Text>
-              <Text style={styles.offerVal}>{offerTerms.price ? `${offerTerms.price} €/mes` : "-"}</Text>
+              <Text style={styles.offerVal}>{offerTerms.price ? `${offerTerms.price} \u20AC/mes` : "-"}</Text>
             </View>
             <View style={styles.offerCell}>
               <Text style={styles.offerKey}>Disponible desde</Text>
               <Text style={styles.offerVal}>{offerTerms.available_from ?? "-"}</Text>
             </View>
             <View style={styles.offerCell}>
-              <Text style={styles.offerKey}>Estancia minima</Text>
+              <Text style={styles.offerKey}>Estancia mínima</Text>
               <Text style={styles.offerVal}>
                 {offerTerms.min_stay_months ? `${offerTerms.min_stay_months} meses` : "Flexible"}
               </Text>
@@ -287,6 +400,15 @@ export default function ConversationScreen() {
               <Text style={styles.offerKey}>Gastos</Text>
               <Text style={styles.offerVal}>{getBillsLabel(offerTerms.bills_mode)}</Text>
             </View>
+          </View>
+
+          <View style={styles.billsDetail}>
+            <Text style={styles.billsDetailLabel}>
+              Incluidos: {billBreakdown.included.length > 0 ? billBreakdown.included.join(", ") : "ninguno"}
+            </Text>
+            <Text style={styles.billsDetailLabel}>
+              Aparte: {billBreakdown.separate.length > 0 ? billBreakdown.separate.join(", ") : "ninguno"}
+            </Text>
           </View>
 
           <View style={styles.offerActions}>
@@ -300,13 +422,28 @@ export default function ConversationScreen() {
               </Pressable>
             )}
 
+            {canWithdrawOffer && (
+              <>
+                <View style={styles.offerPendingPill}>
+                  <Text style={styles.offerPendingText}>Oferta enviada · pendiente de aceptación</Text>
+                </View>
+                <Pressable
+                  style={[styles.outlineBtn, updateRequest.isPending && styles.btnDisabled]}
+                  onPress={handleWithdrawOffer}
+                  disabled={updateRequest.isPending}
+                >
+                  <Text style={styles.outlineBtnText}>Retirar oferta</Text>
+                </Pressable>
+              </>
+            )}
+
             {canConfirmAssignment && (
               <Pressable
                 style={[styles.secondaryBtn, confirmAssignment.isPending && styles.btnDisabled]}
                 onPress={handleConfirmAssignment}
                 disabled={confirmAssignment.isPending}
               >
-                <Text style={styles.secondaryBtnText}>Confirmar asignacion</Text>
+                <Text style={styles.secondaryBtnText}>Confirmar asignación</Text>
               </Pressable>
             )}
           </View>
@@ -324,6 +461,7 @@ export default function ConversationScreen() {
             createdAt={item.created_at}
             isMine={item.sender_id === myId}
             readAt={item.read_at}
+            isSystem={isSystemMessage(item.content)}
           />
         )}
         ListEmptyComponent={
@@ -350,7 +488,7 @@ export default function ConversationScreen() {
 
       <View style={styles.inputBar}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, isReadOnly && styles.inputDisabled]}
           placeholder={isReadOnly ? "Chat bloqueado por asignacion confirmada" : "Escribe un mensaje..."}
           placeholderTextColor={colors.textTertiary}
           value={input}
@@ -419,6 +557,16 @@ const styles = StyleSheet.create({
   },
   preOfferTitle: { color: colors.text, fontWeight: "800", fontSize: fontSize.md },
   preOfferText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20 },
+  preOfferBtn: {
+    alignSelf: "flex-start",
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+  },
+  preOfferBtnText: { color: colors.primary, fontSize: fontSize.sm, fontWeight: "700" },
 
   offerCard: {
     margin: spacing[3],
@@ -442,9 +590,17 @@ const styles = StyleSheet.create({
   },
   offerKey: { color: colors.textTertiary, fontSize: fontSize.xs, fontWeight: "600" },
   offerVal: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
-  offerActions: { flexDirection: "row", gap: spacing[2], marginTop: spacing[1] },
+  billsDetail: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing[2],
+    gap: 4,
+    backgroundColor: colors.gray100,
+  },
+  billsDetailLabel: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: "600" },
+  offerActions: { gap: spacing[2], marginTop: spacing[1] },
   primaryBtn: {
-    flex: 1,
     backgroundColor: colors.verify,
     borderRadius: radius.full,
     paddingVertical: spacing[2],
@@ -452,13 +608,30 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
   secondaryBtn: {
-    flex: 1,
     backgroundColor: colors.text,
     borderRadius: radius.full,
     paddingVertical: spacing[2],
     alignItems: "center",
   },
   secondaryBtnText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
+  outlineBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.text,
+    borderRadius: radius.full,
+    paddingVertical: spacing[2],
+    alignItems: "center",
+    backgroundColor: colors.surface,
+  },
+  outlineBtnText: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
+  offerPendingPill: {
+    backgroundColor: colors.gray100,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  offerPendingText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: "700" },
   btnDisabled: { opacity: 0.6 },
 
   messageList: { flexGrow: 1, paddingVertical: spacing[2] },
@@ -501,13 +674,19 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: colors.gray100,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius["2xl"],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2] + 2,
     fontSize: fontSize.sm,
     color: colors.text,
     maxHeight: 120,
+  },
+  inputDisabled: {
+    backgroundColor: colors.gray100,
+    color: colors.textTertiary,
   },
   sendBtn: {
     width: 40,
@@ -520,4 +699,3 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { backgroundColor: colors.gray300 },
   sendBtnText: { color: colors.white, fontSize: 18, fontWeight: "700", lineHeight: 22 },
 });
-

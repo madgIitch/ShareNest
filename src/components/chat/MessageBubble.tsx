@@ -7,9 +7,21 @@ type Props = {
   createdAt: string;
   isMine: boolean;
   readAt?: string | null;
+  isSystem?: boolean;
 };
 
-export function MessageBubble({ content, createdAt, isMine, readAt }: Props) {
+export function MessageBubble({ content, createdAt, isMine, readAt, isSystem = false }: Props) {
+  if (isSystem) {
+    return (
+      <View style={styles.systemRow}>
+        <View style={styles.systemBubble}>
+          <Text style={styles.systemText}>{content}</Text>
+          <Text style={styles.systemTime}>{formatTime(createdAt)}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.row, isMine && styles.rowMine]}>
       <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
@@ -51,6 +63,33 @@ const styles = StyleSheet.create({
   },
   rowMine: {
     justifyContent: "flex-end",
+  },
+  systemRow: {
+    alignItems: "center",
+    marginBottom: spacing[2],
+    paddingHorizontal: spacing[4],
+  },
+  systemBubble: {
+    maxWidth: "88%",
+    backgroundColor: colors.gray100,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    alignItems: "center",
+    gap: 3,
+  },
+  systemText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    textAlign: "center",
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  systemTime: {
+    fontSize: 10,
+    color: colors.textTertiary,
   },
   bubble: {
     maxWidth: "78%",

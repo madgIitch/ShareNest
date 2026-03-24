@@ -54,7 +54,8 @@ export function useMyHousehold() {
       if (error) throw error;
       return (data?.[0] ?? null) as MyHousehold | null;
     },
-    staleTime: 1000 * 60 * 2,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 

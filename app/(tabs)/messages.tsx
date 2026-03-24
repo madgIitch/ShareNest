@@ -33,6 +33,18 @@ function isActiveRequest(status: string) {
   return ACTIVE_REQUEST_STATUSES.includes(status as (typeof ACTIVE_REQUEST_STATUSES)[number]);
 }
 
+function toDisplayName(name: string | null | undefined) {
+  if (!name) return "Usuario";
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => {
+      const lower = part.toLocaleLowerCase("es-ES");
+      return lower.charAt(0).toLocaleUpperCase("es-ES") + lower.slice(1);
+    })
+    .join(" ");
+}
+
 function statusMeta(status: RequestWithDetails["status"]) {
   if (status === "assigned") return { label: "Asignada", variant: "success" as const };
   if (status === "offered") return { label: "Ofertada", variant: "primary" as const };
@@ -356,14 +368,14 @@ function ConversationItem({
       <View style={styles.itemBody}>
         <View style={styles.itemRow}>
           <Text style={styles.itemName} numberOfLines={1}>
-            {other?.full_name ?? "Usuario"}
+            {toDisplayName(other?.full_name)}
           </Text>
           {conv.last_message_at && (
             <Text style={styles.itemTime}>{formatRelative(conv.last_message_at)}</Text>
           )}
         </View>
         {conv.listing && (
-          <Text style={styles.itemSub} numberOfLines={1}>?? {conv.listing.title}</Text>
+          <Text style={styles.itemSub} numberOfLines={1}>Anuncio: {conv.listing.title}</Text>
         )}
         {conv.last_message_preview ? (
           <Text style={styles.itemPreview} numberOfLines={1}>
@@ -417,16 +429,17 @@ function RequestItem({
         <View style={styles.itemRow}>
           <Text style={[styles.itemName, { flex: 1 }]} numberOfLines={1}>
             {role === "owner"
-              ? request.requester?.full_name ?? "Usuario"
+              ? toDisplayName(request.requester?.full_name)
               : request.listing?.title ?? "Anuncio"}
           </Text>
           <TagBadge label={label} variant={variant} />
         </View>
         <Text style={styles.itemSub} numberOfLines={1}>
           {role === "owner"
-            ? `?? ${request.listing?.title ?? ""}`
-            : `?? ${request.listing?.city ?? ""}`}
+            ? `Anuncio: ${request.listing?.title ?? "Sin titulo"}`
+            : `Ciudad: ${request.listing?.city ?? "Sin ciudad"}`}
         </Text>
+        <Text style={styles.itemTime}>{formatRelative(request.created_at)}</Text>
         {request.message && (
           <Text style={styles.itemPreview} numberOfLines={1}>{request.message}</Text>
         )}
@@ -508,7 +521,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: fontSize.md, fontWeight: "700", color: colors.text, flex: 1 },
   itemTime: { fontSize: fontSize.xs, color: colors.textTertiary },
   itemSub: { fontSize: fontSize.xs, color: colors.textSecondary },
-  itemPreview: { fontSize: fontSize.sm, color: colors.textSecondary },
+  itemPreview: { fontSize: fontSize.xs, color: colors.textTertiary },
 
   sentScroll: { padding: spacing[4], gap: spacing[3] },
   sentHeader: {

@@ -28,6 +28,8 @@ export type RequestWithDetails = Request & {
     verified_at: string | null;
     bio: string | null;
     city: string | null;
+    birth_year: number | null;
+    occupation: string | null;
   } | null;
   listing: {
     id: string;
@@ -48,7 +50,7 @@ export function useReceivedRequests(ownerId: string | undefined) {
         .from("requests")
         .select(`
           *,
-          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city),
+          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city, birth_year, occupation),
           listing:listings!requests_listing_id_fkey(id, title, city, images, price, available_from, min_stay_months)
         `)
         .eq("owner_id", ownerId!)
@@ -104,7 +106,7 @@ export function useRequest(requestId: string | undefined) {
         .from("requests")
         .select(`
           *,
-          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city),
+          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city, birth_year, occupation),
           listing:listings!requests_listing_id_fkey(id, title, city, images, price, available_from, min_stay_months)
         `)
         .eq("id", requestId!)
@@ -205,7 +207,8 @@ export function useUpdateRequestStatus() {
       offerTerms?: OfferTerms;
     }) => {
       if (status === "invited") {
-        const { data, error } = await supabase.rpc("accept_request_chat", {
+        const rpcName = request.status === "offered" ? "rollback_offer_to_invited" : "accept_request_chat";
+        const { data, error } = await supabase.rpc(rpcName, {
           p_request_id: request.id,
         });
         if (error) throw error;

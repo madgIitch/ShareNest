@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+﻿import { router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -13,13 +13,18 @@ import {
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../src/components/ui/TagBadge";
 import { useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
+import { useMutualFriends } from "../../src/hooks/useConnections";
 import { supabase } from "../../src/lib/supabase";
+import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 
 export default function RequestDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { session } = useAuth();
+  const myId = session?.user?.id;
   const { data: request, isLoading } = useRequest(id);
   const updateStatus = useUpdateRequestStatus();
+  const { data: mutual = [] } = useMutualFriends(myId, request?.requester_id);
 
   if (isLoading || !request) {
     return (
@@ -33,6 +38,12 @@ export default function RequestDetailScreen() {
   const listing = request.listing;
   const canAcceptChat = request.status === "pending";
   const isClosed = request.status === "denied" || request.status === "assigned";
+  const age = requester?.birth_year ? Math.max(0, new Date().getFullYear() - requester.birth_year) : null;
+  const mutualPreview = mutual
+    .slice(0, 3)
+    .map((f) => (f.full_name ?? "").split(" ")[0])
+    .filter(Boolean)
+    .join(", ");
 
   const openChatForRequest = async () => {
     const { data, error } = await supabase
@@ -46,41 +57,33 @@ export default function RequestDetailScreen() {
     }
     const conv = data as { id: string } | null;
     if (!conv?.id) {
-      Alert.alert("Chat no disponible", "Aun no hay una conversacion vinculada a esta solicitud.");
+      Alert.alert("Chat no disponible", "Aún no hay una conversación vinculada a esta solicitud.");
       return;
     }
     router.push(`/conversation/${conv.id}`);
   };
 
-  const handleAcceptChat = () => {
-    Alert.alert("Aceptar chat", "Se abrira el chat con este candidato para continuar la conversacion.", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Aceptar chat",
-        onPress: async () => {
-          try {
-            const conv = (await updateStatus.mutateAsync({
-              request,
-              status: "invited",
-            })) as { id: string } | null;
-            if (conv?.id) {
-              router.replace(`/conversation/${conv.id}`);
-            } else {
-              router.back();
-            }
-          } catch (err) {
-            Alert.alert("Error", (err as Error).message);
-          }
-        },
-      },
-    ]);
+  const handleAcceptChat = async () => {
+    try {
+      const conv = (await updateStatus.mutateAsync({
+        request,
+        status: "invited",
+      })) as { id: string } | null;
+      if (conv?.id) {
+        router.replace(`/conversation/${conv.id}`);
+      } else {
+        router.back();
+      }
+    } catch (err) {
+      Alert.alert("Error", (err as Error).message);
+    }
   };
 
   const handleDeny = () => {
-    Alert.alert("Rechazar solicitud", "El solicitante recibira una actualizacion en su estado.", [
+    Alert.alert("Rechazar solicitud", "Esta acción es irreversible. El solicitante recibirá una actualización.", [
       { text: "Cancelar", style: "cancel" },
       {
-        text: "Rechazar",
+        text: "Sí, rechazar",
         style: "destructive",
         onPress: async () => {
           try {
@@ -106,7 +109,7 @@ export default function RequestDetailScreen() {
               : request.status === "accepted"
                 ? "Chat confirmado"
                 : request.status === "assigned"
-                  ? "Habitacion asignada"
+                  ? "Habitación asignada"
                   : "Solicitud denegada"}
           </Text>
         </View>
@@ -124,10 +127,26 @@ export default function RequestDetailScreen() {
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{requester?.full_name ?? "Usuario"}</Text>
             {requester?.city && <Text style={styles.profileCity}>{requester.city}</Text>}
-            {requester?.verified_at && <TagBadge label="Numero verificado" variant="primary" />}
+            {requester?.verified_at && <TagBadge label="Número verificado" variant="primary" />}
           </View>
         </Pressable>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>{age ? `${age} años` : "Edad no indicada"}</Text>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.metaText}>{requester?.occupation?.trim() || "Profesión no indicada"}</Text>
+        </View>
+        {mutual.length > 0 && (
+          <View style={styles.mutualBanner}>
+            <Text style={styles.mutualTitle}>
+              {mutual.length} {mutual.length === 1 ? "conexión en común" : "conexiones en común"}
+            </Text>
+            <Text style={styles.mutualText} numberOfLines={1}>
+              {mutualPreview}
+            </Text>
+          </View>
+        )}
         {requester?.bio && <Text style={styles.bio}>{requester.bio}</Text>}
+        <Text style={styles.requestTime}>Recibida {formatRelative(request.created_at)}</Text>
       </View>
 
       {listing && (
@@ -144,7 +163,7 @@ export default function RequestDetailScreen() {
               {listing.title}
             </Text>
             <Text style={styles.listingCity}>{listing.city}</Text>
-            <Text style={styles.listingPrice}>{listing.price} €/mes</Text>
+            <Text style={styles.listingPrice}>{listing.price} {"\u20AC"}/mes</Text>
           </View>
         </Pressable>
       )}
@@ -160,13 +179,13 @@ export default function RequestDetailScreen() {
         <View style={styles.actions}>
           <Pressable
             style={[styles.btn, styles.acceptBtn]}
-            onPress={handleAcceptChat}
+            onPress={() => void handleAcceptChat()}
             disabled={updateStatus.isPending}
           >
             {updateStatus.isPending ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.acceptBtnText}>Aceptar chat</Text>
+              <Text style={styles.acceptBtnText}>Iniciar conversación</Text>
             )}
           </Pressable>
           <Pressable
@@ -186,6 +205,17 @@ export default function RequestDetailScreen() {
       )}
     </ScrollView>
   );
+}
+
+function formatRelative(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "ahora";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
 const styles = StyleSheet.create({
@@ -226,7 +256,20 @@ const styles = StyleSheet.create({
   profileInfo: { flex: 1, gap: spacing[1] },
   profileName: { fontSize: fontSize.lg, fontWeight: "700", color: colors.text },
   profileCity: { fontSize: fontSize.sm, color: colors.textSecondary },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: spacing[1] },
+  metaText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: "600" },
+  metaDot: { fontSize: fontSize.sm, color: colors.textTertiary },
+  mutualBanner: {
+    backgroundColor: colors.purple,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    gap: 2,
+  },
+  mutualTitle: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
+  mutualText: { color: colors.white, opacity: 0.92, fontSize: fontSize.xs },
   bio: { fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
+  requestTime: { fontSize: fontSize.xs, color: colors.textTertiary, fontWeight: "600" },
 
   listingCard: {
     flexDirection: "row",
@@ -268,4 +311,5 @@ const styles = StyleSheet.create({
   denyBtn: { backgroundColor: colors.errorLight },
   denyBtnText: { color: colors.error, fontWeight: "700", fontSize: fontSize.md },
 });
+
 
