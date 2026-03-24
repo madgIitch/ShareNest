@@ -380,8 +380,8 @@ function Step3CommonPhotos({
 }) {
   return (
     <>
-      <Text style={styles.stepTitle}>Fotos del piso</Text>
-      <Text style={styles.stepSubtitle}>Salón, cocina, baño, zonas comunes. Mínimo 2.</Text>
+      <Text style={styles.stepTitle}>Fotos del piso (cocina, baño, terraza...)</Text>
+      <Text style={styles.stepSubtitle}>Zonas comunes del piso. Mínimo 2 fotos.</Text>
       <PhotoList photos={photos} onAdd={onAdd} onRemove={onRemove} onMove={onMove} />
     </>
   );
@@ -886,8 +886,13 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     });
     return fromProperty;
   });
-  const [photoUris, setPhotoUris] = useState<string[]>(initial?.images ?? (existingProperty?.images as string[] | undefined) ?? []);
-  const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>([]);
+  const flatPhotos = (existingProperty?.images as string[] | undefined) ?? [];
+  const [photoUris, setPhotoUris] = useState<string[]>(flatPhotos);
+  const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>(() => {
+    if (!initial?.images) return [];
+    const flatSet = new Set(flatPhotos);
+    return (initial.images as string[]).filter((url) => !flatSet.has(url));
+  });
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const postalSyncSeq = useRef(0);
@@ -1207,12 +1212,21 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       setSubmitting(true);
       const folder = initial?.id ?? `${Date.now().toString(36)}`;
 
+      // Flat / common-area photos (→ properties.images)
       const localUris = photoUris.filter((u) => !u.startsWith("http"));
       const existingUrls = photoUris.filter((u) => u.startsWith("http"));
       const uploadedUrls = localUris.length > 0
         ? await uploadAllListingImages(userId, folder, localUris)
         : [];
-      const allImages = [...existingUrls, ...uploadedUrls, ...roomPhotoUris];
+
+      // Room photos (→ listings.images, stored in a separate sub-folder)
+      const localRoomUris = roomPhotoUris.filter((u) => !u.startsWith("http"));
+      const existingRoomUrls = roomPhotoUris.filter((u) => u.startsWith("http"));
+      const uploadedRoomUrls = localRoomUris.length > 0
+        ? await uploadAllListingImages(userId, `${folder}_r`, localRoomUris)
+        : [];
+
+      const allImages = [...existingUrls, ...uploadedUrls, ...existingRoomUrls, ...uploadedRoomUrls];
 
       const houseRules: string[] = [
         form.no_smokers && "no_fumadores",
