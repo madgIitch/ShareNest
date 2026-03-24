@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 
 import { ListingWizard } from "../../src/components/listing/ListingWizard";
@@ -7,6 +8,7 @@ import { useAuth } from "../../src/providers/AuthProvider";
 import { colors } from "../../src/theme";
 
 export default function NewListingScreen() {
+  const { propertyId } = useLocalSearchParams<{ propertyId?: string }>();
   const { session } = useAuth();
   const userId = session?.user?.id;
   const { data: isSuper = false, isLoading: loadingTier } = useIsSuperfriendz();
@@ -20,11 +22,13 @@ export default function NewListingScreen() {
     );
   }
 
-  const existingProperty = !isSuper && myProperties.length > 0 ? myProperties[0] : null;
+  const forcedProperty = propertyId ? myProperties.find((p) => p.id === propertyId) ?? null : null;
+  const existingProperty = forcedProperty ?? (!isSuper && myProperties.length > 0 ? myProperties[0] : null);
+  const startAtStep = existingProperty ? 6 : 1;
 
   return (
     <ListingWizard
-      startAtStep={existingProperty ? 6 : 1}
+      startAtStep={startAtStep}
       existingProperty={existingProperty}
       existingCityName={existingProperty?.city?.name ?? null}
     />

@@ -1,5 +1,7 @@
-﻿import { router } from "expo-router";
-import { useState } from "react";
+﻿import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   Image,
@@ -8,45 +10,70 @@ import {
   Text,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 import { EmptyState } from "../../src/components/ui/EmptyState";
 import { ListingCardSkeleton } from "../../src/components/ui/Skeleton";
 import { TagBadge } from "../../src/components/ui/TagBadge";
-import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
+import { useListingsByIds, useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
 import { useMyProperties } from "../../src/hooks/useProperties";
 import { useReceivedRequests } from "../../src/hooks/useRequests";
+import { getSavedListingIds } from "../../src/lib/savedListings";
 import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import type { Database, ListingStatus } from "../../src/types/database";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
-type Tab = ListingStatus;
+type Tab = ListingStatus | "saved";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "active", label: "Activos" },
   { key: "paused", label: "Pausados" },
   { key: "rented", label: "Archivados" },
+  { key: "saved", label: "Guardados" },
 ];
 
 export default function MyListingsScreen() {
   const { session } = useAuth();
   const [tab, setTab] = useState<Tab>("active");
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [isSavedLoading, setIsSavedLoading] = useState(true);
   const { data: listings, isLoading } = useMyListings(session?.user?.id);
   const { data: myProperties = [] } = useMyProperties(session?.user?.id);
   const { data: receivedRequests = [] } = useReceivedRequests(session?.user?.id);
+  const { data: savedListings = [], isLoading: isSavedListingsLoading } = useListingsByIds(savedIds);
   const updateStatus = useUpdateListingStatus();
   const { data: isSuper = false } = useIsSuperfriendz();
 
+  const refreshSaved = useCallback(async () => {
+    setIsSavedLoading(true);
+    const ids = await getSavedListingIds();
+    setSavedIds(ids);
+    setIsSavedLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refreshSaved();
+  }, [refreshSaved]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshSaved();
+    }, [refreshSaved]),
+  );
+
   const freeHasOneProperty = !isSuper && myProperties.length >= 1;
-  const filtered = (listings ?? []).filter((l) => l.status === tab);
+  const filtered = tab === "saved"
+    ? savedListings
+    : (listings ?? []).filter((l) => l.status === tab);
 
   return (
     <View style={styles.screen}>
       <View style={styles.tabs}>
         {TABS.map((t) => {
-          const count = (listings ?? []).filter((l) => l.status === t.key).length;
+          const count = t.key === "saved"
+            ? savedIds.length
+            : (listings ?? []).filter((l) => l.status === t.key).length;
           return (
             <Pressable
               key={t.key}
@@ -62,7 +89,7 @@ export default function MyListingsScreen() {
         })}
       </View>
 
-      {isLoading ? (
+      {isLoading || (tab === "saved" && (isSavedLoading || isSavedListingsLoading)) ? (
         <View style={styles.list}>
           {[1, 2].map((i) => <ListingCardSkeleton key={i} />)}
         </View>
@@ -78,26 +105,41 @@ export default function MyListingsScreen() {
                 (r) => r.listing_id === item.id && r.status === "pending",
               ).length}
               onPress={() => router.push(`/listing/${item.id}`)}
-              onEdit={() => router.push(`/listing/${item.id}/edit`)}
-              onToggleStatus={() =>
-                updateStatus.mutateAsync({
-                  id: item.id,
-                  status: item.status === "active" ? "paused" : "active",
-                })
+              onEdit={
+                tab === "saved"
+                  ? undefined
+                  : () => router.push(`/listing/${item.id}/edit`)
+              }
+              onToggleStatus={
+                tab === "saved"
+                  ? undefined
+                  : () =>
+                    updateStatus.mutateAsync({
+                      id: item.id,
+                      status: item.status === "active" ? "paused" : "active",
+                    })
               }
             />
           )}
           ListEmptyComponent={
             <EmptyState
-              icon={tab === "active" ? "[]" : tab === "paused" ? "||" : "H"}
+              icon={tab === "active" ? "[]" : tab === "paused" ? "||" : tab === "saved" ? "<3" : "H"}
               title={
                 tab === "active"
                   ? "No tienes anuncios activos"
                   : tab === "paused"
                     ? "No tienes anuncios pausados"
-                    : "Sin anuncios archivados"
+                    : tab === "saved"
+                      ? "No tienes anuncios guardados"
+                      : "Sin anuncios archivados"
               }
-              subtitle={tab === "active" ? "Publica tu primer anuncio." : undefined}
+              subtitle={
+                tab === "active"
+                  ? "Publica tu primer anuncio."
+                  : tab === "saved"
+                    ? "Da like en Explorar para guardarlos aqui."
+                    : undefined
+              }
               action={
                 tab === "active"
                   ? { label: "Publicar anuncio", onPress: () => router.push("/listing/new") }
@@ -117,16 +159,18 @@ export default function MyListingsScreen() {
         </View>
       )}
 
-      <Pressable
-        style={styles.fab}
-        onPress={() => {
-          router.push("/listing/new");
-        }}
-        accessibilityLabel="Nuevo anuncio"
-      >
-        <Text style={styles.fabText}>+</Text>
-        <Text style={styles.fabLabel}>Nuevo anuncio</Text>
-      </Pressable>
+      {tab !== "saved" && (
+        <Pressable
+          style={styles.fab}
+          onPress={() => {
+            router.push("/listing/new");
+          }}
+          accessibilityLabel="Nuevo anuncio"
+        >
+          <Text style={styles.fabText}>+</Text>
+          <Text style={styles.fabLabel}>Nuevo anuncio</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -141,11 +185,12 @@ function MyListingRow({
   listing: Listing;
   pendingRequests: number;
   onPress: () => void;
-  onEdit: () => void;
-  onToggleStatus: () => void;
+  onEdit?: () => void;
+  onToggleStatus?: () => void;
 }) {
   const cover = (listing.images as string[])[0];
-  const canToggle = listing.status === "active" || listing.status === "paused";
+  const canToggle =
+    !!onToggleStatus && (listing.status === "active" || listing.status === "paused");
 
   return (
     <Pressable style={styles.row} onPress={onPress}>
@@ -176,24 +221,28 @@ function MyListingRow({
         </View>
       </View>
 
-      <View style={styles.rowActions}>
-        <Pressable style={styles.actionBtn} onPress={onEdit} accessibilityLabel="Editar anuncio">
-          <Ionicons name="create-outline" size={18} color={colors.textSecondary} />
-        </Pressable>
-        {canToggle && (
-          <Pressable
-            style={styles.actionBtn}
-            onPress={onToggleStatus}
-            accessibilityLabel={listing.status === "active" ? "Pausar anuncio" : "Activar anuncio"}
-          >
-            <Ionicons
-              name={listing.status === "active" ? "pause" : "play"}
-              size={18}
-              color={colors.textSecondary}
-            />
-          </Pressable>
-        )}
-      </View>
+      {(onEdit || canToggle) && (
+        <View style={styles.rowActions}>
+          {onEdit && (
+            <Pressable style={styles.actionBtn} onPress={onEdit} accessibilityLabel="Editar anuncio">
+              <Ionicons name="create-outline" size={18} color={colors.textSecondary} />
+            </Pressable>
+          )}
+          {canToggle && onToggleStatus && (
+            <Pressable
+              style={styles.actionBtn}
+              onPress={onToggleStatus}
+              accessibilityLabel={listing.status === "active" ? "Pausar anuncio" : "Activar anuncio"}
+            >
+              <Ionicons
+                name={listing.status === "active" ? "pause" : "play"}
+                size={18}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+          )}
+        </View>
+      )}
     </Pressable>
   );
 }

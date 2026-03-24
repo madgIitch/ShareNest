@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../../src/theme";
@@ -113,6 +114,7 @@ export default function EditPropertyScreen() {
 
   const { data: property, isLoading } = useProperty(id);
   const updateProperty = useUpdateProperty();
+  const insets = useSafeAreaInsets();
 
   const [address, setAddress] = useState("");
   const [streetNumber, setStreetNumber] = useState("");
@@ -193,14 +195,17 @@ export default function EditPropertyScreen() {
 
   if (isLoading || !property) {
     return (
-      <View style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={["top", "bottom"]}>
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
+  const footerBottom = spacing[4] + Math.max(insets.bottom, 6);
+  const footerHeightEstimate = 98;
+
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace(`/(tabs)/property/${property.id}`))}>
           <Text style={styles.back}>Atras</Text>
@@ -209,7 +214,7 @@ export default function EditPropertyScreen() {
         <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: footerHeightEstimate + footerBottom }]}>
         <View style={styles.block}>
           <Text style={styles.blockTitle}>Ubicacion del piso</Text>
           <Text style={styles.fieldLabel}>Calle</Text>
@@ -363,7 +368,7 @@ export default function EditPropertyScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: footerBottom }]}>
         <Pressable style={styles.cancelBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace(`/(tabs)/property/${property.id}`))}>
           <Text style={styles.cancelText}>Cancelar</Text>
         </Pressable>
@@ -371,7 +376,7 @@ export default function EditPropertyScreen() {
           <Text style={styles.saveText}>{updateProperty.isPending ? "Guardando..." : "Guardar piso"}</Text>
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -379,7 +384,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   header: {
-    paddingTop: spacing[6],
+    paddingTop: spacing[2],
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[3],
     borderBottomWidth: 1,
@@ -391,7 +396,7 @@ const styles = StyleSheet.create({
   },
   back: { color: colors.primary, fontWeight: "700" },
   title: { fontSize: fontSize.lg, fontWeight: "800", color: colors.text },
-  content: { padding: spacing[4], paddingBottom: 150, gap: spacing[3] },
+  content: { padding: spacing[4], gap: spacing[3] },
   block: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -472,7 +477,6 @@ const styles = StyleSheet.create({
   hint: { color: colors.textSecondary, fontSize: fontSize.xs },
   footer: {
     position: "absolute",
-    bottom: spacing[4],
     left: spacing[4],
     right: spacing[4],
     padding: spacing[4],

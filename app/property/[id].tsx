@@ -273,7 +273,10 @@ export default function PropertyDashboardScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>HABITACIONES</Text>
             <Pressable
-              onPress={() => router.push("/listing/new")}
+              onPress={() => {
+                if (!editablePropertyId) return;
+                router.push({ pathname: "/listing/new", params: { propertyId: editablePropertyId } });
+              }}
             >
               <Text style={styles.addRoomText}>+ Añadir habitación</Text>
             </Pressable>
@@ -303,7 +306,10 @@ export default function PropertyDashboardScreen() {
               </Text>
               <Pressable
                 style={styles.addFirstRoomBtn}
-                onPress={() => router.push("/listing/new")}
+                onPress={() => {
+                  if (!editablePropertyId) return;
+                  router.push({ pathname: "/listing/new", params: { propertyId: editablePropertyId } });
+                }}
               >
                 <Text style={styles.addFirstRoomBtnText}>Publicar primera habitación</Text>
               </Pressable>

@@ -32,7 +32,7 @@ export default function RequestDetailScreen() {
 
   const requester = request.requester;
   const listing = request.listing;
-  const canOffer = request.status === "pending";
+  const canAcceptChat = request.status === "pending";
   const isClosed = request.status === "denied" || request.status === "assigned";
 
   const openChatForRequest = async () => {
@@ -60,11 +60,11 @@ export default function RequestDetailScreen() {
     bills_mode: "extra",
   });
 
-  const handleOffer = () => {
-    Alert.alert("Ofrecer habitacion", "Se enviara una oferta formal y se abrira el chat para confirmacion final.", [
+  const handleAcceptChat = () => {
+    Alert.alert("Aceptar chat", "Se abrira el chat con este candidato para continuar la conversacion.", [
       { text: "Cancelar", style: "cancel" },
       {
-        text: "Enviar oferta",
+        text: "Aceptar chat",
         onPress: async () => {
           try {
             const conv = (await updateStatus.mutateAsync({
@@ -109,9 +109,9 @@ export default function RequestDetailScreen() {
         <View style={[styles.statusBanner, request.status === "denied" ? styles.bannerDenied : styles.bannerActive]}>
           <Text style={[styles.statusBannerText, request.status === "denied" ? styles.bannerTextDenied : styles.bannerTextActive]}>
             {request.status === "offered"
-              ? "Oferta enviada"
+              ? "Chat aceptado"
               : request.status === "accepted"
-                ? "Oferta aceptada"
+                ? "Chat confirmado"
                 : request.status === "assigned"
                   ? "Habitacion asignada"
                   : "Solicitud denegada"}
@@ -163,17 +163,17 @@ export default function RequestDetailScreen() {
         </View>
       )}
 
-      {canOffer && (
+      {canAcceptChat && (
         <View style={styles.actions}>
           <Pressable
             style={[styles.btn, styles.acceptBtn]}
-            onPress={handleOffer}
+            onPress={handleAcceptChat}
             disabled={updateStatus.isPending}
           >
             {updateStatus.isPending ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.acceptBtnText}>Ofrecer habitacion</Text>
+              <Text style={styles.acceptBtnText}>Aceptar chat</Text>
             )}
           </Pressable>
           <Pressable
@@ -186,7 +186,7 @@ export default function RequestDetailScreen() {
         </View>
       )}
 
-      {!canOffer && !isClosed && (
+      {!canAcceptChat && !isClosed && (
         <Pressable style={[styles.btn, styles.acceptBtn]} onPress={() => void openChatForRequest()}>
           <Text style={styles.acceptBtnText}>Ir al chat</Text>
         </Pressable>

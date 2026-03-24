@@ -23,10 +23,12 @@ type Props = {
   listing: ListingPreview;
   connectionDegree?: 1 | 2 | null;
   viewerId?: string;
+  isSaved?: boolean;
+  onToggleSaved?: (listingId: string) => void;
   onPress?: () => void;
 };
 
-export function ListingCard({ listing, connectionDegree, viewerId, onPress }: Props) {
+export function ListingCard({ listing, connectionDegree, viewerId, isSaved = false, onToggleSaved, onPress }: Props) {
   const ownerId = listing.owner_id;
   const { data: mutual = [] } = useMutualFriends(
     viewerId,
@@ -80,8 +82,17 @@ export function ListingCard({ listing, connectionDegree, viewerId, onPress }: Pr
           </View>
         )}
 
-        <Pressable style={styles.likeBtn} hitSlop={8}>
-          <Text style={styles.likeBtnText}>{"\u2661"}</Text>
+        <Pressable
+          style={[styles.likeBtn, isSaved && styles.likeBtnSaved]}
+          hitSlop={8}
+          onPress={(e) => {
+            e.stopPropagation();
+            onToggleSaved?.(listing.id);
+          }}
+        >
+          <Text style={[styles.likeBtnText, isSaved && styles.likeBtnTextSaved]}>
+            {isSaved ? "\u2665" : "\u2661"}
+          </Text>
         </Pressable>
 
         <View style={styles.priceOverlay} pointerEvents="none">
@@ -197,10 +208,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  likeBtnSaved: {
+    backgroundColor: colors.errorLight,
+    borderWidth: 1,
+    borderColor: colors.error + "44",
+  },
   likeBtnText: {
     fontSize: 16,
     color: colors.gray600,
     lineHeight: 18,
+  },
+  likeBtnTextSaved: {
+    color: colors.error,
   },
 
   priceOverlay: {

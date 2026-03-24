@@ -168,7 +168,7 @@ export type Database = {
         Row: {
           id: string;
           owner_id: string;
-          property_id: string | null; // new â€” links to properties table
+          property_id: string | null; // new - links to properties table
           type: ListingType;
           title: string;
           description: string | null;
@@ -180,7 +180,7 @@ export type Database = {
           street_number: string | null;
           postal_code: string | null;
           price: number;
-          size_m2: number | null; // mÂ² of the room
+          size_m2: number | null; // m2 of the room
           rooms: number | null;   // number of roommates
           available_from: string | null;
           is_furnished: boolean;
@@ -272,8 +272,8 @@ export type Database = {
           owner_id: string;
           status: RequestStatus;
           message: string | null;
-          presentation_message: string | null; // new â€” shown in candidates view
-          is_boosted: boolean;                  // new â€” true if Superfriendz active at send time
+          presentation_message: string | null; // new - shown in candidates view
+          is_boosted: boolean;                  // new - true if Superfriendz active at send time
           offered_at: string | null;
           offer_terms: Json | null;
           requester_confirmed_at: string | null;

@@ -60,6 +60,26 @@ export function useActiveListings(city?: string) {
   });
 }
 
+export function useListingsByIds(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids));
+
+  return useQuery<Listing[]>({
+    queryKey: ["listings", "by-ids", uniqueIds.sort().join(",")],
+    queryFn: async () => {
+      if (uniqueIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("listings")
+        .select("*")
+        .in("id", uniqueIds);
+      if (error) throw error;
+      const rows = (data ?? []) as Listing[];
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      return uniqueIds.map((id) => byId.get(id)).filter((x): x is Listing => !!x);
+    },
+    enabled: uniqueIds.length > 0,
+  });
+}
+
 // --- Mutations ---
 
 export function useCreateListing() {

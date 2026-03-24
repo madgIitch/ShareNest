@@ -29,13 +29,13 @@ type SortMode = "mutual" | "recent" | "verified";
 function CandidateCard({
   request,
   myId,
-  onOffer,
+  onAcceptChat,
   onReject,
   onOpenChat,
 }: {
   request: RequestWithDetails;
   myId: string | undefined;
-  onOffer: (r: RequestWithDetails) => void;
+  onAcceptChat: (r: RequestWithDetails) => void;
   onReject: (r: RequestWithDetails) => void;
   onOpenChat: (r: RequestWithDetails) => void;
 }) {
@@ -113,8 +113,8 @@ function CandidateCard({
             <Text style={styles.actionChatText}>Chat</Text>
           </Pressable>
         ) : (
-          <Pressable style={styles.actionOffer} onPress={() => onOffer(request)}>
-            <Text style={styles.actionOfferText}>Ofrecer</Text>
+          <Pressable style={styles.actionOffer} onPress={() => onAcceptChat(request)}>
+            <Text style={styles.actionOfferText}>Aceptar chat</Text>
           </Pressable>
         )}
       </View>
@@ -157,14 +157,14 @@ export default function CandidatesScreen() {
     router.push(`/conversation/${conv.id}`);
   };
 
-  const handleOffer = (request: RequestWithDetails) => {
+  const handleAcceptChat = (request: RequestWithDetails) => {
     Alert.alert(
-      "Ofrecer habitacion",
-      `Enviar oferta formal a ${request.requester?.full_name ?? "este candidato"} para continuar en chat.`,
+      "Aceptar chat",
+      `Se abrira el chat con ${request.requester?.full_name ?? "este candidato"} para continuar la conversacion.`,
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Enviar oferta",
+          text: "Aceptar chat",
           onPress: async () => {
             const conv = (await updateRequest.mutateAsync({
               request,
@@ -242,7 +242,7 @@ export default function CandidatesScreen() {
                 key={r.id}
                 request={r}
                 myId={myId}
-                onOffer={handleOffer}
+                onAcceptChat={handleAcceptChat}
                 onReject={handleReject}
                 onOpenChat={openChatByRequest}
               />
@@ -262,7 +262,7 @@ export default function CandidatesScreen() {
                 key={r.id}
                 request={r}
                 myId={myId}
-                onOffer={handleOffer}
+                onAcceptChat={handleAcceptChat}
                 onReject={handleReject}
                 onOpenChat={openChatByRequest}
               />

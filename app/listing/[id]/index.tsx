@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,7 @@ import {
   NativeSyntheticEvent,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -26,6 +27,7 @@ import { useConversations } from "../../../src/hooks/useConversations";
 import { useMutualFriends } from "../../../src/hooks/useConnections";
 import { useAuth } from "../../../src/providers/AuthProvider";
 import { useHaptics } from "../../../src/hooks/useHaptics";
+import { getSavedListingIds, toggleSavedListing } from "../../../src/lib/savedListings";
 import { colors, fontSize, radius, spacing } from "../../../src/theme";
 
 const { width: SW } = Dimensions.get("window");
@@ -159,6 +161,7 @@ export default function ListingDetailScreen() {
 
   const [photoIndex, setPhotoIndex] = useState(0);
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   const { data: myRequest } = useMyRequestForListing(id, myId);
   const { data: receivedRequests = [] } = useReceivedRequests(myId);
@@ -176,6 +179,10 @@ export default function ListingDetailScreen() {
     },
     [],
   );
+
+  useEffect(() => {
+    getSavedListingIds().then((ids) => setIsSaved(ids.includes(id)));
+  }, [id]);
 
   if (isLoading || !listing) {
     return (
@@ -241,6 +248,21 @@ export default function ListingDetailScreen() {
     ]);
   };
 
+  const handleToggleSaved = async () => {
+    const { saved } = await toggleSavedListing(listing.id);
+    setIsSaved(saved);
+  };
+
+  const handleShareListing = async () => {
+    try {
+      const url = `homimatch://listing/${listing.id}`;
+      const message = `${listing.title} - ${listing.price} EUR/mes en ${listing.city}\n${url}`;
+      await Share.share({ message });
+    } catch {
+      Alert.alert("Error", "No se pudo compartir el anuncio.");
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
@@ -271,8 +293,10 @@ export default function ListingDetailScreen() {
           </Pressable>
 
           {/* Wishlist button */}
-          <Pressable style={styles.heartBtn}>
-            <Text style={{ fontSize: 20 }}>*</Text>
+          <Pressable style={[styles.heartBtn, isSaved && styles.heartBtnActive]} onPress={handleToggleSaved}>
+            <Text style={[styles.heartBtnIcon, isSaved && styles.heartBtnIconActive]}>
+              {isSaved ? "\u2665" : "\u2661"}
+            </Text>
           </Pressable>
 
           {/* Photo counter */}
@@ -524,11 +548,8 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          <Pressable style={styles.footerIconBtn}>
-            <Text style={styles.footerIconText}>*</Text>
-          </Pressable>
-          <Pressable style={styles.footerIconBtn}>
-            <Text style={styles.footerIconText}>+</Text>
+          <Pressable style={styles.footerIconBtn} onPress={handleShareListing}>
+            <Text style={styles.footerIconText}>{"\u2934"}</Text>
           </Pressable>
 
           {myId && (
@@ -590,6 +611,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  heartBtnActive: {
+    backgroundColor: colors.errorLight,
+  },
+  heartBtnIcon: { fontSize: 18, color: colors.textSecondary, lineHeight: 20 },
+  heartBtnIconActive: { color: colors.error },
   photoCounter: {
     position: "absolute",
     top: 50,

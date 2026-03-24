@@ -227,7 +227,13 @@ function OwnerHomesDashboard({
             >
               <Text style={styles.outlineBtnText}>Editar piso</Text>
             </Pressable>
-            <Pressable style={styles.outlineBtn} onPress={() => router.push("/listing/new")}>
+            <Pressable
+              style={styles.outlineBtn}
+              onPress={() =>
+                selectedProperty?.id &&
+                router.push({ pathname: "/listing/new", params: { propertyId: selectedProperty.id } })
+              }
+            >
               <Text style={styles.outlineBtnText}>+ Habitacion</Text>
             </Pressable>
           </View>

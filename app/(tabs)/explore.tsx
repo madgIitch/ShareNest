@@ -23,6 +23,7 @@ import { useSearchListings, useListingsForMap } from "../../src/hooks/useSearchL
 import { useMyFriendz } from "../../src/hooks/useConnections";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { loadFilters, saveFilters } from "../../src/lib/filterStorage";
+import { getSavedListingIds, toggleSavedListing } from "../../src/lib/savedListings";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import { DEFAULT_FILTERS, countActiveFilters } from "../../src/types/filters";
 import type { ListingFilters } from "../../src/types/filters";
@@ -41,6 +42,7 @@ export default function ExploreScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [queryInput, setQueryInput] = useState(""); // raw text input
+  const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
 
   // Debounced query — fires 400ms after typing stops
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,7 +60,13 @@ export default function ExploreScreen() {
       setFilters(saved);
       setQueryInput(saved.query);
     });
+    getSavedListingIds().then(setSavedListingIds);
   }, []);
+
+  const handleToggleSaved = async (listingId: string) => {
+    const { ids } = await toggleSavedListing(listingId);
+    setSavedListingIds(ids);
+  };
 
   const activeFilterCount = countActiveFilters(filters);
 
@@ -240,6 +248,8 @@ export default function ExploreScreen() {
                         ? 1
                         : null
                   }
+                  isSaved={savedListingIds.includes(item.id)}
+                  onToggleSaved={handleToggleSaved}
                   onPress={() => router.push(`/listing/${item.id}`)}
                 />
               )}
