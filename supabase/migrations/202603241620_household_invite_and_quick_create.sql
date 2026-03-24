@@ -106,7 +106,7 @@ begin
 
   insert into public.household_members (household_id, user_id, role)
   values (v_household_id, v_uid, 'admin')
-  on conflict (household_id, user_id) do nothing;
+  on conflict do nothing;
 
   insert into public.properties (
     owner_id,
@@ -136,4 +136,3 @@ $$;
 
 revoke all on function public.create_household_quick(text, text, text, text, text, text, text) from public;
 grant execute on function public.create_household_quick(text, text, text, text, text, text, text) to authenticated, service_role;
-

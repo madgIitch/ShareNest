@@ -1,6 +1,6 @@
 ﻿import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
   ActivityIndicator,
@@ -21,7 +21,7 @@ import { CitySelector } from "../ui/CitySelector";
 import { DistrictSelector } from "../ui/DistrictSelector";
 import { MiniMapView } from "../ui/MiniMapView";
 import { supabase } from "../../lib/supabase";
-import { type City, type Place } from "../../services/locationService";
+import { locationService, type City, type Place } from "../../services/locationService";
 import { useCreateListing, useUpdateListing } from "../../hooks/useListings";
 import { useMyProperties } from "../../hooks/useProperties";
 import { useIsSuperfriendz } from "../../hooks/useSubscription";
@@ -258,7 +258,7 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 // ─── Step components ──────────────────────────────────────────────────────────
 
 function Step1Address({
-  form, set, onCitySelect, onDistrictSelect, onDetectLocation, locating,
+  form, set, onCitySelect, onDistrictSelect, onDetectLocation, locating, onPostalCodeChange,
 }: {
   form: FormData;
   set: (k: keyof FormData, v: unknown) => void;
@@ -266,6 +266,7 @@ function Step1Address({
   onDistrictSelect: (p: Place) => void;
   onDetectLocation: () => void;
   locating: boolean;
+  onPostalCodeChange: (value: string) => void;
 }) {
   return (
     <>
@@ -292,7 +293,7 @@ function Step1Address({
           <Label>Código postal</Label>
           <Input
             value={form.postal_code}
-            onChangeText={(v) => set("postal_code", v)}
+            onChangeText={onPostalCodeChange}
             placeholder="28004"
             keyboardType="numeric"
           />
@@ -794,6 +795,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
   const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>([]);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const geoSyncSeq = useRef(0);
 
   const createListing = useCreateListing();
   const updateListing = useUpdateListing();
@@ -815,14 +817,128 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     }));
   };
 
+  const pickCityFromName = async (rawCity: string) => {
+    const cityName = rawCity.trim();
+    if (!cityName) return null;
+    const cities = await locationService.getCities(cityName, { limit: 8 });
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+    const target = normalize(cityName);
+    return (
+      cities.find((c) => normalize(c.name) === target)
+      ?? cities.find((c) => normalize(c.name).includes(target))
+      ?? cities[0]
+      ?? null
+    );
+  };
+
+  const syncPostalFromCityAndDistrict = (cityName: string, districtName: string, streetName: string) => {
+    const city = cityName.trim();
+    const district = districtName.trim();
+    if (!city || !district) return;
+    const seq = ++geoSyncSeq.current;
+    void (async () => {
+      try {
+        const query = [streetName.trim(), district, city].filter(Boolean).join(", ");
+        const [geoPoint] = await Location.geocodeAsync(query);
+        if (!geoPoint || seq !== geoSyncSeq.current) return;
+        const [rev] = await Location.reverseGeocodeAsync({
+          latitude: geoPoint.latitude,
+          longitude: geoPoint.longitude,
+        });
+        const detectedPostal = rev?.postalCode?.trim();
+        if (!detectedPostal || seq !== geoSyncSeq.current) return;
+        setForm((f) => ({ ...f, postal_code: detectedPostal }));
+      } catch {
+        // Best effort.
+      }
+    })();
+  };
+
+  const syncFromPostalCode = (rawPostal: string) => {
+    const postal = rawPostal.replace(/\D/g, "").slice(0, 5);
+    set("postal_code", postal);
+    if (postal.length !== 5) return;
+
+    const seq = ++geoSyncSeq.current;
+    void (async () => {
+      try {
+        const query = [postal, form.city?.trim() || "Espana"].filter(Boolean).join(", ");
+        const [geoPoint] = await Location.geocodeAsync(query);
+        if (!geoPoint || seq !== geoSyncSeq.current) return;
+
+        const [rev] = await Location.reverseGeocodeAsync({
+          latitude: geoPoint.latitude,
+          longitude: geoPoint.longitude,
+        });
+        if (!rev || seq !== geoSyncSeq.current) return;
+
+        const inferredCityName = rev.city?.trim() || form.city?.trim() || "";
+        const inferredDistrict = rev.district?.trim() || rev.subregion?.trim() || "";
+        const matchedCity = inferredCityName ? await pickCityFromName(inferredCityName) : null;
+        if (seq !== geoSyncSeq.current) return;
+
+        setForm((f) => ({
+          ...f,
+          postal_code: postal,
+          city: (matchedCity?.name ?? inferredCityName) || f.city,
+          city_id: matchedCity?.id ?? f.city_id,
+          district: inferredDistrict || f.district,
+          place_id: null,
+          lat: geoPoint.latitude ?? f.lat,
+          lng: geoPoint.longitude ?? f.lng,
+        }));
+
+        if (matchedCity?.id && inferredDistrict) {
+          const places = await locationService.getPlaces(matchedCity.id, inferredDistrict, { limit: 12 });
+          if (seq !== geoSyncSeq.current) return;
+          const normalize = (s: string) =>
+            s
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .trim();
+          const target = normalize(inferredDistrict);
+          const best =
+            places.find((p) => normalize(p.name) === target)
+            ?? places.find((p) => normalize(p.name).includes(target))
+            ?? null;
+          if (best) {
+            setForm((f) => ({
+              ...f,
+              district: best.name,
+              place_id: best.id,
+              city_id: best.city_id || f.city_id,
+              lat: best.centroid?.lat ?? f.lat,
+              lng: best.centroid?.lon ?? f.lng,
+            }));
+          }
+        }
+      } catch {
+        // Best effort sync.
+      }
+    })();
+  };
+
   const handleDistrictSelect = (place: Place) => {
+    const nextLat = place.centroid?.lat ?? null;
+    const nextLng = place.centroid?.lon ?? null;
+    const streetForLookup = form.street.trim();
+    const cityForLookup = form.city.trim();
+
     setForm((f) => ({
       ...f,
       district: place.name,
       place_id: place.id,
-      lat: place.centroid?.lat ?? f.lat,
-      lng: place.centroid?.lon ?? f.lng,
+      city_id: place.city_id || f.city_id,
+      lat: nextLat ?? f.lat,
+      lng: nextLng ?? f.lng,
     }));
+    syncPostalFromCityAndDistrict(cityForLookup, place.name, streetForLookup);
   };
 
   const handleDetectLocation = async () => {
@@ -1037,6 +1153,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
             onDistrictSelect={handleDistrictSelect}
             onDetectLocation={handleDetectLocation}
             locating={locating}
+            onPostalCodeChange={syncFromPostalCode}
           />
         )}
         {step === 2 && <Step2Piso form={form} set={set} />}

@@ -2,6 +2,7 @@ import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 
 import { ListingWizard } from "../../src/components/listing/ListingWizard";
+import { useMyListings } from "../../src/hooks/useListings";
 import { useMyProperties } from "../../src/hooks/useProperties";
 import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -13,8 +14,9 @@ export default function NewListingScreen() {
   const userId = session?.user?.id;
   const { data: isSuper = false, isLoading: loadingTier } = useIsSuperfriendz();
   const { data: myProperties = [], isLoading: loadingProps } = useMyProperties(userId);
+  const { data: myListings = [], isLoading: loadingListings } = useMyListings(userId);
 
-  if (loadingTier || loadingProps) {
+  if (loadingTier || loadingProps || loadingListings) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -24,7 +26,9 @@ export default function NewListingScreen() {
 
   const forcedProperty = propertyId ? myProperties.find((p) => p.id === propertyId) ?? null : null;
   const existingProperty = forcedProperty ?? (!isSuper && myProperties.length > 0 ? myProperties[0] : null);
-  const startAtStep = existingProperty ? 6 : 1;
+  const hasRoomsInSelectedProperty = !!existingProperty
+    && myListings.some((l) => l.property_id === existingProperty.id);
+  const startAtStep = existingProperty && hasRoomsInSelectedProperty ? 6 : 1;
 
   return (
     <ListingWizard

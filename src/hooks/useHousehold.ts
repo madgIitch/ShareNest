@@ -114,6 +114,23 @@ export function useHouseholdById(householdId: string | undefined) {
   });
 }
 
+export function useOwnedHouseholds(userId: string | undefined) {
+  return useQuery({
+    queryKey: ["household", "owned", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("households")
+        .select("id, name, invite_code, created_by, created_at")
+        .eq("created_by", userId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as HouseholdSummary[];
+    },
+    staleTime: 1000 * 60,
+  });
+}
+
 export function useHouseholdInvite(householdId: string | undefined) {
   return useQuery({
     queryKey: ["household", "invite", householdId],

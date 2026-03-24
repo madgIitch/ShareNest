@@ -1,16 +1,23 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 
 import { BalanceCard } from "../../src/components/expenses/BalanceCard";
 import { ExpenseItem } from "../../src/components/expenses/ExpenseItem";
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { useBalances, useExpenses } from "../../src/hooks/useExpenses";
-import { useHouseholdById, useHouseholdMembers, useMyHousehold, useMyHouseholdMemberships } from "../../src/hooks/useHousehold";
+import {
+  useHouseholdById,
+  useHouseholdMembers,
+  useMyHousehold,
+  useMyHouseholdMemberships,
+  useOwnedHouseholds,
+} from "../../src/hooks/useHousehold";
 import { useMyListings } from "../../src/hooks/useListings";
 import { useMyProperties } from "../../src/hooks/useProperties";
 import { ACTIVE_REQUEST_STATUSES, useReceivedRequests, useSentRequests } from "../../src/hooks/useRequests";
 import { useAuth } from "../../src/providers/AuthProvider";
+import { requestHouseholdAddExpense } from "../../src/state/householdIntents";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 
 type WorkspaceTab = "seeking" | "owner" | "household";
@@ -58,27 +65,56 @@ export default function WorkspaceScreen() {
   const { data: properties = [] } = useMyProperties(myId);
   const { data: myHousehold } = useMyHousehold();
   const { data: memberships = [] } = useMyHouseholdMemberships(myId);
+  const { data: ownedHouseholds = [] } = useOwnedHouseholds(myId);
 
   const sentActive = sent.filter((r) => isActiveRequest(r.status));
   const pendingReceived = received.filter((r) => r.status === "pending");
 
-  const ownerHouseholdId = properties.find((p) => Boolean(p.household_id))?.household_id ?? null;
-  const memberHouseholdId = memberships[0]?.household_id ?? null;
-  const activeHouseholdId = myHousehold?.id ?? ownerHouseholdId ?? memberHouseholdId ?? null;
+  const ownerHouseholdIds = Array.from(
+    new Set(properties.map((p) => p.household_id).filter((v): v is string => !!v)),
+  );
+  const memberHouseholdIds = Array.from(
+    new Set(memberships.map((m) => m.household_id).filter((v): v is string => !!v)),
+  );
+  const householdIds = Array.from(
+    new Set([
+      ...(myHousehold?.id ? [myHousehold.id] : []),
+      ...ownerHouseholdIds,
+      ...memberHouseholdIds,
+      ...ownedHouseholds.map((h) => h.id),
+    ]),
+  );
+  const defaultHouseholdId = householdIds[0] ?? null;
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(defaultHouseholdId);
+  const defaultPropertyId = properties[0]?.id ?? null;
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(defaultPropertyId);
 
+  useEffect(() => {
+    if (!selectedHouseholdId || !householdIds.includes(selectedHouseholdId)) {
+      setSelectedHouseholdId(defaultHouseholdId);
+    }
+  }, [defaultHouseholdId, householdIds, selectedHouseholdId]);
+  useEffect(() => {
+    const ids = properties.map((p) => p.id);
+    if (!selectedPropertyId || !ids.includes(selectedPropertyId)) {
+      setSelectedPropertyId(defaultPropertyId);
+    }
+  }, [defaultPropertyId, properties, selectedPropertyId]);
+
+  const selectedProperty = properties.find((p) => p.id === selectedPropertyId) ?? properties[0] ?? null;
+  const ownerHouseholdId = selectedProperty?.household_id ?? null;
   const activeProperty =
-    properties.find((p) => p.household_id === activeHouseholdId) ??
-    properties[0] ??
-    null;
+    properties.find((p) => p.household_id === selectedHouseholdId) ?? selectedProperty ?? properties[0] ?? null;
 
-  const { data: activeHousehold } = useHouseholdById(activeHouseholdId ?? undefined);
-  const { data: members = [] } = useHouseholdMembers(activeHouseholdId ?? undefined);
-  const { data: balancesData } = useBalances(activeHouseholdId ?? undefined);
-  const { data: expenses = [] } = useExpenses(activeHouseholdId ?? undefined);
+  const { data: ownerHousehold } = useHouseholdById(ownerHouseholdId ?? undefined);
+  const { data: activeHousehold } = useHouseholdById(selectedHouseholdId ?? undefined);
+  const { data: members = [] } = useHouseholdMembers(selectedHouseholdId ?? undefined);
+  const { data: balancesData } = useBalances(selectedHouseholdId ?? undefined);
+  const { data: expenses = [] } = useExpenses(selectedHouseholdId ?? undefined);
 
   const hasSeekingTab = sent.length > 0;
-  const hasOwnerTab = listings.length > 0;
-  const hasHouseholdTab = Boolean(myHousehold?.id || ownerHouseholdId || memberHouseholdId);
+  const hasOwnerTab = listings.length > 0 || properties.length > 0 || ownedHouseholds.length > 0;
+  const hasHouseholdTab = householdIds.length > 0;
 
   const tabs = useMemo(() => {
     const out: Array<{ key: WorkspaceTab; label: string }> = [];
@@ -114,15 +150,32 @@ export default function WorkspaceScreen() {
     return map;
   }, [pendingReceived]);
 
-  const occupied = listings.filter((l) => l.status === "rented").length;
-  const free = listings.filter((l) => l.status === "active").length;
+  const listingsForProperty = useMemo(() => {
+    if (!selectedProperty) return listings;
+    const withProperty = listings.filter((l) => l.property_id === selectedProperty.id);
+    if (withProperty.length > 0) return withProperty;
+    if (properties.length === 1) return listings;
+    return [];
+  }, [listings, properties.length, selectedProperty]);
+
+  const occupied = listingsForProperty.filter((l) => l.status === "rented").length;
+  const free = listingsForProperty.filter((l) => l.status === "active").length;
+  const pendingForProperty = listingsForProperty.reduce((sum, l) => sum + (pendingByListing.get(l.id) ?? 0), 0);
+  const ownerIsMemberOfSelectedHousehold = !!ownerHouseholdId && memberships.some((m) => m.household_id === ownerHouseholdId);
 
   const handleOpenInvite = () => {
-    if (!activeHouseholdId) {
+    if (!selectedHouseholdId) {
       Alert.alert("Sin household", "Primero unete al piso o crea household para generar codigo.");
       return;
     }
-    router.push({ pathname: "/household/invite", params: { householdId: activeHouseholdId } });
+    router.push({ pathname: "/household/invite", params: { householdId: selectedHouseholdId } });
+  };
+  const handleShareCode = async (code: string | undefined | null) => {
+    if (!code) {
+      Alert.alert("Sin codigo", "Este piso aun no tiene codigo de invitacion.");
+      return;
+    }
+    await Share.share({ message: `Unete a mi piso en ShareNest con este codigo: ${code}` });
   };
 
   return (
@@ -140,42 +193,6 @@ export default function WorkspaceScreen() {
           </Pressable>
         ))}
       </View>
-
-      {(hasOwnerTab || hasHouseholdTab) && (
-        <View style={styles.block}>
-          <Text style={styles.sectionTitle}>Incorporar personas al piso</Text>
-
-          <Pressable style={styles.entryCard} onPress={handleOpenInvite}>
-            <View style={styles.entryIconWrap}>
-              <Text style={styles.entryIcon}>#</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.entryTitle}>Compartir codigo de invitacion</Text>
-              <Text style={styles.entrySub}>El companero introduce el codigo y entra directo al household.</Text>
-            </View>
-          </Pressable>
-
-          <Pressable style={styles.entryCard} onPress={() => router.push("/household/join")}>
-            <View style={styles.entryIconWrap}>
-              <Text style={styles.entryIcon}>+</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.entryTitle}>Unirme yo al piso</Text>
-              <Text style={styles.entrySub}>Si aun no eres miembro, entra con codigo.</Text>
-            </View>
-          </Pressable>
-
-          <Pressable style={[styles.entryCard, styles.entryCardDashed]} onPress={() => router.push("/household/create")}>
-            <View style={styles.entryIconWrap}>
-              <Text style={styles.entryIcon}>*</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.entryTitle}>Crear household sin anuncio</Text>
-              <Text style={styles.entrySub}>Solo pide direccion. Sin wizard de anuncio.</Text>
-            </View>
-          </Pressable>
-        </View>
-      )}
 
       {activeTab === "seeking" ? (
         <View style={styles.block}>
@@ -218,20 +235,65 @@ export default function WorkspaceScreen() {
 
       {activeTab === "owner" ? (
         <View style={styles.block}>
+          {properties.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorRow}>
+              {properties.map((p) => {
+                const active = p.id === selectedProperty?.id;
+                return (
+                  <Pressable
+                    key={p.id}
+                    style={[styles.selectorChip, active && styles.selectorChipActive]}
+                    onPress={() => setSelectedPropertyId(p.id)}
+                  >
+                    <Text style={[styles.selectorChipText, active && styles.selectorChipTextActive]} numberOfLines={1}>
+                      {p.address}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable style={[styles.selectorChip, styles.selectorChipDashed]} onPress={() => router.push("/household/create")}>
+                <Text style={styles.selectorChipAction}>+ Nuevo piso</Text>
+              </Pressable>
+            </ScrollView>
+          ) : null}
+
+          {selectedProperty ? (
+            <View style={styles.addressCard}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.addressMain}>
+                  {selectedProperty.address}
+                  {selectedProperty.street_number ? `, ${selectedProperty.street_number}` : ""}
+                </Text>
+                <Pressable onPress={() => router.push(`/(tabs)/property/${selectedProperty.id}/edit`)}>
+                  <Text style={styles.link}>Editar piso</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.addressSub}>
+                {selectedProperty.city?.name ?? "Ciudad"}{selectedProperty.postal_code ? ` - ${selectedProperty.postal_code}` : ""}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.kpiRow}>
             <Stat value={occupied} label="Ocupadas" />
             <Stat value={free} label="Libres" />
-            <Stat value={pendingReceived.length} label="Solicitudes" highlight={pendingReceived.length > 0} />
+            <Stat value={pendingForProperty} label="Solicitudes" highlight={pendingForProperty > 0} />
           </View>
 
           <View style={styles.rowBetween}>
             <Text style={styles.sectionTitle}>Habitaciones</Text>
-            <Pressable onPress={() => router.push("/listing/new")}>
+            <Pressable
+              onPress={() =>
+                selectedProperty?.id
+                  ? router.push({ pathname: "/listing/new", params: { propertyId: selectedProperty.id } })
+                  : router.push("/listing/new")
+              }
+            >
               <Text style={styles.link}>+ Anadir</Text>
             </Pressable>
           </View>
 
-          {listings.slice(0, 5).map((l) => {
+          {listingsForProperty.slice(0, 5).map((l) => {
             const pending = pendingByListing.get(l.id) ?? 0;
             return (
               <Pressable key={l.id} style={styles.listItem} onPress={() => router.push(`/listing/${l.id}`)}>
@@ -249,20 +311,64 @@ export default function WorkspaceScreen() {
             );
           })}
 
-          {listings.length === 0 && <Text style={styles.empty}>No tienes habitaciones publicadas.</Text>}
-
-          {activeProperty ? (
-            <View style={styles.addressCard}>
-              <Text style={styles.sectionTitle}>Direccion</Text>
-              <Text style={styles.addressMain}>
-                {activeProperty.address}
-                {activeProperty.street_number ? `, ${activeProperty.street_number}` : ""}
-              </Text>
-              <Text style={styles.addressSub}>
-                {activeProperty.city?.name ?? "Ciudad"}{activeProperty.postal_code ? ` - ${activeProperty.postal_code}` : ""}
-              </Text>
+          {listingsForProperty.length === 0 && (
+            <View style={[styles.entryCard, styles.entryCardDashed, styles.emptyRoomCard]}>
+              <Text style={styles.emptyRoomIcon}>+</Text>
+              <Text style={styles.emptyRoomTitle}>Sin habitaciones publicadas</Text>
+              <Text style={styles.emptyRoomSub}>Anade una habitacion para que los buscadores puedan encontrarla.</Text>
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() =>
+                  selectedProperty?.id
+                    ? router.push({ pathname: "/listing/new", params: { propertyId: selectedProperty.id } })
+                    : router.push("/listing/new")
+                }
+              >
+                <Text style={styles.primaryBtnText}>+ Anadir primera habitacion</Text>
+              </Pressable>
             </View>
-          ) : null}
+          )}
+
+          <View style={styles.inviteUtilityCard}>
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inviteUtilityTitle}>Codigo de invitacion</Text>
+                <Text style={styles.inviteUtilitySub}>Para anadir companeros sin anuncio</Text>
+              </View>
+              <Text style={styles.inviteUtilityCode}>{ownerHousehold?.invite_code ?? "------"}</Text>
+            </View>
+            <View style={styles.inviteUtilityActions}>
+              <Pressable style={styles.utilityBtnPrimary} onPress={() => handleShareCode(ownerHousehold?.invite_code)}>
+                <Text style={styles.utilityBtnPrimaryText}>Compartir codigo</Text>
+              </Pressable>
+              <Pressable
+                style={styles.utilityBtn}
+                onPress={() =>
+                  ownerHouseholdId
+                    ? router.push({ pathname: "/household/invite", params: { householdId: ownerHouseholdId } })
+                    : Alert.alert("Sin household", "Primero anadete al piso para generar codigo.")
+                }
+              >
+                <Text style={styles.utilityBtnText}>Gestionar</Text>
+              </Pressable>
+            </View>
+            {!ownerIsMemberOfSelectedHousehold && (
+              <Pressable style={styles.utilityBtnOwnerJoin} onPress={() => router.push("/(tabs)/household")}>
+                <Text style={styles.utilityBtnOwnerJoinText}>Anadirme al piso</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={styles.entryCardMiniWrap}>
+            <Pressable style={styles.entryCardMini} onPress={() => router.push("/household/join")}>
+              <Text style={styles.entryMiniTitle}>Unirme yo al piso</Text>
+              <Text style={styles.entryMiniSub}>Si aun no eres miembro, entra con codigo.</Text>
+            </Pressable>
+            <Pressable style={styles.entryCardMini} onPress={() => router.push("/household/create")}>
+              <Text style={styles.entryMiniTitle}>Crear household sin anuncio</Text>
+              <Text style={styles.entryMiniSub}>Solo direccion. Sin wizard completo.</Text>
+            </Pressable>
+          </View>
 
           <Pressable style={styles.primaryBtn} onPress={() => router.push("/(tabs)/household")}>
             <Text style={styles.primaryBtnText}>Abrir panel de pisos</Text>
@@ -272,6 +378,29 @@ export default function WorkspaceScreen() {
 
       {activeTab === "household" ? (
         <View style={styles.block}>
+          {householdIds.length > 1 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorRow}>
+              {householdIds.map((id) => {
+                const membership = memberships.find((m) => m.household_id === id);
+                const property = properties.find((p) => p.household_id === id);
+                const owned = ownedHouseholds.find((h) => h.id === id);
+                const label = membership?.households?.name ?? owned?.name ?? property?.address ?? "Piso";
+                const active = selectedHouseholdId === id;
+                return (
+                  <Pressable
+                    key={id}
+                    style={[styles.selectorChip, active && styles.selectorChipActive]}
+                    onPress={() => setSelectedHouseholdId(id)}
+                  >
+                    <Text style={[styles.selectorChipText, active && styles.selectorChipTextActive]} numberOfLines={1}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+
           <View style={styles.addressCard}>
             <Text style={styles.addressMain}>{activeHousehold?.name ?? "Mi piso"}</Text>
             <Text style={styles.addressSub}>
@@ -310,7 +439,12 @@ export default function WorkspaceScreen() {
 
           <View style={styles.rowBetween}>
             <Text style={styles.sectionTitle}>Gastos</Text>
-            <Pressable onPress={() => router.push("/(tabs)/household?add=1")}>
+            <Pressable
+              onPress={() => {
+                requestHouseholdAddExpense();
+                router.push("/(tabs)/household");
+              }}
+            >
               <Text style={styles.link}>+ Anadir</Text>
             </Pressable>
           </View>
@@ -323,7 +457,7 @@ export default function WorkspaceScreen() {
                 <View key={month} style={styles.monthBlock}>
                   <Text style={styles.monthTitle}>{formatMonth(month)}</Text>
                   {items.slice(0, 3).map((e) => (
-                    <ExpenseItem key={e.id} expense={e} currentUserId={myId ?? ""} householdId={activeHouseholdId ?? ""} />
+                    <ExpenseItem key={e.id} expense={e} currentUserId={myId ?? ""} householdId={selectedHouseholdId ?? ""} />
                   ))}
                 </View>
               ))
@@ -339,6 +473,24 @@ export default function WorkspaceScreen() {
           ) : (
             <Text style={styles.empty}>No hay normas definidas todavia.</Text>
           )}
+
+          <View style={styles.inviteUtilityCard}>
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.inviteUtilityTitle}>Codigo de invitacion</Text>
+                <Text style={styles.inviteUtilitySub}>Comparte para anadir companeros</Text>
+              </View>
+              <Text style={styles.inviteUtilityCode}>{activeHousehold?.invite_code ?? "------"}</Text>
+            </View>
+            <View style={styles.inviteUtilityActions}>
+              <Pressable style={styles.utilityBtnPrimary} onPress={() => handleShareCode(activeHousehold?.invite_code)}>
+                <Text style={styles.utilityBtnPrimaryText}>Compartir codigo</Text>
+              </Pressable>
+              <Pressable style={styles.utilityBtn} onPress={handleOpenInvite}>
+                <Text style={styles.utilityBtnText}>Gestionar</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
       ) : null}
     </ScrollView>
@@ -520,6 +672,102 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   memberName: { fontSize: fontSize.sm, color: colors.text, fontWeight: "600" },
+  selectorRow: { gap: spacing[2], paddingRight: spacing[1] },
+  selectorChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    backgroundColor: colors.gray50,
+    maxWidth: 180,
+  },
+  selectorChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}1A`,
+  },
+  selectorChipDashed: {
+    borderStyle: "dashed",
+  },
+  selectorChipAction: {
+    color: colors.verify,
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+  },
+  selectorChipText: { color: colors.textSecondary, fontSize: fontSize.xs, fontWeight: "700" },
+  selectorChipTextActive: { color: colors.primary },
+  emptyRoomCard: {
+    alignItems: "center",
+    textAlign: "center",
+    gap: spacing[2],
+  },
+  emptyRoomIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: colors.textTertiary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    lineHeight: 36,
+    fontWeight: "800",
+  },
+  emptyRoomTitle: { color: colors.text, fontWeight: "700", fontSize: fontSize.md },
+  emptyRoomSub: { color: colors.textSecondary, fontSize: fontSize.sm, textAlign: "center" },
+  inviteUtilityCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing[3],
+    backgroundColor: colors.gray50,
+    gap: spacing[2],
+  },
+  inviteUtilityTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
+  inviteUtilitySub: { color: colors.textSecondary, fontSize: fontSize.xs, marginTop: 2 },
+  inviteUtilityCode: { color: colors.text, fontSize: fontSize.lg, fontWeight: "800", letterSpacing: 1 },
+  inviteUtilityActions: { flexDirection: "row", gap: spacing[2] },
+  utilityBtnPrimary: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing[2],
+    backgroundColor: colors.text,
+    alignItems: "center",
+  },
+  utilityBtnPrimaryText: { color: colors.white, fontSize: fontSize.sm, fontWeight: "700" },
+  utilityBtn: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+  },
+  utilityBtnText: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
+  utilityBtnOwnerJoin: {
+    borderRadius: radius.md,
+    paddingVertical: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: "center",
+    backgroundColor: colors.primaryLight,
+  },
+  utilityBtnOwnerJoinText: {
+    color: colors.primary,
+    fontSize: fontSize.sm,
+    fontWeight: "800",
+  },
+  entryCardMiniWrap: { gap: spacing[2] },
+  entryCardMini: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing[2],
+    backgroundColor: colors.surface,
+  },
+  entryMiniTitle: { color: colors.text, fontSize: fontSize.sm, fontWeight: "700" },
+  entryMiniSub: { color: colors.textSecondary, fontSize: fontSize.xs, marginTop: 2 },
   monthBlock: { gap: spacing[2] },
   monthTitle: { color: colors.textTertiary, fontSize: fontSize.xs, fontWeight: "700" },
   ruleItem: { color: colors.text, fontSize: fontSize.sm },

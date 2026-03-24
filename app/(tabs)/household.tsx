@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,16 +28,25 @@ import { useMyProperties, useUpdateProperty, type PropertyWithCity } from "../..
 import { useReceivedRequests, type RequestWithDetails } from "../../src/hooks/useRequests";
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { useAuth } from "../../src/providers/AuthProvider";
+import { consumeHouseholdAddExpenseRequest } from "../../src/state/householdIntents";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import type { Database } from "../../src/types/database";
+import { useFocusEffect } from "@react-navigation/native";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
 
 export default function HouseholdScreen() {
-  const params = useLocalSearchParams<{ add?: string }>();
-  const autoOpenAdd = params.add === "1";
+  const [autoOpenAdd, setAutoOpenAdd] = useState(false);
   const { session } = useAuth();
   const myId = session?.user?.id ?? "";
+
+  useFocusEffect(
+    useCallback(() => {
+      if (consumeHouseholdAddExpenseRequest()) {
+        setAutoOpenAdd(true);
+      }
+    }, []),
+  );
 
   const { data: myProperties = [], isLoading: loadingProperties } = useMyProperties(myId);
   const { data: myListings = [], isLoading: loadingListings } = useMyListings(myId);
@@ -60,6 +69,7 @@ export default function HouseholdScreen() {
       <OwnerHomesDashboard
         userId={myId}
         autoOpenAdd={autoOpenAdd}
+        onAutoOpenConsumed={() => setAutoOpenAdd(false)}
         properties={myProperties}
         listings={myListings}
         receivedRequests={receivedRequests}
@@ -68,7 +78,14 @@ export default function HouseholdScreen() {
   }
 
   if (residentMemberships.length > 0) {
-    return <ResidentHomesView userId={myId} memberships={residentMemberships} autoOpenAdd={autoOpenAdd} />;
+    return (
+      <ResidentHomesView
+        userId={myId}
+        memberships={residentMemberships}
+        autoOpenAdd={autoOpenAdd}
+        onAutoOpenConsumed={() => setAutoOpenAdd(false)}
+      />
+    );
   }
 
   return <EmptyHomesView />;
@@ -77,12 +94,14 @@ export default function HouseholdScreen() {
 function OwnerHomesDashboard({
   userId,
   autoOpenAdd,
+  onAutoOpenConsumed,
   properties,
   listings,
   receivedRequests,
 }: {
   userId: string;
   autoOpenAdd?: boolean;
+  onAutoOpenConsumed?: () => void;
   properties: PropertyWithCity[];
   listings: Listing[];
   receivedRequests: RequestWithDetails[];
@@ -110,8 +129,9 @@ function OwnerHomesDashboard({
   useEffect(() => {
     if (autoOpenAdd && selectedHouseholdId) {
       setSheetOpen(true);
+      onAutoOpenConsumed?.();
     }
-  }, [autoOpenAdd, selectedHouseholdId]);
+  }, [autoOpenAdd, onAutoOpenConsumed, selectedHouseholdId]);
 
   const filteredListings = useMemo(() => {
     if (!selectedProperty) return [];
@@ -401,10 +421,12 @@ function ResidentHomesView({
   userId,
   memberships,
   autoOpenAdd,
+  onAutoOpenConsumed,
 }: {
   userId: string;
   memberships: MyHouseholdMembership[];
   autoOpenAdd?: boolean;
+  onAutoOpenConsumed?: () => void;
 }) {
   const [selectedHouseholdId, setSelectedHouseholdId] = useState(memberships[0]?.household_id ?? "");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -417,8 +439,9 @@ function ResidentHomesView({
   useEffect(() => {
     if (autoOpenAdd && selectedHouseholdId) {
       setSheetOpen(true);
+      onAutoOpenConsumed?.();
     }
-  }, [autoOpenAdd, selectedHouseholdId]);
+  }, [autoOpenAdd, onAutoOpenConsumed, selectedHouseholdId]);
 
   const byMonth = expenses.reduce<Record<string, typeof expenses>>((acc, e) => {
     const key = e.date.slice(0, 7);

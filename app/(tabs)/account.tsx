@@ -80,7 +80,7 @@ function formatRelativeDate(value: string) {
 }
 
 export default function AccountScreen() {
-  const { session, profile, signOut } = useAuth();
+  const { session, profile } = useAuth();
   const [tab, setTab] = useState<ProfileTab>("profile");
   const [friendzTab, setFriendzTab] = useState<FriendzTab>("friendz");
   const [searchQuery, setSearchQuery] = useState("");
@@ -381,12 +381,6 @@ export default function AccountScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>
 
-          <Pressable style={[styles.settingRow, styles.signOutBtn]} onPress={() => signOut()}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="log-out-outline" size={18} color={colors.error} />
-              <Text style={styles.signOutText}>Cerrar sesion</Text>
-            </View>
-          </Pressable>
         </View>
       ) : null}
     </ScrollView>
@@ -596,6 +590,4 @@ const styles = StyleSheet.create({
   },
   settingLeft: { flexDirection: "row", alignItems: "center", gap: spacing[2] },
   settingText: { color: colors.text, fontSize: fontSize.sm, fontWeight: "600" },
-  signOutBtn: { marginTop: spacing[1] },
-  signOutText: { color: colors.error, fontSize: fontSize.sm, fontWeight: "700" },
 });
