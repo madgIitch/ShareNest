@@ -26,6 +26,8 @@ export type ExpenseSplit = {
   amount: number;
   is_settled: boolean;
   settled_at: string | null;
+  settled_by: string | null;
+  profiles?: { full_name: string | null; avatar_url: string | null } | null;
 };
 
 export type BalanceTransfer = {
@@ -68,7 +70,7 @@ export function useExpenseSplits(expenseId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_splits")
-        .select("*")
+        .select("*, profiles(full_name, avatar_url)")
         .eq("expense_id", expenseId!);
       if (error) throw error;
       return (data ?? []) as ExpenseSplit[];
@@ -98,32 +100,33 @@ export function useAddExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
+      expenseId,
       householdId,
       paidBy,
       amount,
       category,
       description,
-      receiptUrl,
       date,
       splitType,
-      memberIds,
-      customSplits,
+      splits,
+      receiptUrl,
     }: {
+      expenseId?: string;
       householdId: string;
       paidBy: string;
       amount: number;
       category: ExpenseCategory;
       description?: string;
-      receiptUrl?: string;
       date: string;
       splitType: SplitType;
-      memberIds: string[];
-      customSplits?: Record<string, number>;
+      splits: Array<{ user_id: string; amount: number }>;
+      receiptUrl?: string;
     }) => {
       // Insert expense
       const { data: expense, error: expErr } = await supabase
         .from("expenses")
         .insert({
+          id: expenseId,
           household_id: householdId,
           paid_by: paidBy,
           amount,
@@ -137,15 +140,12 @@ export function useAddExpense() {
         .single();
       if (expErr) throw expErr;
 
-      // Build splits
-      const splits = memberIds.map((uid) => {
-        const share = splitType === "equal"
-          ? Math.round((amount / memberIds.length) * 100) / 100
-          : (customSplits?.[uid] ?? 0);
-        return { expense_id: expense.id, user_id: uid, amount: share };
-      });
-
-      const { error: splitErr } = await supabase.from("expense_splits").insert(splits);
+      const rows = splits.map((s) => ({
+        expense_id: expense.id,
+        user_id: s.user_id,
+        amount: Math.round(s.amount * 100) / 100,
+      }));
+      const { error: splitErr } = await supabase.from("expense_splits").insert(rows);
       if (splitErr) throw splitErr;
 
       return expense.id as string;
@@ -161,9 +161,18 @@ export function useSettleSplit() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ splitId, householdId }: { splitId: string; householdId: string }) => {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const currentUserId = authData.user?.id;
+      if (!currentUserId) throw new Error("No authenticated user");
+
       const { error } = await supabase
         .from("expense_splits")
-        .update({ is_settled: true, settled_at: new Date().toISOString() })
+        .update({
+          is_settled: true,
+          settled_at: new Date().toISOString(),
+          settled_by: currentUserId,
+        })
         .eq("id", splitId);
       if (error) throw error;
       return householdId;

@@ -1,8 +1,9 @@
 // src/components/expenses/ExpenseItem.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { Expense, ExpenseSplit } from "../../hooks/useExpenses";
 import { useExpenseSplits, useSettleSplit } from "../../hooks/useExpenses";
+import { supabase } from "../../lib/supabase";
 import { colors, fontSize, radius, spacing } from "../../theme";
 
 const CATEGORY_META: Record<string, { icon: string; color: string }> = {
@@ -66,6 +67,33 @@ function ExpenseDetailModal({
   const settle = useSettleSplit();
   const meta = CATEGORY_META[expense.category] ?? CATEGORY_META.otros;
   const mysplits = splits.filter((s) => s.user_id === currentUserId && !s.is_settled);
+  const [receiptSignedUrl, setReceiptSignedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadReceipt = async () => {
+      if (!visible || !expense.receipt_url) {
+        setReceiptSignedUrl(null);
+        return;
+      }
+      if (expense.receipt_url.startsWith("http://") || expense.receipt_url.startsWith("https://")) {
+        setReceiptSignedUrl(expense.receipt_url);
+        return;
+      }
+      const { data, error } = await supabase.storage
+        .from("receipts")
+        .createSignedUrl(expense.receipt_url, 60 * 60);
+      if (!cancelled) {
+        if (error) setReceiptSignedUrl(null);
+        else setReceiptSignedUrl(data?.signedUrl ?? null);
+      }
+    };
+
+    void loadReceipt();
+    return () => {
+      cancelled = true;
+    };
+  }, [expense.receipt_url, visible]);
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -85,15 +113,15 @@ function ExpenseDetailModal({
         </Text>
 
         {/* Receipt */}
-        {expense.receipt_url && (
-          <Image source={{ uri: expense.receipt_url }} style={styles.receipt} resizeMode="contain" />
+        {receiptSignedUrl && (
+          <Image source={{ uri: receiptSignedUrl }} style={styles.receipt} resizeMode="contain" />
         )}
 
         {/* Splits */}
         <Text style={styles.sectionLabel}>Reparto</Text>
         {splits.map((s) => (
           <View key={s.id} style={styles.splitRow}>
-            <Text style={styles.splitUser}>{s.user_id.slice(0, 8)}…</Text>
+            <Text style={styles.splitUser}>{formatSplitUserLabel(s, currentUserId)}</Text>
             <Text style={styles.splitAmount}>€{Number(s.amount).toFixed(2)}</Text>
             <View style={[styles.settledChip, s.is_settled ? styles.settledChipGreen : styles.settledChipRed]}>
               <Text style={styles.settledChipText}>{s.is_settled ? "Saldado" : "Pendiente"}</Text>
@@ -118,6 +146,11 @@ function ExpenseDetailModal({
       </ScrollView>
     </Modal>
   );
+}
+
+function formatSplitUserLabel(split: ExpenseSplit, currentUserId: string) {
+  if (split.user_id === currentUserId) return "Tu";
+  return split.profiles?.full_name ?? `${split.user_id.slice(0, 8)}...`;
 }
 
 const styles = StyleSheet.create({

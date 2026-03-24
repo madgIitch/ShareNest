@@ -411,13 +411,21 @@ export type Database = {
           user_id: string;
           role: "admin" | "member";
           joined_at: string;
+          leaving_date: string | null;
+          leaving_reason: "contract_end" | "manual" | null;
         };
         Insert: {
           household_id: string;
           user_id: string;
           role?: "admin" | "member";
+          leaving_date?: string | null;
+          leaving_reason?: "contract_end" | "manual" | null;
         };
-        Update: { role?: "admin" | "member" };
+        Update: {
+          role?: "admin" | "member";
+          leaving_date?: string | null;
+          leaving_reason?: "contract_end" | "manual" | null;
+        };
         Relationships: [];
       };
       expenses: {
@@ -457,14 +465,21 @@ export type Database = {
           amount: number;
           is_settled: boolean;
           settled_at: string | null;
+          settled_by: string | null;
         };
         Insert: {
           expense_id: string;
           user_id: string;
           amount: number;
           is_settled?: boolean;
+          settled_at?: string | null;
+          settled_by?: string | null;
         };
-        Update: { is_settled?: boolean; settled_at?: string | null };
+        Update: {
+          is_settled?: boolean;
+          settled_at?: string | null;
+          settled_by?: string | null;
+        };
         Relationships: [];
       };
     };

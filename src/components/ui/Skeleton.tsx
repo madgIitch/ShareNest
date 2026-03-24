@@ -40,7 +40,7 @@ export function Skeleton({ width = "100%", height = 16, borderRadius = radius.sm
 export function ListingCardSkeleton() {
   return (
     <View style={styles.card}>
-      <Skeleton height={160} borderRadius={0} />
+      <Skeleton height={200} borderRadius={0} />
       <View style={styles.body}>
         <Skeleton width="40%" height={12} />
         <Skeleton width="80%" height={16} />

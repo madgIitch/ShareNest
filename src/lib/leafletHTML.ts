@@ -143,14 +143,17 @@ function renderClusters(clusters) {
       var pin = item.pin;
       var sel = pin.id === _selId;
 
-      // Nivel 2: círculo difuminado ±150 m (offset determinístico ya aplicado por PrivacyEngine)
-      if (pin.privacyLevel === 2) {
+      // Nivel 1/2: círculo de incertidumbre
+      if (pin.privacyLevel === 1 || pin.privacyLevel === 2) {
+        var radius = pin.privacyLevel === 1 ? 900 : 150;
+        var fillOpacity = pin.privacyLevel === 1 ? 0.06 : 0.08;
+        var strokeOpacity = pin.privacyLevel === 1 ? 0.18 : 0.25;
         var circle = L.circle([item.lat, item.lng], {
-          radius: 150,
+          radius: radius,
           fillColor: '#3478F6',
-          fillOpacity: 0.08,
+          fillOpacity: fillOpacity,
           color: '#3478F6',
-          opacity: 0.25,
+          opacity: strokeOpacity,
           weight: 1.5,
           interactive: false
         }).addTo(map);

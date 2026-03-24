@@ -1,4 +1,5 @@
-﻿import { Tabs } from "expo-router";
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import { colors, fontSize } from "../../src/theme";
 
@@ -25,42 +26,42 @@ export default function TabsLayout() {
         name="explore"
         options={{
           title: "Explorar",
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🔍" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="search-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="listings"
         options={{
           title: "Mis anuncios",
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: "Mensajes",
-          tabBarIcon: ({ focused }) => <TabIcon emoji="💬" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="friendz"
         options={{
           title: "Friendz",
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👥" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="household"
         options={{
-          title: "Hogar",
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏡" focused={focused} />,
+          title: "Piso",
+          tabBarIcon: ({ color, size }) => <Ionicons name="business-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
           title: "Perfil",
-          tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -79,9 +80,4 @@ export default function TabsLayout() {
       />
     </Tabs>
   );
-}
-
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  const { Text } = require("react-native");
-  return <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>;
 }

@@ -227,11 +227,11 @@ function OwnerHomesDashboard({
         <View style={styles.block}>
           <View style={styles.blockHeader}>
             <Text style={styles.blockTitle}>Gastos del piso</Text>
-            {!selectedHouseholdId && <Text style={styles.muted}>Sin household</Text>}
+            {!selectedHouseholdId && <Text style={styles.muted}>Sin piso compartido</Text>}
           </View>
 
           {!selectedHouseholdId ? (
-            <Text style={styles.muted}>Este piso aun no tiene household activo.</Text>
+            <Text style={styles.muted}>Este piso aun no tiene convivencia activa.</Text>
           ) : (
             <>
               {loadingBal ? (
@@ -283,7 +283,7 @@ function ResidentHomesView({ memberships }: { memberships: MyHouseholdMembership
       <Text style={styles.pageTitle}>Pisos donde vives</Text>
       {memberships.map((m) => (
         <View key={`${m.household_id}-${m.joined_at}`} style={styles.roomCard}>
-          <Text style={styles.roomTitle}>{m.households?.name ?? "Household"}</Text>
+          <Text style={styles.roomTitle}>{m.households?.name ?? "Piso compartido"}</Text>
           <Text style={styles.roomMeta}>Unido el {new Date(m.joined_at).toLocaleDateString("es-ES")}</Text>
         </View>
       ))}
@@ -294,8 +294,8 @@ function ResidentHomesView({ memberships }: { memberships: MyHouseholdMembership
 function EmptyHomesView() {
   return (
     <ScrollView contentContainerStyle={styles.emptyState}>
-      <Text style={styles.pageTitle}>Hogar</Text>
-      <Text style={styles.muted}>Aun no tienes pisos ni hogares compartidos.</Text>
+      <Text style={styles.pageTitle}>Piso</Text>
+      <Text style={styles.muted}>Aun no tienes pisos ni convivencias compartidas.</Text>
       <Pressable style={styles.primaryBtn} onPress={() => router.push("/listing/new")}> 
         <Text style={styles.primaryBtnText}>Crear primer piso</Text>
       </Pressable>

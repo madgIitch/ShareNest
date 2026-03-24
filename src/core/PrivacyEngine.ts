@@ -3,8 +3,9 @@
  * según el nivel de privacidad del listing.
  *
  * Nivel 1 — búsqueda pública:
- *   Centroide del barrio (city_places). Si no hay barrio, las coords del listing
- *   (que ya deben ser aproximadas). Radio de 500 m visible.
+ *   Centroide del barrio (city_places) + offset determinístico amplio.
+ *   Si no hay barrio, coords del listing + offset amplio.
+ *   Radio de 900 m visible.
  *
  * Nivel 2 — listing abierto (usuario interesado):
  *   Coords reales + offset determinístico ±150 m. El offset usa las coords como
@@ -36,21 +37,21 @@ export interface DisplayLocation {
  * Offset determinístico basado en las coordenadas reales.
  * Mismo input → siempre el mismo output (no usa Math.random).
  */
-function deterministicOffset(lat: number, lng: number): { dlat: number; dlng: number } {
+function deterministicOffset(lat: number, lng: number, maxMeters: number): { dlat: number; dlng: number } {
   // Dos seeds independientes usando el truco sin/frac clásico
   const s1 = Math.sin(lat * 12.9898 + lng * 78.233) * 43758.5453123;
   const s2 = Math.sin(lng * 12.9898 + lat * 78.233) * 43758.5453123;
   const f1 = s1 - Math.floor(s1); // 0..1
   const f2 = s2 - Math.floor(s2); // 0..1
 
-  // 150 m en grados. Para latitud: 1° ≈ 111 km → 150 m ≈ 0.00135°
+  // Conversión aproximada metros→grados
   // Para longitud: se comprime según la latitud (cos).
-  const maxLat = 0.00135;
-  const maxLng = 0.00135 / Math.cos((lat * Math.PI) / 180);
+  const maxLat = maxMeters / 111000;
+  const maxLng = maxLat / Math.max(Math.cos((lat * Math.PI) / 180), 0.2);
 
   return {
-    dlat: (f1 * 2 - 1) * maxLat, // ±150 m en latitud
-    dlng: (f2 * 2 - 1) * maxLng, // ±150 m en longitud
+    dlat: (f1 * 2 - 1) * maxLat,
+    dlng: (f2 * 2 - 1) * maxLng,
   };
 }
 
@@ -62,14 +63,16 @@ export function applyPrivacy(location: RawLocation, level: PrivacyLevel): Displa
 
   switch (level) {
     case 1: {
-      // Preferir centroide del barrio; si no hay, usar coords del listing
-      const displayLat = placeLat ?? lat;
-      const displayLng = placeLng ?? lng;
-      return { lat: displayLat, lng: displayLng, accuracyRadius: 500 };
+      // Preferir centroide del barrio y siempre aplicar un offset amplio para
+      // evitar que el pin apunte a una calle concreta.
+      const baseLat = placeLat ?? lat;
+      const baseLng = placeLng ?? lng;
+      const { dlat, dlng } = deterministicOffset(baseLat, baseLng, 700);
+      return { lat: baseLat + dlat, lng: baseLng + dlng, accuracyRadius: 900 };
     }
 
     case 2: {
-      const { dlat, dlng } = deterministicOffset(lat, lng);
+      const { dlat, dlng } = deterministicOffset(lat, lng, 150);
       return { lat: lat + dlat, lng: lng + dlng, accuracyRadius: 150 };
     }
 

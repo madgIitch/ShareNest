@@ -151,6 +151,9 @@ export default function ExploreScreen() {
           onPress={() => setFilterSheetOpen(true)}
         >
           <Text style={styles.filterBtnIcon}>⚙</Text>
+          <Text style={[styles.filterBtnLabel, activeFilterCount > 0 && styles.filterBtnLabelActive]}>
+            Filtrar
+          </Text>
           {activeFilterCount > 0 && (
             <View style={styles.filterBadge}>
               <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
@@ -222,12 +225,14 @@ export default function ExploreScreen() {
                 <ListingCard
                   listing={{
                     id: item.id,
+                    owner_id: item.owner_id,
                     title: item.title,
                     price: item.price,
                     city: item.city,
                     type: item.type,
                     image_url: (item.images as string[])[0] ?? null,
                   }}
+                  viewerId={session?.user?.id}
                   connectionDegree={
                     item.owner_id === session?.user?.id
                       ? null
@@ -356,10 +361,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   filterBtn: {
-    width: 40,
+    minWidth: 92,
     height: 40,
     borderRadius: radius.full,
     backgroundColor: colors.gray100,
+    paddingHorizontal: spacing[3],
+    flexDirection: "row",
+    gap: spacing[1],
     justifyContent: "center",
     alignItems: "center",
   },
@@ -368,6 +376,14 @@ const styles = StyleSheet.create({
   },
   filterBtnIcon: {
     fontSize: 16,
+  },
+  filterBtnLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  filterBtnLabelActive: {
+    color: colors.primaryDark,
   },
   filterBadge: {
     position: "absolute",

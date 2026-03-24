@@ -155,9 +155,9 @@ export default function ConversationScreen() {
     try {
       const result = await confirmAssignment.mutateAsync(request.id);
       if (result?.assignment_completed) {
-        Alert.alert("Asignacion completada", "La habitacion ha quedado asignada y el household ya esta creado.", [
+        Alert.alert("Asignacion completada", "La habitacion ha quedado asignada y el piso ya esta creado.", [
           {
-            text: "Ir al household",
+            text: "Ir al piso",
             onPress: () => router.push("/(tabs)/household"),
           },
           { text: "Cerrar", style: "cancel" },

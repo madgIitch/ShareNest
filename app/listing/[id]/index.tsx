@@ -21,7 +21,7 @@ import { UserAvatar } from "../../../src/components/ui/UserAvatar";
 import type { PrivacyLevel } from "../../../src/core/PrivacyEngine";
 import { useListing, useUpdateListingStatus, useDeleteListing } from "../../../src/hooks/useListings";
 import { useProfile } from "../../../src/hooks/useProfile";
-import { useMyRequestForListing } from "../../../src/hooks/useRequests";
+import { useMyRequestForListing, useReceivedRequests } from "../../../src/hooks/useRequests";
 import { useConversations } from "../../../src/hooks/useConversations";
 import { useMutualFriends } from "../../../src/hooks/useConnections";
 import { useAuth } from "../../../src/providers/AuthProvider";
@@ -47,6 +47,15 @@ function StatCell({ value, label }: { value: string; label: string }) {
   );
 }
 
+function MetricCell({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.metricCell}>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function RuleTag({ label }: { label: string }) {
   return (
     <View style={styles.ruleTag}>
@@ -66,8 +75,12 @@ function ResidentRow({
 }) {
   const { data: profile } = useProfile(userId);
   const { data: mutual = [] } = useMutualFriends(myId, userId);
-
-  if (!profile) return null;
+  const displayName = profile?.full_name ?? "Propietario";
+  const mutualPreview = mutual
+    .slice(0, 2)
+    .map((f) => (f.full_name ?? "").split(" ")[0])
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Pressable
@@ -76,15 +89,15 @@ function ResidentRow({
     >
       <View style={{ position: "relative" }}>
         <UserAvatar
-          avatarUrl={profile.avatar_url}
-          name={profile.full_name}
+          avatarUrl={profile?.avatar_url}
+          name={displayName}
           size="sm"
-          verified={!!profile.verified_at}
+          verified={!!profile?.verified_at}
         />
       </View>
       <View style={styles.residentInfo}>
         <View style={styles.residentNameRow}>
-          <Text style={styles.residentName}>{profile.full_name ?? "Usuario"}</Text>
+          <Text style={styles.residentName}>{displayName}</Text>
           {isOwner && (
             <View style={styles.ownerBadge}>
               <Text style={styles.ownerBadgeText}>Propietario</Text>
@@ -93,16 +106,38 @@ function ResidentRow({
         </View>
         <Text style={styles.residentMutual}>
           {mutual.length > 0
-            ? `${mutual.length} ${mutual.length === 1 ? "amigo" : "amigos"} en comun - ${mutual
-                .slice(0, 2)
-                .map((f) => (f.full_name ?? "").split(" ")[0])
-                .join(", ")}`
+            ? `${mutual.length} ${mutual.length === 1 ? "amigo" : "amigos"} en comun${mutualPreview ? ` - ${mutualPreview}` : ""}`
             : "Sin amigos en comun"}
         </Text>
+        {mutual.length > 0 && (
+          <View style={styles.mutualAvatarsRow}>
+            {mutual.slice(0, 3).map((f, idx) => (
+              <View key={f.id} style={[styles.mutualAvatarWrap, { marginLeft: idx === 0 ? 0 : -8 }]}>
+                <UserAvatar avatarUrl={f.avatar_url} name={f.full_name} size="xs" />
+              </View>
+            ))}
+          </View>
+        )}
       </View>
       <Text style={styles.residentArrow}>{">"}</Text>
     </Pressable>
   );
+}
+
+function formatPublishedAgo(isoDate: string) {
+  const published = new Date(isoDate).getTime();
+  if (Number.isNaN(published)) return "Sin dato";
+
+  const diffMs = Date.now() - published;
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  if (diffDays === 0) return "Hoy";
+  if (diffDays === 1) return "Hace 1 dia";
+  if (diffDays < 30) return `Hace ${diffDays} dias`;
+  const months = Math.floor(diffDays / 30);
+  if (months === 1) return "Hace 1 mes";
+  if (months < 12) return `Hace ${months} meses`;
+  const years = Math.floor(months / 12);
+  return years === 1 ? "Hace 1 ano" : `Hace ${years} anos`;
 }
 
 // Main Screen
@@ -125,8 +160,13 @@ export default function ListingDetailScreen() {
   const [requestSheetOpen, setRequestSheetOpen] = useState(false);
 
   const { data: myRequest } = useMyRequestForListing(id, myId);
+  const { data: receivedRequests = [] } = useReceivedRequests(myId);
   const { data: conversations = [] } = useConversations(myId);
   const linkedConversation = conversations.find((c) => c.listing_id === id);
+  const listingRequestsCount = receivedRequests.filter((r) => r.listing_id === id).length;
+  const pendingRequestsCount = receivedRequests.filter(
+    (r) => r.listing_id === id && r.status === "pending",
+  ).length;
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -170,6 +210,8 @@ export default function ListingDetailScreen() {
       ? "1 ano min."
       : `${listing.min_stay_months}m min.`
     : "Flexible";
+  const statusLabel =
+    listing.status === "active" ? "Activo" : listing.status === "paused" ? "Pausado" : "Archivado";
 
   const handleStatusChange = (status: "active" | "paused" | "rented") => {
     Alert.alert("Cambiar estado", `Marcar como "${status}"?`, [
@@ -268,20 +310,52 @@ export default function ListingDetailScreen() {
                 .filter(Boolean)
                 .join(" - ")}
             </Text>
+            <View style={styles.contextBadges}>
+              <View
+                style={[
+                  styles.contextBadge,
+                  listing.status === "active"
+                    ? styles.contextBadgeActive
+                    : listing.status === "paused"
+                      ? styles.contextBadgePaused
+                      : styles.contextBadgeArchived,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.contextBadgeText,
+                    listing.status === "active"
+                      ? styles.contextBadgeTextActive
+                      : listing.status === "paused"
+                        ? styles.contextBadgeTextPaused
+                        : styles.contextBadgeTextArchived,
+                  ]}
+                >
+                  {statusLabel}
+                </Text>
+              </View>
+              {isOwner && (
+                <View style={[styles.contextBadge, styles.contextBadgePending]}>
+                  <Text style={[styles.contextBadgeText, styles.contextBadgeTextPending]}>
+                    {pendingRequestsCount} solicitudes pendientes
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Stats grid 4 cols */}
           <View style={styles.statsGrid}>
             <StatCell
-              value={listing.size_m2 ? `${listing.size_m2} m2` : "-"}
+              value={listing.size_m2 ? `${listing.size_m2} m2` : "No especificado"}
               label="Habitacion"
             />
             <StatCell
-              value="-"
+              value="No especificado"
               label="Piso total"
             />
             <StatCell
-              value={listing.rooms ? String(listing.rooms) : "-"}
+              value={listing.rooms ? String(listing.rooms) : "No especificado"}
               label="Companeros"
             />
             <StatCell value={minStayLabel} label="Estancia" />
@@ -334,8 +408,8 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          {/* Quien vive aqui */}
-          {listing.owner_id && (
+          {/* Quien vive aqui (buscador) */}
+          {listing.owner_id && !isOwner && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>QUIEN VIVE AQUI</Text>
               <ResidentRow
@@ -343,6 +417,18 @@ export default function ListingDetailScreen() {
                 myId={myId}
                 isOwner={true}
               />
+            </View>
+          )}
+
+          {/* Metricas (propietario) */}
+          {isOwner && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>METRICAS DEL ANUNCIO</Text>
+              <View style={styles.metricsGrid}>
+                <MetricCell value="Sin dato" label="Visitas" />
+                <MetricCell value={String(listingRequestsCount)} label="Solicitudes" />
+                <MetricCell value={formatPublishedAgo(listing.created_at)} label="Publicado" />
+              </View>
             </View>
           )}
 
@@ -358,16 +444,16 @@ export default function ListingDetailScreen() {
           {isOwner && (
             <View style={styles.ownerActions}>
               <Pressable
+                style={styles.ownerPrimaryBtn}
+                onPress={() => router.push(`/listing/${listing.id}/candidates`)}
+              >
+                <Text style={styles.ownerPrimaryBtnText}>Ver candidatos</Text>
+              </Pressable>
+              <Pressable
                 style={styles.ownerActionBtn}
                 onPress={() => router.push(`/listing/${listing.id}/edit`)}
               >
                 <Text style={styles.ownerActionText}>Editar</Text>
-              </Pressable>
-              <Pressable
-                style={styles.ownerActionBtn}
-                onPress={() => router.push(`/listing/${listing.id}/candidates`)}
-              >
-                <Text style={styles.ownerActionText}>Ver candidatos</Text>
               </Pressable>
               {listing.status === "active" && (
                 <Pressable
@@ -394,9 +480,16 @@ export default function ListingDetailScreen() {
       </ScrollView>
 
       {/* CTA anclado en footer */}
-      {!isOwner && myId && (
+      {!isOwner && (
         <View style={styles.footer}>
-          {!myRequest && (
+          {!myId ? (
+            <Pressable
+              style={styles.ctaBtn}
+              onPress={() => router.push("/login")}
+            >
+              <Text style={styles.ctaBtnText}>Solicitar habitacion</Text>
+            </Pressable>
+          ) : !myRequest ? (
             <Pressable
               style={styles.ctaBtn}
               onPress={() => {
@@ -406,7 +499,7 @@ export default function ListingDetailScreen() {
             >
               <Text style={styles.ctaBtnText}>Solicitar habitacion</Text>
             </Pressable>
-          )}
+          ) : null}
           {myRequest?.status === "pending" && (
             <View style={[styles.ctaBtn, { backgroundColor: colors.warningLight }]}>
               <Text style={[styles.ctaBtnText, { color: colors.warning }]}>
@@ -437,14 +530,16 @@ export default function ListingDetailScreen() {
             <Text style={styles.footerIconText}>+</Text>
           </Pressable>
 
-          <SendRequestSheet
-            visible={requestSheetOpen}
-            onClose={() => setRequestSheetOpen(false)}
-            listingId={listing.id}
-            listingTitle={listing.title}
-            ownerId={listing.owner_id}
-            requesterId={myId}
-          />
+          {myId && (
+            <SendRequestSheet
+              visible={requestSheetOpen}
+              onClose={() => setRequestSheetOpen(false)}
+              listingId={listing.id}
+              listingTitle={listing.title}
+              ownerId={listing.owner_id}
+              requesterId={myId}
+            />
+          )}
         </View>
       )}
     </View>
@@ -542,6 +637,42 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  contextBadges: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing[2],
+    marginTop: spacing[2],
+  },
+  contextBadge: {
+    borderRadius: radius.full,
+    borderWidth: 1,
+    paddingHorizontal: spacing[3],
+    paddingVertical: 4,
+  },
+  contextBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+  },
+  contextBadgeActive: {
+    backgroundColor: colors.successLight,
+    borderColor: colors.success + "44",
+  },
+  contextBadgeTextActive: { color: colors.success },
+  contextBadgePaused: {
+    backgroundColor: colors.warningLight,
+    borderColor: colors.warning + "44",
+  },
+  contextBadgeTextPaused: { color: colors.warning },
+  contextBadgeArchived: {
+    backgroundColor: colors.gray100,
+    borderColor: colors.gray300,
+  },
+  contextBadgeTextArchived: { color: colors.gray600 },
+  contextBadgePending: {
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary + "44",
+  },
+  contextBadgeTextPending: { color: colors.primaryDark },
 
   // Stats grid
   statsGrid: {
@@ -575,18 +706,20 @@ const styles = StyleSheet.create({
   billsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing[2],
+    rowGap: spacing[3],
+    columnGap: spacing[2],
   },
   billRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing[2],
     width: "47%",
+    paddingVertical: 2,
   },
   billDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   billDotGreen: { backgroundColor: colors.success },
   billDotGray: { backgroundColor: colors.gray300 },
@@ -625,12 +758,48 @@ const styles = StyleSheet.create({
   ownerBadgeText: { fontSize: 10, fontWeight: "700", color: colors.primary },
   residentMutual: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
   residentArrow: { fontSize: 20, color: colors.textTertiary },
+  metricsGrid: { flexDirection: "row", gap: spacing[2] },
+  metricCell: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing[3],
+  },
+  metricValue: { fontSize: fontSize.md, fontWeight: "700", color: colors.text },
+  metricLabel: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  mutualAvatarsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing[1],
+  },
+  mutualAvatarWrap: {
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    borderRadius: radius.full,
+    overflow: "hidden",
+  },
 
   // Description
   description: { fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 22 },
 
   // Owner actions
   ownerActions: { gap: spacing[2], marginTop: spacing[2] },
+  ownerPrimaryBtn: {
+    backgroundColor: colors.text,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.text,
+    paddingVertical: spacing[3],
+    alignItems: "center",
+  },
+  ownerPrimaryBtnText: {
+    fontWeight: "700",
+    color: colors.white,
+    fontSize: fontSize.sm,
+  },
   ownerActionBtn: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -639,7 +808,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[3],
     alignItems: "center",
   },
-  ownerActionDanger: { borderColor: colors.errorLight, backgroundColor: colors.errorLight },
+  ownerActionDanger: {
+    marginTop: spacing[2],
+    borderColor: colors.errorLight,
+    backgroundColor: colors.errorLight,
+  },
   ownerActionText: { fontWeight: "600", color: colors.text, fontSize: fontSize.sm },
 
   // Footer
@@ -671,4 +844,3 @@ const styles = StyleSheet.create({
   },
   footerIconText: { fontSize: 18, color: colors.textSecondary },
 });
-

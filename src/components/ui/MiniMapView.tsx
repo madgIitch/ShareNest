@@ -10,7 +10,7 @@ import { buildMiniMapHTML } from "../../lib/leafletHTML";
 
 // Zoom de Leaflet por nivel de privacidad (más preciso = más zoom)
 const ZOOM: Record<PrivacyLevel, number> = {
-  1: 14, // barrio
+  1: 12, // zona amplia (sin calle exacta)
   2: 15, // manzana
   3: 17, // calle
 };
