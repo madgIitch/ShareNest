@@ -9,7 +9,6 @@ import { useBalances, useExpenses } from "../../src/hooks/useExpenses";
 import {
   useHouseholdById,
   useHouseholdMembers,
-  useMyHousehold,
   useMyHouseholdMemberships,
   useOwnedHouseholds,
 } from "../../src/hooks/useHousehold";
@@ -63,7 +62,6 @@ export default function WorkspaceScreen() {
   const { data: received = [] } = useReceivedRequests(myId);
   const { data: listings = [] } = useMyListings(myId);
   const { data: properties = [] } = useMyProperties(myId);
-  const { data: myHousehold } = useMyHousehold();
   const { data: memberships = [] } = useMyHouseholdMemberships(myId);
   const { data: ownedHouseholds = [] } = useOwnedHouseholds(myId);
 
@@ -78,9 +76,8 @@ export default function WorkspaceScreen() {
   );
   const householdIds = Array.from(
     new Set([
-      ...(myHousehold?.id ? [myHousehold.id] : []),
-      ...ownerHouseholdIds,
       ...memberHouseholdIds,
+      ...ownerHouseholdIds,
       ...ownedHouseholds.map((h) => h.id),
     ]),
   );

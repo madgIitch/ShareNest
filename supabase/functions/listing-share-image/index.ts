@@ -126,7 +126,7 @@ function renderCard({
       "div",
       { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
       chip(typeLabel),
-      h("div", { style: { fontSize: "32px", fontWeight: 800, color: COLORS.card } }, "ShareNest"),
+      h("div", { style: { fontSize: "32px", fontWeight: 800, color: COLORS.card } }, "HomiMatch"),
     ),
     // Dark card
     h(
@@ -192,7 +192,7 @@ function renderCard({
             alignItems: "center",
           },
         },
-        h("div", { style: { fontSize: "22px", color: COLORS.mutedText } }, "sharenest.app"),
+        h("div", { style: { fontSize: "22px", color: COLORS.mutedText } }, "homimatch.com"),
         h(
           "div",
           {
@@ -235,7 +235,7 @@ serve(async (req: Request) => {
     }
 
     const { data: listing, error } = await supabaseAdmin
-      .from("listings")
+      .from("listings_with_property")
       .select("id, title, city, district, price, type, rooms, size_m2, available_from, images")
       .eq("id", listingId)
       .single();

@@ -2,20 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "../lib/supabase";
 import type { Database, ListingStatus } from "../types/database";
+import type { Listing, ListingWithProperty } from "../types/listingWithProperty";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
 type ListingInsert = Database["public"]["Tables"]["listings"]["Insert"];
 type ListingUpdate = Database["public"]["Tables"]["listings"]["Update"];
-type ListingViewRow = Listing & {
-  property_name?: string | null;
-  property_address?: string | null;
-  property_postal_code?: string | null;
-};
 
 // --- Queries ---
 
 export function useListing(id: string | undefined) {
-  return useQuery<Listing>({
+  return useQuery<ListingWithProperty>({
     queryKey: ["listing", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -24,14 +19,14 @@ export function useListing(id: string | undefined) {
         .eq("id", id!)
         .single();
       if (error) throw error;
-      return data as unknown as Listing;
+      return data as ListingWithProperty;
     },
     enabled: !!id,
   });
 }
 
 export function useMyListings(userId: string | undefined) {
-  return useQuery<Listing[]>({
+  return useQuery<ListingWithProperty[]>({
     queryKey: ["listings", "mine", userId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -40,14 +35,14 @@ export function useMyListings(userId: string | undefined) {
         .eq("owner_id", userId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as Listing[];
+      return (data ?? []) as ListingWithProperty[];
     },
     enabled: !!userId,
   });
 }
 
 export function useActiveListings(city?: string) {
-  return useQuery<Listing[]>({
+  return useQuery<ListingWithProperty[]>({
     queryKey: ["listings", "active", city ?? "all"],
     queryFn: async () => {
       let query = supabase
@@ -60,7 +55,7 @@ export function useActiveListings(city?: string) {
 
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as unknown as Listing[];
+      return (data ?? []) as ListingWithProperty[];
     },
   });
 }
@@ -68,7 +63,7 @@ export function useActiveListings(city?: string) {
 export function useListingsByIds(ids: string[]) {
   const uniqueIds = Array.from(new Set(ids));
 
-  return useQuery<Listing[]>({
+  return useQuery<ListingWithProperty[]>({
     queryKey: ["listings", "by-ids", uniqueIds.sort().join(",")],
     queryFn: async () => {
       if (uniqueIds.length === 0) return [];
@@ -77,9 +72,9 @@ export function useListingsByIds(ids: string[]) {
         .select("*")
         .in("id", uniqueIds);
       if (error) throw error;
-      const rows = (data ?? []) as unknown as ListingViewRow[];
+      const rows = (data ?? []) as ListingWithProperty[];
       const byId = new Map(rows.map((r) => [r.id, r]));
-      return uniqueIds.map((id) => byId.get(id)).filter((x): x is Listing => !!x);
+      return uniqueIds.map((id) => byId.get(id)).filter((x): x is ListingWithProperty => !!x);
     },
     enabled: uniqueIds.length > 0,
   });

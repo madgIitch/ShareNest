@@ -113,6 +113,7 @@ export type Database = {
         Row: {
           id: string;
           owner_id: string;
+          name: string | null;
           address: string;
           street_number: string | null;
           city_id: string | null;
@@ -133,6 +134,7 @@ export type Database = {
         Insert: {
           id?: string;
           owner_id: string;
+          name?: string | null;
           address: string;
           street_number?: string | null;
           city_id?: string | null;
@@ -150,6 +152,7 @@ export type Database = {
           household_id?: string | null;
         };
         Update: {
+          name?: string | null;
           address?: string;
           street_number?: string | null;
           postal_code?: string | null;
@@ -370,6 +373,7 @@ export type Database = {
           conversation_id: string;
           sender_id: string;
           content: string;
+          is_system: boolean;
           read_at: string | null;
           created_at: string;
         };
@@ -378,9 +382,11 @@ export type Database = {
           conversation_id: string;
           sender_id: string;
           content: string;
+          is_system?: boolean;
         };
         Update: {
           read_at?: string | null;
+          is_system?: boolean;
         };
         Relationships: [];
       };
@@ -490,6 +496,59 @@ export type Database = {
           active_count: number;
         };
       };
+      listings_with_property: {
+        Row: {
+          id: string;
+          owner_id: string;
+          type: ListingType;
+          title: string;
+          description: string | null;
+          price: number;
+          size_m2: number | null;
+          rooms: number | null;
+          available_from: string | null;
+          is_furnished: boolean;
+          pets_allowed: boolean;
+          smokers_allowed: boolean;
+          status: ListingStatus;
+          images: string[];
+          created_at: string;
+          updated_at: string;
+          search_vector: unknown;
+          min_stay_months: number | null;
+          contract_type: ContractType | null;
+          bed_type: BedType | null;
+          has_private_bath: boolean | null;
+          has_wardrobe: boolean | null;
+          has_desk: boolean | null;
+          city: string;
+          district: string | null;
+          city_id: string | null;
+          place_id: string | null;
+          street: string | null;
+          street_number: string | null;
+          postal_code: string | null;
+          lat: number | null;
+          lng: number | null;
+          property_id: string;
+          property_name: string | null;
+          property_address: string | null;
+          property_street_number: string | null;
+          property_floor: string | null;
+          property_postal_code: string | null;
+          property_city_id: string | null;
+          property_place_id: string | null;
+          property_lat: number | null;
+          property_lng: number | null;
+          property_has_elevator: boolean;
+          property_total_m2: number | null;
+          property_total_rooms: number | null;
+          property_bills_config: Json;
+          property_house_rules: string[] | null;
+          property_images: Json;
+          property_household_id: string | null;
+        };
+      };
     };
     Functions: {
       get_mutual_friends: {
@@ -536,6 +595,10 @@ export type Database = {
         Args: { p_request_id: string };
         Returns: undefined;
       };
+      withdraw_request: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
       confirm_assignment: {
         Args: { p_request_id: string };
         Returns: { conversation_id: string; household_id: string | null; assignment_completed: boolean }[];
@@ -557,7 +620,7 @@ export type Database = {
           p_cursor?:         string | null;
           p_limit?:          number | null;
         };
-        Returns: Database["public"]["Tables"]["listings"]["Row"][];
+        Returns: Database["public"]["Views"]["listings_with_property"]["Row"][];
       };
     };
     Enums: Record<string, never>;

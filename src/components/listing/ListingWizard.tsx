@@ -153,18 +153,27 @@ const EMPTY_FORM: FormData = {
   contract_type: "long_term",
 };
 
-function listingToForm(l: Listing): FormData {
+function listingToForm(
+  l: Listing,
+  opts?: { existingProperty?: PropertyRow | null; existingCityName?: string | null },
+): FormData {
+  const existingProperty = opts?.existingProperty ?? null;
+  const existingCityName = opts?.existingCityName ?? null;
   return {
     ...EMPTY_FORM,
-    street: l.street ?? "",
-    street_number: l.street_number ?? "",
-    city: l.city,
-    city_id: l.city_id ?? null,
-    postal_code: l.postal_code ?? "",
+    street: existingProperty?.address ?? l.street ?? "",
+    street_number: existingProperty?.street_number ?? l.street_number ?? "",
+    city: existingCityName ?? l.city,
+    city_id: existingProperty?.city_id ?? l.city_id ?? null,
+    postal_code: existingProperty?.postal_code ?? l.postal_code ?? "",
     district: l.district ?? "",
-    place_id: l.place_id ?? null,
-    lat: l.lat ?? null,
-    lng: l.lng ?? null,
+    place_id: existingProperty?.place_id ?? l.place_id ?? null,
+    lat: existingProperty?.lat ?? l.lat ?? null,
+    lng: existingProperty?.lng ?? l.lng ?? null,
+    total_m2: existingProperty?.total_m2 != null ? String(existingProperty.total_m2) : "",
+    total_rooms: existingProperty?.total_rooms != null ? String(existingProperty.total_rooms) : "",
+    floor: existingProperty?.floor ?? "",
+    has_elevator: existingProperty?.has_elevator ?? false,
     is_furnished: l.is_furnished,
     title: l.title,
     size_m2: l.size_m2?.toString() ?? "",
@@ -258,12 +267,13 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 // ─── Step components ──────────────────────────────────────────────────────────
 
 function Step1Address({
-  form, set, onCitySelect, onDistrictSelect, onDetectLocation, locating, onPostalCodeChange,
+  form, onStreetChange, onCitySelect, onDistrictSelect, onDistrictTextChange, onDetectLocation, locating, onPostalCodeChange,
 }: {
   form: FormData;
-  set: (k: keyof FormData, v: unknown) => void;
+  onStreetChange: (value: string) => void;
   onCitySelect: (c: City) => void;
   onDistrictSelect: (p: Place) => void;
+  onDistrictTextChange: (value: string) => void;
   onDetectLocation: () => void;
   locating: boolean;
   onPostalCodeChange: (value: string) => void;
@@ -276,7 +286,7 @@ function Step1Address({
       <Label>Dirección</Label>
       <Input
         value={form.street}
-        onChangeText={(v) => set("street", v)}
+        onChangeText={onStreetChange}
         placeholder="Calle del Pez, 14"
       />
 
@@ -304,7 +314,7 @@ function Step1Address({
           {form.city_id ? (
             <DistrictSelector cityId={form.city_id} value={form.district} onSelect={onDistrictSelect} />
           ) : (
-            <Input value={form.district} onChangeText={(v) => set("district", v)} placeholder="Malasaña" />
+            <Input value={form.district} onChangeText={onDistrictTextChange} placeholder="Malasaña" />
           )}
         </View>
       </View>
@@ -772,7 +782,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     });
 
     if (initial) {
-      const base = listingToForm(initial);
+      const base = listingToForm(initial, { existingProperty, existingCityName });
       console.log("[ListingWizard] base form from listing:", {
         street: base.street,
         city: base.city,
@@ -802,11 +812,11 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         street: existingProperty.address ?? base.street,
         street_number: existingProperty.street_number ?? base.street_number,
         city: shouldUsePropertyCity ? (existingCityName ?? base.city) : base.city,
-        city_id: base.city_id ?? existingProperty.city_id,
-        place_id: base.place_id ?? existingProperty.place_id,
-        lat: base.lat ?? existingProperty.lat,
-        lng: base.lng ?? existingProperty.lng,
-        postal_code: base.postal_code || existingProperty.postal_code || "",
+        city_id: existingProperty.city_id ?? base.city_id,
+        place_id: existingProperty.place_id ?? base.place_id,
+        lat: existingProperty.lat ?? base.lat,
+        lng: existingProperty.lng ?? base.lng,
+        postal_code: existingProperty.postal_code || base.postal_code || "",
         total_m2: existingProperty.total_m2 != null ? String(existingProperty.total_m2) : base.total_m2,
         total_rooms: existingProperty.total_rooms != null ? String(existingProperty.total_rooms) : base.total_rooms,
         floor: existingProperty.floor ?? base.floor,
@@ -880,15 +890,16 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
   const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>([]);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const geoSyncSeq = useRef(0);
-  const lastCityDistrictSyncKey = useRef("");
+  const postalSyncSeq = useRef(0);
+  const cityDistrictSyncSeq = useRef(0);
+  const cityDistrictDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didAutoHydrateFromPostalRef = useRef(false);
 
   const createListing = useCreateListing();
   const updateListing = useUpdateListing();
 
-  const set = (key: keyof FormData, value: unknown) => {
-    console.log("[ListingWizard] set()", { key, value });
+  const set = (key: keyof FormData, value: unknown, source: "user" | "sync" = "user") => {
+    console.log("[ListingWizard] set()", { key, value, source });
     setForm((f) => ({ ...f, [key]: value }));
   };
 
@@ -942,6 +953,9 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       lat: city.centroid?.lat ?? f.lat,
       lng: city.centroid?.lon ?? f.lng,
     }));
+    if (form.district.trim()) {
+      scheduleHydrateFromCityDistrict(city.name, form.district, form.street);
+    }
   };
 
   const pickCityFromName = async (rawCity: string) => {
@@ -966,7 +980,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     return picked;
   };
 
-  const syncPostalFromCityAndDistrict = (
+  const hydrateFromCityDistrict = (
     cityName: string,
     districtName: string,
     streetName: string,
@@ -975,8 +989,8 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     const city = cityName.trim();
     const district = districtName.trim();
     if (!city || !district) return;
-    const seq = ++geoSyncSeq.current;
-    console.log("[ListingWizard] syncPostalFromCityAndDistrict start:", { seq, city, district, streetName });
+    const seq = ++cityDistrictSyncSeq.current;
+    console.log("[ListingWizard] hydrateFromCityDistrict start:", { seq, city, district, streetName });
     void (async () => {
       try {
         const resolved = await locationService.resolvePostalFromAddress({
@@ -987,48 +1001,47 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
           lon: fallbackCoords?.lon ?? null,
         });
         const detectedPostal = resolved?.postal_code?.trim() ?? "";
-        console.log("[ListingWizard] resolvePostalFromAddress result:", resolved);
-        if (seq !== geoSyncSeq.current) return;
-
-        if (!detectedPostal) {
-          // If city+district+street cannot resolve, reconcile by current postal code
-          // to avoid stale district/place values in the form.
-          const currentPostal = form.postal_code.replace(/\D/g, "").slice(0, 5);
-          if (currentPostal.length === 5) {
-            console.log("[ListingWizard] resolvePostalFromAddress null -> fallback syncFromPostalCode", { currentPostal });
-            syncFromPostalCode(currentPostal);
-          }
-          return;
-        }
-
+        console.log("[ListingWizard] hydrateFromCityDistrict resolvePostalFromAddress result:", resolved);
+        if (seq !== cityDistrictSyncSeq.current) return;
+        if (!detectedPostal) return;
         setForm((f) => ({ ...f, postal_code: detectedPostal }));
-        // Always reconcile district/place against postal result to prevent stale barrio.
-        syncFromPostalCode(detectedPostal);
       } catch {
         // Best effort.
       }
     })();
   };
 
-  const syncFromPostalCode = (rawPostal: string) => {
+  const scheduleHydrateFromCityDistrict = (
+    cityName: string,
+    districtName: string,
+    streetName: string,
+    fallbackCoords?: { lat?: number | null; lon?: number | null },
+  ) => {
+    if (cityDistrictDebounceRef.current) clearTimeout(cityDistrictDebounceRef.current);
+    cityDistrictDebounceRef.current = setTimeout(() => {
+      hydrateFromCityDistrict(cityName, districtName, streetName, fallbackCoords);
+    }, 300);
+  };
+
+  const hydrateFromPostalCode = (rawPostal: string) => {
     const postal = rawPostal.replace(/\D/g, "").slice(0, 5);
-    console.log("[ListingWizard] syncFromPostalCode input:", rawPostal, "normalized:", postal);
-    set("postal_code", postal);
+    console.log("[ListingWizard] hydrateFromPostalCode input:", rawPostal, "normalized:", postal);
+    set("postal_code", postal, "user");
     if (postal.length !== 5) return;
 
-    const seq = ++geoSyncSeq.current;
-    console.log("[ListingWizard] syncFromPostalCode start:", { seq, postal, cityHint: form.city?.trim() || "Espana" });
+    const seq = ++postalSyncSeq.current;
+    console.log("[ListingWizard] hydrateFromPostalCode start:", { seq, postal, cityHint: form.city?.trim() || "Espana" });
     void (async () => {
       try {
         const resolved = await locationService.resolvePostalCode(postal, form.city?.trim() || null);
-        if (!resolved || seq !== geoSyncSeq.current) return;
-        console.log("[ListingWizard] postal resolved by edge:", resolved);
+        if (!resolved || seq !== postalSyncSeq.current) return;
+        console.log("[ListingWizard] hydrateFromPostalCode postal resolved by edge:", resolved);
 
         const inferredCityName = resolved.city?.trim() || form.city?.trim() || "";
         const inferredDistrict = resolved.district?.trim() || "";
         const matchedCity = inferredCityName ? await pickCityFromName(inferredCityName) : null;
-        if (seq !== geoSyncSeq.current) return;
-        console.log("[ListingWizard] postal inferred:", { inferredCityName, inferredDistrict, matchedCity });
+        if (seq !== postalSyncSeq.current) return;
+        console.log("[ListingWizard] hydrateFromPostalCode inferred:", { inferredCityName, inferredDistrict, matchedCity });
 
         setForm((f) => ({
           ...f,
@@ -1043,8 +1056,8 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
 
         if (matchedCity?.id) {
           const places = await locationService.getPlaces(matchedCity.id, "", { limit: 200 });
-          if (seq !== geoSyncSeq.current) return;
-          console.log("[ListingWizard] places loaded for city:", matchedCity.id, "count:", places.length);
+          if (seq !== postalSyncSeq.current) return;
+          console.log("[ListingWizard] hydrateFromPostalCode places loaded for city:", matchedCity.id, "count:", places.length);
           const withCentroid = places.filter(
             (p) => p.centroid?.lat != null && p.centroid?.lon != null,
           );
@@ -1063,7 +1076,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
           }, null);
 
           if (best) {
-            console.log("[ListingWizard] closest place selected:", best);
+            console.log("[ListingWizard] hydrateFromPostalCode closest place selected:", best);
             setForm((f) => ({
               ...f,
               district: best.name,
@@ -1075,9 +1088,16 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
           }
         }
       } catch (err) {
-        console.error("[ListingWizard] syncFromPostalCode error:", err);
+        console.error("[ListingWizard] hydrateFromPostalCode error:", err);
       }
     })();
+  };
+
+  const handleStreetChange = (value: string) => {
+    set("street", value, "user");
+    if (form.city.trim() && form.district.trim()) {
+      scheduleHydrateFromCityDistrict(form.city, form.district, value);
+    }
   };
 
   const handleDistrictSelect = (place: Place) => {
@@ -1093,28 +1113,18 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       lat: nextLat ?? f.lat,
       lng: nextLng ?? f.lng,
     }));
-    syncPostalFromCityAndDistrict(form.city.trim(), place.name, form.street.trim(), {
+    scheduleHydrateFromCityDistrict(form.city.trim(), place.name, form.street.trim(), {
       lat: nextLat,
       lon: nextLng,
     });
   };
 
-  useEffect(() => {
-    const city = form.city.trim();
-    const district = form.district.trim();
-    const street = form.street.trim();
-    if (!city || !district) return;
-
-    const key = `${city}|${district}|${street}`;
-    if (lastCityDistrictSyncKey.current === key) return;
-
-    const timer = setTimeout(() => {
-      lastCityDistrictSyncKey.current = key;
-      syncPostalFromCityAndDistrict(city, district, street);
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [form.city, form.district, form.street]);
+  const handleDistrictTextChange = (value: string) => {
+    set("district", value, "user");
+    if (form.city.trim() && value.trim()) {
+      scheduleHydrateFromCityDistrict(form.city, value, form.street);
+    }
+  };
 
   // Legacy backfill on edit:
   // If old records were saved with placeholder city ("Ciudad") or null ids,
@@ -1138,7 +1148,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       district: form.district,
       place_id: form.place_id,
     });
-    syncFromPostalCode(postal);
+    hydrateFromPostalCode(postal);
   }, [isEditing, form.postal_code, form.city, form.city_id, form.district, form.place_id]);
 
   const handleDetectLocation = async () => {
@@ -1356,12 +1366,13 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 1 && (
           <Step1Address
             form={form}
-            set={set}
+            onStreetChange={handleStreetChange}
             onCitySelect={handleCitySelect}
             onDistrictSelect={handleDistrictSelect}
+            onDistrictTextChange={handleDistrictTextChange}
             onDetectLocation={handleDetectLocation}
             locating={locating}
-            onPostalCodeChange={syncFromPostalCode}
+            onPostalCodeChange={hydrateFromPostalCode}
           />
         )}
         {step === 2 && <Step2Piso form={form} set={set} />}

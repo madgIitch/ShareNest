@@ -1,4 +1,4 @@
-ï»¿import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,7 @@ import {
 
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { TagBadge } from "../../src/components/ui/TagBadge";
-import { useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
+import { useAcceptChat, useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
 import { useMutualFriends } from "../../src/hooks/useConnections";
 import { supabase } from "../../src/lib/supabase";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -24,6 +24,7 @@ export default function RequestDetailScreen() {
   const myId = session?.user?.id;
   const { data: request, isLoading } = useRequest(id);
   const updateStatus = useUpdateRequestStatus();
+  const acceptChat = useAcceptChat();
   const { data: mutual = [] } = useMutualFriends(myId, request?.requester_id);
 
   if (isLoading || !request) {
@@ -57,7 +58,7 @@ export default function RequestDetailScreen() {
     }
     const conv = data as { id: string } | null;
     if (!conv?.id) {
-      Alert.alert("Chat no disponible", "AÃºn no hay una conversaciÃ³n vinculada a esta solicitud.");
+      Alert.alert("Chat no disponible", "Aún no hay una conversación vinculada a esta solicitud.");
       return;
     }
     router.push(`/conversation/${conv.id}`);
@@ -65,12 +66,9 @@ export default function RequestDetailScreen() {
 
   const handleAcceptChat = async () => {
     try {
-      const conv = (await updateStatus.mutateAsync({
-        request,
-        status: "invited",
-      })) as { id: string } | null;
-      if (conv?.id) {
-        router.replace(`/conversation/${conv.id}`);
+      const convId = await acceptChat.mutateAsync(request);
+      if (convId) {
+        router.replace(`/conversation/${convId}`);
       } else {
         router.back();
       }
@@ -80,10 +78,10 @@ export default function RequestDetailScreen() {
   };
 
   const handleDeny = () => {
-    Alert.alert("Rechazar solicitud", "Esta acciÃ³n es irreversible. El solicitante recibirÃ¡ una actualizaciÃ³n.", [
+    Alert.alert("Rechazar solicitud", "Esta acción es irreversible. El solicitante recibirá una actualización.", [
       { text: "Cancelar", style: "cancel" },
       {
-        text: "SÃ­, rechazar",
+        text: "Sí, rechazar",
         style: "destructive",
         onPress: async () => {
           try {
@@ -109,7 +107,7 @@ export default function RequestDetailScreen() {
               : request.status === "accepted"
                 ? "Chat confirmado"
                 : request.status === "assigned"
-                  ? "HabitaciÃ³n asignada"
+                  ? "Habitación asignada"
                   : "Solicitud denegada"}
           </Text>
         </View>
@@ -127,18 +125,18 @@ export default function RequestDetailScreen() {
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{requester?.full_name ?? "Usuario"}</Text>
             {requester?.city && <Text style={styles.profileCity}>{requester.city}</Text>}
-            {requester?.verified_at && <TagBadge label="NÃºmero verificado" variant="primary" />}
+            {requester?.verified_at && <TagBadge label="Número verificado" variant="primary" />}
           </View>
         </Pressable>
         <View style={styles.metaRow}>
-          <Text style={styles.metaText}>{age ? `${age} aÃ±os` : "Edad no indicada"}</Text>
-          <Text style={styles.metaDot}>Â·</Text>
-          <Text style={styles.metaText}>{requester?.occupation?.trim() || "ProfesiÃ³n no indicada"}</Text>
+          <Text style={styles.metaText}>{age ? `${age} años` : "Edad no indicada"}</Text>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.metaText}>{requester?.occupation?.trim() || "Profesión no indicada"}</Text>
         </View>
         {mutual.length > 0 && (
           <View style={styles.mutualBanner}>
             <Text style={styles.mutualTitle}>
-              {mutual.length} {mutual.length === 1 ? "conexiÃ³n en comÃºn" : "conexiones en comÃºn"}
+              {mutual.length} {mutual.length === 1 ? "conexión en común" : "conexiones en común"}
             </Text>
             <Text style={styles.mutualText} numberOfLines={1}>
               {mutualPreview}
@@ -180,18 +178,18 @@ export default function RequestDetailScreen() {
           <Pressable
             style={[styles.btn, styles.acceptBtn]}
             onPress={() => void handleAcceptChat()}
-            disabled={updateStatus.isPending}
+            disabled={acceptChat.isPending || updateStatus.isPending}
           >
-            {updateStatus.isPending ? (
+            {acceptChat.isPending ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.acceptBtnText}>Iniciar conversaciÃ³n</Text>
+              <Text style={styles.acceptBtnText}>Iniciar conversación</Text>
             )}
           </Pressable>
           <Pressable
             style={[styles.btn, styles.denyBtn]}
             onPress={handleDeny}
-            disabled={updateStatus.isPending}
+            disabled={acceptChat.isPending || updateStatus.isPending}
           >
             <Text style={styles.denyBtnText}>Rechazar</Text>
           </Pressable>
@@ -311,5 +309,7 @@ const styles = StyleSheet.create({
   denyBtn: { backgroundColor: colors.errorLight },
   denyBtnText: { color: colors.error, fontWeight: "700", fontSize: fontSize.md },
 });
+
+
 
 

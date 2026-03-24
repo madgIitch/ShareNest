@@ -40,10 +40,18 @@ export default function EditListingScreen() {
     );
   }
 
+  if (!listing.property_id || !existingProperty) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <ListingWizard
       initial={listing}
-      existingProperty={existingProperty ?? null}
+      existingProperty={existingProperty}
       existingCityName={existingProperty?.city?.name ?? null}
     />
   );

@@ -10,17 +10,28 @@ import * as Linking from "expo-linking";
 import { supabase } from "../lib/supabase";
 
 const SUPABASE_FUNCTIONS_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1`;
+const APP_SCHEME = process.env.EXPO_PUBLIC_APP_SCHEME?.trim();
+
+function buildDeepLink(path: string) {
+  const normalizedPath = path.replace(/^\/+/, "");
+  if (APP_SCHEME) return `${APP_SCHEME}://${normalizedPath}`;
+  return Linking.createURL(normalizedPath);
+}
 
 export const subscriptionService = {
   /**
    * Open Stripe Checkout in a browser tab.
    * The Edge Function creates a Checkout Session and returns the URL.
-   * On success, Stripe redirects to sharenest://subscription/success
+   * On success, Stripe redirects to the app deep link (configurable scheme).
    */
   async startCheckout(priceId: string): Promise<"success" | "cancelled" | "error"> {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) throw new Error("Not authenticated");
+
+      const successUrl = buildDeepLink("subscription/success");
+      const cancelUrl = buildDeepLink("subscription/cancel");
+      const returnUrl = buildDeepLink("subscription");
 
       const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/create-stripe-session`, {
         method: "POST",
@@ -30,15 +41,15 @@ export const subscriptionService = {
         },
         body: JSON.stringify({
           price_id: priceId,
-          success_url: "sharenest://subscription/success",
-          cancel_url: "sharenest://subscription/cancel",
+          success_url: successUrl,
+          cancel_url: cancelUrl,
         }),
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { url } = (await res.json()) as { url: string };
 
-      const result = await WebBrowser.openAuthSessionAsync(url, "sharenest://subscription");
+      const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
       if (result.type === "success") {
         const parsed = Linking.parse(result.url);
         if (parsed.path?.includes("success")) return "success";
@@ -64,7 +75,7 @@ export const subscriptionService = {
           "Content-Type": "application/json",
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
-        body: JSON.stringify({ return_url: "sharenest://subscription/portal-return" }),
+        body: JSON.stringify({ return_url: buildDeepLink("subscription/portal-return") }),
       });
 
       if (!res.ok) return;

@@ -23,7 +23,7 @@ import {
 } from "../../src/hooks/useConversations";
 import { useListing } from "../../src/hooks/useListings";
 import { useProperty } from "../../src/hooks/useProperties";
-import { useAcceptOffer, useConfirmAssignment, useRequest, useUpdateRequestStatus } from "../../src/hooks/useRequests";
+import { useAcceptOffer, useConfirmAssignment, useRequest, useRollbackOffer, useUpdateRequestStatus } from "../../src/hooks/useRequests";
 import type { OfferTerms } from "../../src/hooks/useRequests";
 import { supabase } from "../../src/lib/supabase";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -108,18 +108,6 @@ function getStatusSubLabel(
   return "";
 }
 
-function isSystemMessage(content: string) {
-  const text = content.trim().toLowerCase();
-  return (
-    text.startsWith("oferta enviada.") ||
-    text.startsWith("oferta retirada.") ||
-    text.startsWith("chat aceptado.") ||
-    text.startsWith("solicitud rechazada.") ||
-    text.startsWith("asignacion completada.") ||
-    text.startsWith("confirmacion registrada.")
-  );
-}
-
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
@@ -134,6 +122,7 @@ export default function ConversationScreen() {
   const sendMessage = useSendMessage();
   const markRead = useMarkRead();
   const updateRequest = useUpdateRequestStatus();
+  const rollbackOffer = useRollbackOffer();
   const acceptOffer = useAcceptOffer();
   const confirmAssignment = useConfirmAssignment();
 
@@ -277,7 +266,7 @@ export default function ConversationScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await updateRequest.mutateAsync({ request, status: "invited" });
+            await rollbackOffer.mutateAsync(request);
           } catch (err) {
             Alert.alert("Error", (err as Error).message);
           }
@@ -367,7 +356,7 @@ export default function ConversationScreen() {
           <Pressable
             style={[styles.preOfferBtn, updateRequest.isPending && styles.btnDisabled]}
             onPress={handleSendOfferFromChat}
-            disabled={updateRequest.isPending}
+            disabled={updateRequest.isPending || rollbackOffer.isPending}
           >
             {updateRequest.isPending ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -428,9 +417,9 @@ export default function ConversationScreen() {
                   <Text style={styles.offerPendingText}>Oferta enviada · pendiente de aceptación</Text>
                 </View>
                 <Pressable
-                  style={[styles.outlineBtn, updateRequest.isPending && styles.btnDisabled]}
+                  style={[styles.outlineBtn, (updateRequest.isPending || rollbackOffer.isPending) && styles.btnDisabled]}
                   onPress={handleWithdrawOffer}
-                  disabled={updateRequest.isPending}
+                  disabled={updateRequest.isPending || rollbackOffer.isPending}
                 >
                   <Text style={styles.outlineBtnText}>Retirar oferta</Text>
                 </Pressable>
@@ -461,7 +450,7 @@ export default function ConversationScreen() {
             createdAt={item.created_at}
             isMine={item.sender_id === myId}
             readAt={item.read_at}
-            isSystem={isSystemMessage(item.content)}
+            isSystem={item.is_system}
           />
         )}
         ListEmptyComponent={
@@ -699,3 +688,5 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { backgroundColor: colors.gray300 },
   sendBtnText: { color: colors.white, fontSize: 18, fontWeight: "700", lineHeight: 22 },
 });
+
+

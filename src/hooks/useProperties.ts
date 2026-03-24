@@ -18,7 +18,7 @@ export function useMyProperties(ownerId: string | undefined) {
         .from("properties")
         .select("*, city:cities(name)")
         .eq("owner_id", ownerId!)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as PropertyWithCity[];
     },

@@ -177,18 +177,19 @@ export function useWithdrawRequest() {
       ownerId: string;
       listingId: string;
     }) => {
-      const { error } = await supabase
-        .from("requests")
-        .delete()
-        .eq("id", requestId)
-        .eq("requester_id", requesterId);
+      const { error } = await supabase.rpc("withdraw_request", {
+        p_request_id: requestId,
+      });
       if (error) throw error;
     },
-    onSuccess: (_, { requesterId, ownerId, listingId }) => {
+    onSuccess: (_, { requestId, requesterId, ownerId, listingId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["request", requestId] });
       void queryClient.invalidateQueries({ queryKey: ["requests", "sent", requesterId] });
       void queryClient.invalidateQueries({ queryKey: ["requests", "received", ownerId] });
       void queryClient.invalidateQueries({ queryKey: ["requests", "for-listing", listingId, requesterId] });
       void queryClient.invalidateQueries({ queryKey: ["active-requests-count", requesterId] });
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      void queryClient.invalidateQueries({ queryKey: ["messages"] });
     },
   });
 }
@@ -203,19 +204,9 @@ export function useUpdateRequestStatus() {
       offerTerms,
     }: {
       request: RequestWithDetails;
-      status: Extract<RequestStatus, "invited" | "offered" | "denied">;
+      status: Extract<RequestStatus, "offered" | "denied">;
       offerTerms?: OfferTerms;
     }) => {
-      if (status === "invited") {
-        const rpcName = request.status === "offered" ? "rollback_offer_to_invited" : "accept_request_chat";
-        const { data, error } = await supabase.rpc(rpcName, {
-          p_request_id: request.id,
-        });
-        if (error) throw error;
-        if (!data) return null;
-        return { id: data as string };
-      }
-
       if (status === "offered") {
         const terms: OfferTerms = offerTerms ?? {
           price: request.listing?.price ?? null,
@@ -239,6 +230,48 @@ export function useUpdateRequestStatus() {
       return null;
     },
     onSuccess: (_, { request }) => {
+      void queryClient.invalidateQueries({ queryKey: ["request", request.id] });
+      void queryClient.invalidateQueries({ queryKey: ["requests", "received", request.owner_id] });
+      void queryClient.invalidateQueries({ queryKey: ["requests", "sent", request.requester_id] });
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      void queryClient.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+}
+
+export function useAcceptChat() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (request: Pick<RequestWithDetails, "id" | "owner_id" | "requester_id">) => {
+      const { data, error } = await supabase.rpc("accept_request_chat", {
+        p_request_id: request.id,
+      });
+      if (error) throw error;
+      return (data as string) ?? null;
+    },
+    onSuccess: (_, request) => {
+      void queryClient.invalidateQueries({ queryKey: ["request", request.id] });
+      void queryClient.invalidateQueries({ queryKey: ["requests", "received", request.owner_id] });
+      void queryClient.invalidateQueries({ queryKey: ["requests", "sent", request.requester_id] });
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      void queryClient.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
+}
+
+export function useRollbackOffer() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (request: Pick<RequestWithDetails, "id" | "owner_id" | "requester_id">) => {
+      const { data, error } = await supabase.rpc("rollback_offer_to_invited", {
+        p_request_id: request.id,
+      });
+      if (error) throw error;
+      return (data as string) ?? null;
+    },
+    onSuccess: (_, request) => {
       void queryClient.invalidateQueries({ queryKey: ["request", request.id] });
       void queryClient.invalidateQueries({ queryKey: ["requests", "received", request.owner_id] });
       void queryClient.invalidateQueries({ queryKey: ["requests", "sent", request.requester_id] });
@@ -281,6 +314,8 @@ export function useConfirmAssignment() {
       void queryClient.invalidateQueries({ queryKey: ["requests"] });
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
       void queryClient.invalidateQueries({ queryKey: ["messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["household"] });
+      void queryClient.invalidateQueries({ queryKey: ["properties"] });
     },
   });
 }

@@ -67,7 +67,7 @@ export function SendRequestSheet({
     <BottomSheet visible={visible} onClose={onClose} snapPoint={420}>
       <View style={styles.container}>
         <Text style={styles.title}>Solicitar habitacion</Text>
-        <Text style={styles.listing} numberOfLines={2}>?? {listingTitle}</Text>
+        <Text style={styles.listing} numberOfLines={2}>{listingTitle}</Text>
 
         <Text style={styles.label}>Mensaje de presentacion</Text>
         <Text style={styles.hint}>
