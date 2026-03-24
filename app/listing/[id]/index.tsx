@@ -22,6 +22,7 @@ import { UserAvatar } from "../../../src/components/ui/UserAvatar";
 import type { PrivacyLevel } from "../../../src/core/PrivacyEngine";
 import { useListing, useUpdateListingStatus, useDeleteListing } from "../../../src/hooks/useListings";
 import { useProfile } from "../../../src/hooks/useProfile";
+import { useProperty } from "../../../src/hooks/useProperties";
 import { useMyRequestForListing, useReceivedRequests } from "../../../src/hooks/useRequests";
 import { useConversations } from "../../../src/hooks/useConversations";
 import { useMutualFriends } from "../../../src/hooks/useConnections";
@@ -151,6 +152,7 @@ export default function ListingDetailScreen() {
   const haptics = useHaptics();
 
   const { data: listing, isLoading } = useListing(id);
+  const { data: property } = useProperty(listing?.property_id ?? undefined);
   const { data: owner } = useProfile(listing?.owner_id);
   const updateStatus = useUpdateListingStatus();
   const deleteListing = useDeleteListing();
@@ -192,7 +194,29 @@ export default function ListingDetailScreen() {
     );
   }
 
-  const images: string[] = listing.images ?? [];
+  // Parse flat photos (from property.images — may be {url,zone}[] or string[])
+  type FlatPhotoItem = { url: string; zone: string };
+  const flatPhotoItems: FlatPhotoItem[] = (() => {
+    const raw = property?.images;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item) =>
+      typeof item === "string"
+        ? { url: item, zone: "Zona" }
+        : { url: String((item as Record<string, unknown>).url ?? ""), zone: String((item as Record<string, unknown>).zone ?? "Zona") },
+    );
+  })();
+  const flatPhotoUrls = flatPhotoItems.map((p) => p.url).filter(Boolean);
+
+  // Room photos from listing.images (all are room photos after new format)
+  const listingImages: string[] = (listing.images as string[] | null) ?? [];
+  // If listing hasn't been re-saved yet, listingImages may still contain flat+room combined
+  const flatUrlSet = new Set(flatPhotoUrls);
+  const roomImages = flatPhotoUrls.length > 0
+    ? listingImages.filter((u) => !flatUrlSet.has(u))
+    : listingImages;
+
+  // Hero shows room photos (or all if no split yet)
+  const images = roomImages.length > 0 ? roomImages : listingImages;
 
   // Bills from bills_config or fallback to current schema
   const bills = listing.property_id
@@ -308,16 +332,11 @@ export default function ListingDetailScreen() {
             </View>
           )}
 
-          {/* Price + location overlay */}
+          {/* Price badge overlay */}
           <View style={styles.priceOverlay}>
-            <Text style={styles.priceOverlayAmount}>
-              {listing.price} EUR/mes
-            </Text>
-            <Text style={styles.priceOverlayLocation}>
-              {listing.street
-                ? `${listing.street} - ${listing.city}`
-                : `${listing.district ?? listing.city}`}
-            </Text>
+            <View style={styles.priceBadge}>
+              <Text style={styles.priceBadgeText}>{listing.price} €/mes</Text>
+            </View>
           </View>
         </View>
 
@@ -325,15 +344,12 @@ export default function ListingDetailScreen() {
         <View style={styles.body}>
           {/* Title + metadata */}
           <View>
+            <Text style={styles.heroSubMeta}>
+              Habitación{listing.size_m2 ? ` · ${listing.size_m2} m²` : ""}
+            </Text>
             <Text style={styles.title}>{listing.title}</Text>
             <Text style={styles.titleMeta}>
-              {[
-                listing.street ? `${listing.street}` : null,
-                listing.status === "active" ? "Disponible" : null,
-                listing.available_from ? `Desde ${listing.available_from}` : null,
-              ]
-                .filter(Boolean)
-                .join(" - ")}
+              📍 {[listing.district, listing.city, listing.postal_code].filter(Boolean).join(" · ")}
             </Text>
             <View style={styles.contextBadges}>
               <View
@@ -372,19 +388,59 @@ export default function ListingDetailScreen() {
           {/* Stats grid 4 cols */}
           <View style={styles.statsGrid}>
             <StatCell
-              value={listing.size_m2 ? `${listing.size_m2} m2` : "No especificado"}
-              label="Habitacion"
+              value={listing.size_m2 ? `${listing.size_m2}` : "—"}
+              label="m² hab."
             />
             <StatCell
-              value="No especificado"
-              label="Piso total"
+              value={property?.total_m2 ? `${property.total_m2}` : "—"}
+              label="m² piso"
             />
             <StatCell
-              value={listing.rooms ? String(listing.rooms) : "No especificado"}
-              label="Companeros"
+              value={listing.rooms ? String(listing.rooms) : "—"}
+              label="compañeros"
             />
-            <StatCell value={minStayLabel} label="Estancia" />
+            <StatCell value={minStayLabel} label="mínimo" />
           </View>
+
+          {/* Fotos del piso */}
+          {flatPhotoItems.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>FOTOS DEL PISO</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScrollView}>
+                <View style={styles.photosRow}>
+                  {flatPhotoItems.map((item, i) => (
+                    <View key={item.url + i} style={styles.photoThumbWrap}>
+                      <Image source={{ uri: item.url }} style={styles.photoThumbImg} />
+                      <View style={styles.photoThumbLabel}>
+                        <Text style={styles.photoThumbLabelText} numberOfLines={1}>{item.zone}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Fotos de la habitación */}
+          {roomImages.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>FOTOS DE LA HABITACIÓN</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photosScrollView}>
+                <View style={styles.photosRow}>
+                  {roomImages.map((uri, i) => (
+                    <View key={uri + i} style={styles.photoThumbWrap}>
+                      <Image source={{ uri }} style={styles.photoThumbImg} />
+                      <View style={[styles.photoThumbLabel, styles.photoThumbLabelRoom]}>
+                        <Text style={[styles.photoThumbLabelText, styles.photoThumbLabelTextRoom]} numberOfLines={1}>
+                          Habitación
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
 
           {/* Gastos */}
           <View style={styles.section}>
@@ -436,7 +492,7 @@ export default function ListingDetailScreen() {
           {/* Quien vive aqui (buscador) */}
           {listing.owner_id && !isOwner && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>QUIEN VIVE AQUI</Text>
+              <Text style={styles.sectionTitle}>QUIÉN VIVE AQUÍ</Text>
               <ResidentRow
                 userId={listing.owner_id}
                 myId={myId}
@@ -632,24 +688,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: spacing[4],
-    paddingBottom: spacing[5],
-    backgroundColor: "rgba(0,0,0,0.18)",
+    paddingBottom: spacing[4],
   },
-  priceOverlayAmount: {
-    fontSize: 32,
+  priceBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.success,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+  },
+  priceBadgeText: {
+    fontSize: fontSize.lg,
     fontWeight: "800",
     color: colors.white,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
-  priceOverlayLocation: {
+  heroSubMeta: {
     fontSize: fontSize.sm,
-    color: colors.white,
-    opacity: 0.9,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    color: colors.textSecondary,
+    marginBottom: spacing[1],
   },
 
   // Body
@@ -870,4 +926,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   footerIconText: { fontSize: 18, color: colors.textSecondary },
+
+  // Photo gallery sections
+  photosScrollView: { marginHorizontal: -spacing[4] },
+  photosRow: { flexDirection: "row", gap: spacing[2], paddingHorizontal: spacing[4] },
+  photoThumbWrap: { width: 110, height: 110, borderRadius: radius.lg, overflow: "hidden", position: "relative" },
+  photoThumbImg: { width: "100%", height: "100%", resizeMode: "cover" },
+  photoThumbLabel: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.success + "cc",
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    alignItems: "center",
+  },
+  photoThumbLabelText: { color: colors.white, fontSize: 11, fontWeight: "700" },
+  photoThumbLabelRoom: { backgroundColor: colors.purple + "cc" },
+  photoThumbLabelTextRoom: { color: colors.white },
 });

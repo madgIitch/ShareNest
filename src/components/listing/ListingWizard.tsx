@@ -199,6 +199,29 @@ const BILL_LABELS: Record<keyof BillsConfig, string> = {
   calefaccion: "Calefacción",
 };
 
+// ─── Photo zones ──────────────────────────────────────────────────────────────
+
+const ZONE_OPTIONS = [
+  { label: "Salón",     emoji: "🛋️" },
+  { label: "Cocina",    emoji: "🍳" },
+  { label: "Baño",      emoji: "🚿" },
+  { label: "Terraza",   emoji: "🌿" },
+  { label: "Pasillo",   emoji: "🚪" },
+  { label: "Comedor",   emoji: "🍽️" },
+  { label: "Dormitorio",emoji: "🛏️" },
+  { label: "Jardín",    emoji: "🌳" },
+  { label: "Garaje",    emoji: "🚗" },
+  { label: "Otro",      emoji: "📷" },
+] as const;
+
+type ZoneLabel = (typeof ZONE_OPTIONS)[number]["label"];
+
+function zoneEmoji(label: string): string {
+  return ZONE_OPTIONS.find((z) => z.label === label)?.emoji ?? "📷";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -371,18 +394,61 @@ function Step2Piso({ form, set }: { form: FormData; set: (k: keyof FormData, v: 
 }
 
 function Step3CommonPhotos({
-  photos, onAdd, onRemove, onMove,
+  photos, zones, onAdd, onRemove, onMove, onZoneChange,
 }: {
   photos: string[];
+  zones: string[];
   onAdd: () => void;
   onRemove: (i: number) => void;
   onMove: (i: number, d: -1 | 1) => void;
+  onZoneChange: (i: number) => void;
 }) {
   return (
     <>
-      <Text style={styles.stepTitle}>Fotos del piso (cocina, baño, terraza...)</Text>
-      <Text style={styles.stepSubtitle}>Zonas comunes del piso. Mínimo 2 fotos.</Text>
-      <PhotoList photos={photos} onAdd={onAdd} onRemove={onRemove} onMove={onMove} />
+      <Text style={styles.stepTitle}>Fotos del piso</Text>
+      <Text style={styles.stepSubtitle}>
+        Cocina, baño, terraza, salón... Toca la etiqueta para cambiar la zona.
+      </Text>
+
+      {photos.map((uri, i) => {
+        const zone = zones[i] ?? "Salón";
+        return (
+          <View key={uri + i} style={styles.photoRow}>
+            <Image source={{ uri }} style={styles.photoThumb} />
+            <View style={styles.photoInfo}>
+              <Pressable style={styles.zonePill} onPress={() => onZoneChange(i)}>
+                <Text style={styles.zonePillText}>{zoneEmoji(zone)} {zone}</Text>
+              </Pressable>
+              <Text style={styles.photoMeta}>
+                {i === 0 ? "Portada · toca para cambiar zona" : `Foto ${i + 1} · toca para cambiar`}
+              </Text>
+            </View>
+            <View style={styles.photoActions}>
+              <Pressable onPress={() => onMove(i, -1)} disabled={i === 0} style={styles.photoBtn}>
+                <Text style={[styles.photoBtnText, i === 0 && styles.photoBtnDisabled]}>↑</Text>
+              </Pressable>
+              <Pressable onPress={() => onMove(i, 1)} disabled={i === photos.length - 1} style={styles.photoBtn}>
+                <Text style={[styles.photoBtnText, i === photos.length - 1 && styles.photoBtnDisabled]}>↓</Text>
+              </Pressable>
+              <Pressable onPress={() => onRemove(i)} style={[styles.photoBtn, styles.photoBtnRemove]}>
+                <Text style={styles.photoBtnRemoveText}>✕</Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      })}
+
+      {photos.length < MAX_IMAGES && (
+        <Pressable style={styles.addPhotoBtn} onPress={onAdd}>
+          <Text style={styles.addPhotoBtnText}>＋ Añadir fotos del piso ({photos.length}/{MAX_IMAGES})</Text>
+        </Pressable>
+      )}
+
+      <View style={styles.photoHint}>
+        <Text style={styles.photoHintText}>
+          Cada foto tiene una etiqueta de zona. Los buscadores verán qué habitación es cada foto.
+        </Text>
+      </View>
     </>
   );
 }
@@ -504,10 +570,18 @@ function Step6Room({ form, set }: { form: FormData; set: (k: keyof FormData, v: 
   );
 }
 
+const ROOM_PHOTO_HINTS = [
+  "Esta será la imagen principal del anuncio",
+  "Ventana / luz natural",
+  "Armario o escritorio",
+  "Detalle de la habitación",
+];
+
 function Step7RoomPhotos({
-  photos, onAdd, onRemove, onMove,
+  photos, flatPhotosCount, onAdd, onRemove, onMove,
 }: {
   photos: string[];
+  flatPhotosCount: number;
   onAdd: () => void;
   onRemove: (i: number) => void;
   onMove: (i: number, d: -1 | 1) => void;
@@ -515,8 +589,49 @@ function Step7RoomPhotos({
   return (
     <>
       <Text style={styles.stepTitle}>Fotos de la habitación</Text>
-      <Text style={styles.stepSubtitle}>Mínimo 1 foto de la habitación.</Text>
-      <PhotoList photos={photos} onAdd={onAdd} onRemove={onRemove} onMove={onMove} />
+      <Text style={styles.stepSubtitle}>
+        Solo la habitación. Las fotos del piso ya las has subido en el paso anterior.
+      </Text>
+
+      {photos.map((uri, i) => (
+        <View key={uri + i} style={styles.photoRow}>
+          <Image source={{ uri }} style={styles.photoThumb} />
+          <View style={styles.photoInfo}>
+            <Text style={styles.photoRowTitle}>
+              {i === 0 ? "Portada habitación" : `Foto ${i + 1}`}
+            </Text>
+            <Text style={styles.photoMeta}>{ROOM_PHOTO_HINTS[i] ?? "Foto adicional"}</Text>
+          </View>
+          <View style={styles.photoActions}>
+            <Pressable onPress={() => onMove(i, -1)} disabled={i === 0} style={styles.photoBtn}>
+              <Text style={[styles.photoBtnText, i === 0 && styles.photoBtnDisabled]}>↑</Text>
+            </Pressable>
+            <Pressable onPress={() => onMove(i, 1)} disabled={i === photos.length - 1} style={styles.photoBtn}>
+              <Text style={[styles.photoBtnText, i === photos.length - 1 && styles.photoBtnDisabled]}>↓</Text>
+            </Pressable>
+            <Pressable onPress={() => onRemove(i)} style={[styles.photoBtn, styles.photoBtnRemove]}>
+              <Text style={styles.photoBtnRemoveText}>✕</Text>
+            </Pressable>
+          </View>
+        </View>
+      ))}
+
+      {photos.length < MAX_IMAGES && (
+        <Pressable style={[styles.addPhotoBtn, styles.addPhotoBtnRoom]} onPress={onAdd}>
+          <Text style={[styles.addPhotoBtnText, styles.addPhotoBtnRoomText]}>
+            ＋ Añadir fotos de la habitación ({photos.length}/{MAX_IMAGES})
+          </Text>
+        </Pressable>
+      )}
+
+      {flatPhotosCount > 0 && (
+        <View style={styles.flatPhotosInfoBox}>
+          <Text style={styles.flatPhotosInfoTitle}>Fotos del piso ya guardadas</Text>
+          <Text style={styles.flatPhotosInfoText}>
+            {flatPhotosCount} {flatPhotosCount === 1 ? "foto de zona común subida" : "fotos de zonas comunes subidas"} en el paso 3 (cocina, baño, terraza).
+          </Text>
+        </View>
+      )}
     </>
   );
 }
@@ -620,24 +735,60 @@ function Step8Price({ form, set }: { form: FormData; set: (k: keyof FormData, v:
 
 function Step9Review({
   form,
-  photos,
+  flatPhotos,
+  flatPhotoZones,
+  roomPhotos,
   onPublish,
   onDraft,
   submitting,
 }: {
   form: FormData;
-  photos: string[];
+  flatPhotos: string[];
+  flatPhotoZones: string[];
+  roomPhotos: string[];
   onPublish: () => void;
   onDraft: () => void;
   submitting: boolean;
 }) {
-  const checklist = [
-    { label: "Dirección confirmada", done: !!form.city },
-    { label: `Fotos del piso (${photos.length})`, done: photos.length >= 2 },
-    { label: "Precio definido", done: !!form.price },
-    { label: "Gastos configurados", done: Object.values(form.bills).every(Boolean) },
-    { label: "Normas añadidas", done: true },
+  const billsOk = Object.values(form.bills).some((v) => v === "included");
+  const uniqueZones = [...new Set(flatPhotoZones.filter(Boolean))].slice(0, 3);
+
+  type CheckItem = { label: string; detail: string; done: boolean };
+  const checklist: CheckItem[] = [
+    {
+      label: "Dirección confirmada",
+      detail: [form.district, form.city, form.postal_code].filter(Boolean).join(", ") || "Sin zona",
+      done: !!form.city,
+    },
+    {
+      label: `Fotos del piso (${flatPhotos.length})`,
+      detail: uniqueZones.length > 0 ? uniqueZones.map((z) => z.toLowerCase()).join(", ") : "Sin fotos",
+      done: flatPhotos.length >= 2,
+    },
+    {
+      label: `Fotos de la habitación (${roomPhotos.length})`,
+      detail: roomPhotos.length === 0
+        ? "Sin fotos"
+        : roomPhotos.length === 1
+          ? "Portada"
+          : `Portada + ${roomPhotos.length - 1} foto${roomPhotos.length > 2 ? "s" : ""} adicional${roomPhotos.length > 2 ? "es" : ""}`,
+      done: roomPhotos.length >= 1,
+    },
+    {
+      label: "Precio definido",
+      detail: form.price ? `${form.price} €/mes` : "Sin precio",
+      done: !!form.price,
+    },
+    {
+      label: billsOk ? "Gastos configurados" : "Gastos sin configurar",
+      detail: billsOk
+        ? Object.entries(form.bills).filter(([, v]) => v === "included").map(([k]) => BILL_LABELS[k as keyof BillsConfig]).join(", ") || "Configurados"
+        : "Vuelve al paso 4",
+      done: billsOk,
+    },
   ];
+
+  const coverPhoto = roomPhotos[0] ?? flatPhotos[0];
 
   return (
     <>
@@ -646,8 +797,15 @@ function Step9Review({
 
       {/* Preview card */}
       <View style={styles.previewCard}>
-        {photos[0] ? (
-          <Image source={{ uri: photos[0] }} style={styles.previewImage} />
+        {coverPhoto ? (
+          <View>
+            <Image source={{ uri: coverPhoto }} style={styles.previewImage} />
+            {form.price ? (
+              <View style={styles.previewPriceBadge}>
+                <Text style={styles.previewPriceBadgeText}>{form.price} €/mes</Text>
+              </View>
+            ) : null}
+          </View>
         ) : (
           <View style={styles.previewImagePlaceholder}>
             <Text style={{ fontSize: 36 }}>🏠</Text>
@@ -658,7 +816,7 @@ function Step9Review({
             {form.title || "Título del anuncio"}
           </Text>
           <Text style={styles.previewMeta}>
-            {form.price ? `${form.price} €/mes` : "—"} · {form.city || "Ciudad"} · {form.size_m2 ? `${form.size_m2} m²` : "—"}
+            📍 {form.district ? `${form.district} · ` : ""}{form.city || "Ciudad"}{form.size_m2 ? ` · ${form.size_m2} m²` : ""}
           </Text>
           <View style={styles.previewTags}>
             {form.min_stay_months && form.min_stay_months !== "0" && (
@@ -668,7 +826,7 @@ function Step9Review({
             )}
             {Object.entries(form.bills)
               .filter(([, state]) => state === "included")
-              .slice(0, 3)
+              .slice(0, 2)
               .map(([key]) => (
                 <View key={key} style={styles.previewTag}>
                   <Text style={styles.previewTagText}>
@@ -683,14 +841,19 @@ function Step9Review({
       {/* Checklist */}
       <View style={styles.checklist}>
         <Text style={styles.checklistTitle}>CHECKLIST DE PUBLICACIÓN</Text>
-        {checklist.map(({ label, done }) => (
+        {checklist.map(({ label, detail, done }) => (
           <View key={label} style={styles.checklistItem}>
-            <Text style={[styles.checklistIcon, done ? styles.checkDone : styles.checkMissing]}>
-              {done ? "✓" : "○"}
-            </Text>
-            <Text style={[styles.checklistLabel, !done && styles.checklistLabelMissing]}>
-              {label}
-            </Text>
+            <View style={[styles.checklistCircle, done ? styles.checklistCircleDone : styles.checklistCircleMissing]}>
+              <Text style={styles.checklistCircleText}>{done ? "✓" : "!"}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.checklistLabel, !done && styles.checklistLabelMissing]}>
+                {label}
+              </Text>
+              <Text style={[styles.checklistDetail, !done && styles.checklistDetailMissing]}>
+                {detail}
+              </Text>
+            </View>
           </View>
         ))}
       </View>
@@ -886,12 +1049,27 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     });
     return fromProperty;
   });
-  const flatPhotos = (existingProperty?.images as string[] | undefined) ?? [];
-  const [photoUris, setPhotoUris] = useState<string[]>(flatPhotos);
+  // Flat photos (url + zone) — stored in properties.images as {url,zone}[]
+  const [photoUris, setPhotoUris] = useState<string[]>(() => {
+    const raw = existingProperty?.images;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item) => (typeof item === "string" ? item : String((item as Record<string, unknown>).url ?? "")));
+  });
+  const [photoZones, setPhotoZones] = useState<string[]>(() => {
+    const raw = existingProperty?.images;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item) => (typeof item === "string" ? "Salón" : String((item as Record<string, unknown>).zone ?? "Salón")));
+  });
+  // Room photos — stored in listings.images (room only, no flat photos)
   const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>(() => {
     if (!initial?.images) return [];
-    const flatSet = new Set(flatPhotos);
-    return (initial.images as string[]).filter((url) => !flatSet.has(url));
+    const raw = existingProperty?.images;
+    const flatUrls = new Set(
+      Array.isArray(raw)
+        ? raw.map((item) => (typeof item === "string" ? item : String((item as Record<string, unknown>).url ?? "")))
+        : [],
+    );
+    return (initial.images as string[]).filter((url) => !flatUrls.has(url));
   });
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -1179,7 +1357,29 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
   const handleAddPhotos = async () => {
     if (photoUris.length >= MAX_IMAGES) return;
     const uris = await pickListingImages();
-    setPhotoUris((prev) => [...prev, ...uris].slice(0, MAX_IMAGES));
+    const slots = MAX_IMAGES - photoUris.length;
+    const added = uris.slice(0, slots);
+    setPhotoUris((prev) => [...prev, ...added]);
+    setPhotoZones((prev) => [...prev, ...added.map(() => "Salón")]);
+  };
+
+  const handleZoneChange = (index: number) => {
+    Alert.alert(
+      "¿Qué zona es esta foto?",
+      undefined,
+      [
+        ...ZONE_OPTIONS.map((opt) => ({
+          text: `${opt.emoji} ${opt.label}`,
+          onPress: () =>
+            setPhotoZones((prev) => {
+              const arr = [...prev];
+              arr[index] = opt.label;
+              return arr;
+            }),
+        })),
+        { text: "Cancelar", style: "cancel" as const },
+      ],
+    );
   };
 
   const handleAddRoomPhotos = async () => {
@@ -1212,21 +1412,26 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       setSubmitting(true);
       const folder = initial?.id ?? `${Date.now().toString(36)}`;
 
-      // Flat / common-area photos (→ properties.images)
-      const localUris = photoUris.filter((u) => !u.startsWith("http"));
-      const existingUrls = photoUris.filter((u) => u.startsWith("http"));
-      const uploadedUrls = localUris.length > 0
-        ? await uploadAllListingImages(userId, folder, localUris)
+      // Flat / common-area photos — stored as {url, zone}[] in properties.images
+      const localFlatUris = photoUris.filter((u) => !u.startsWith("http"));
+      const existingFlatUris = photoUris.filter((u) => u.startsWith("http"));
+      const uploadedFlatUrls = localFlatUris.length > 0
+        ? await uploadAllListingImages(userId, folder, localFlatUris)
         : [];
+      // Reconstruct ordered list preserving zones
+      const orderedFlatPhotos = photoUris.map((u, i) => {
+        const isLocal = !u.startsWith("http");
+        const url = isLocal ? uploadedFlatUrls[localFlatUris.indexOf(u)] ?? u : u;
+        return { url, zone: photoZones[i] ?? "Salón" };
+      });
 
-      // Room photos (→ listings.images, stored in a separate sub-folder)
+      // Room photos — stored as string[] in listings.images (room only)
       const localRoomUris = roomPhotoUris.filter((u) => !u.startsWith("http"));
       const existingRoomUrls = roomPhotoUris.filter((u) => u.startsWith("http"));
       const uploadedRoomUrls = localRoomUris.length > 0
         ? await uploadAllListingImages(userId, `${folder}_r`, localRoomUris)
         : [];
-
-      const allImages = [...existingUrls, ...uploadedUrls, ...existingRoomUrls, ...uploadedRoomUrls];
+      const allImages = [...existingRoomUrls, ...uploadedRoomUrls];
 
       const houseRules: string[] = [
         form.no_smokers && "no_fumadores",
@@ -1248,7 +1453,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         has_elevator: form.has_elevator,
         total_m2: form.total_m2 ? Number(form.total_m2) : null,
         total_rooms: form.total_rooms ? Number(form.total_rooms) : null,
-        images: photoUris,
+        images: orderedFlatPhotos as unknown as string[],
         bills_config: form.bills,
         house_rules: houseRules,
       };
@@ -1393,15 +1598,24 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 3 && (
           <Step3CommonPhotos
             photos={photoUris}
+            zones={photoZones}
             onAdd={handleAddPhotos}
-            onRemove={(i) => setPhotoUris((p) => p.filter((_, idx) => idx !== i))}
-            onMove={(i, d) => setPhotoUris((p) => {
-              const arr = [...p];
-              const next = i + d;
-              if (next < 0 || next >= arr.length) return arr;
-              [arr[i], arr[next]] = [arr[next], arr[i]];
-              return arr;
-            })}
+            onZoneChange={handleZoneChange}
+            onRemove={(i) => {
+              setPhotoUris((p) => p.filter((_, idx) => idx !== i));
+              setPhotoZones((z) => z.filter((_, idx) => idx !== i));
+            }}
+            onMove={(i, d) => {
+              const swap = (arr: string[]) => {
+                const a = [...arr];
+                const next = i + d;
+                if (next < 0 || next >= a.length) return a;
+                [a[i], a[next]] = [a[next], a[i]];
+                return a;
+              };
+              setPhotoUris((p) => swap(p));
+              setPhotoZones((z) => swap(z));
+            }}
           />
         )}
         {step === 4 && <Step4Bills form={form} set={set} />}
@@ -1410,6 +1624,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 7 && (
           <Step7RoomPhotos
             photos={roomPhotoUris}
+            flatPhotosCount={photoUris.length}
             onAdd={handleAddRoomPhotos}
             onRemove={(i) => setRoomPhotoUris((p) => p.filter((_, idx) => idx !== i))}
             onMove={(i, d) => setRoomPhotoUris((p) => {
@@ -1425,7 +1640,9 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 9 && (
           <Step9Review
             form={form}
-            photos={[...photoUris, ...roomPhotoUris]}
+            flatPhotos={photoUris}
+            flatPhotoZones={photoZones}
+            roomPhotos={roomPhotoUris}
             onPublish={() => handleSubmit(false)}
             onDraft={() => handleSubmit(true)}
             submitting={submitting}
@@ -1453,9 +1670,9 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
             <Text style={styles.nextBtnText}>Siguiente →</Text>
           </Pressable>
         ) : (
-          <View style={styles.publishRow}>
+          <>
             <Pressable style={styles.draftBtn} onPress={() => handleSubmit(true)} disabled={submitting}>
-              <Text style={styles.draftBtnText}>Guardar borrador</Text>
+              <Text style={styles.draftBtnText}>Borrador</Text>
             </Pressable>
             <Pressable
               style={[styles.nextBtn, { backgroundColor: colors.success }, submitting && styles.btnDisabled]}
@@ -1464,10 +1681,10 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
             >
               {submitting
                 ? <ActivityIndicator color={colors.white} />
-                : <Text style={styles.nextBtnText}>Publicar anuncio</Text>
+                : <Text style={styles.nextBtnText}>Publicar</Text>
               }
             </Pressable>
-          </View>
+          </>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -1661,8 +1878,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   photoThumb: { width: 72, height: 72 },
-  photoInfo: { flex: 1, paddingHorizontal: spacing[3] },
+  photoInfo: { flex: 1, paddingHorizontal: spacing[3], gap: 4 },
   photoIndex: { fontSize: fontSize.sm, fontWeight: "600", color: colors.text },
+  photoRowTitle: { fontSize: fontSize.sm, fontWeight: "700", color: colors.text },
+  photoMeta: { fontSize: fontSize.xs, color: colors.textSecondary },
   photoActions: { flexDirection: "row", paddingRight: spacing[2], gap: spacing[1] },
   photoBtn: {
     width: 32,
@@ -1686,6 +1905,40 @@ const styles = StyleSheet.create({
     marginTop: spacing[2],
   },
   addPhotoBtnText: { color: colors.primary, fontWeight: "600", fontSize: fontSize.md },
+  addPhotoBtnRoom: { borderColor: colors.purple },
+  addPhotoBtnRoomText: { color: colors.purple },
+  // Zone pill
+  zonePill: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: colors.purple,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 3,
+    backgroundColor: colors.purpleLight,
+  },
+  zonePillText: { fontSize: 12, fontWeight: "700", color: colors.purple },
+  // Photo hint box
+  photoHint: {
+    backgroundColor: colors.gray100,
+    borderRadius: radius.md,
+    padding: spacing[3],
+    marginTop: spacing[2],
+  },
+  photoHintText: { fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: 18 },
+  // Room photos flat-photos info box
+  flatPhotosInfoBox: {
+    backgroundColor: colors.purpleLight,
+    borderRadius: radius.md,
+    padding: spacing[3],
+    marginTop: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.purple + "33",
+  },
+  flatPhotosInfoTitle: { fontSize: fontSize.sm, fontWeight: "700", color: colors.purple, marginBottom: 2 },
+  flatPhotosInfoText: { fontSize: fontSize.xs, color: colors.purple, opacity: 0.85, lineHeight: 18 },
 
   // Review
   previewCard: {
@@ -1696,7 +1949,17 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginTop: spacing[3],
   },
-  previewImage: { width: "100%", height: 140 },
+  previewImage: { width: "100%", height: 160 },
+  previewPriceBadge: {
+    position: "absolute",
+    bottom: spacing[3],
+    left: spacing[3],
+    backgroundColor: colors.success,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+  },
+  previewPriceBadgeText: { color: colors.white, fontWeight: "700", fontSize: fontSize.sm },
   previewImagePlaceholder: {
     height: 140,
     backgroundColor: colors.primaryLight,
@@ -1731,12 +1994,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: spacing[1],
   },
-  checklistItem: { flexDirection: "row", alignItems: "center", gap: spacing[2] },
+  checklistItem: { flexDirection: "row", alignItems: "flex-start", gap: spacing[3], paddingVertical: spacing[1] },
+  checklistCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 1,
+  },
+  checklistCircleDone: { backgroundColor: colors.success },
+  checklistCircleMissing: { backgroundColor: colors.error },
+  checklistCircleText: { color: colors.white, fontSize: 13, fontWeight: "700" },
+  checklistLabel: { fontSize: fontSize.sm, fontWeight: "600", color: colors.text },
+  checklistLabelMissing: { color: colors.error },
+  checklistDetail: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 1 },
+  checklistDetailMissing: { color: colors.error },
+  // kept for compat
   checklistIcon: { fontSize: fontSize.md, fontWeight: "700" },
   checkDone: { color: colors.success },
   checkMissing: { color: colors.gray300 },
-  checklistLabel: { fontSize: fontSize.sm, color: colors.text },
-  checklistLabelMissing: { color: colors.textSecondary },
 
   privacyCallout: {
     flexDirection: "row",
