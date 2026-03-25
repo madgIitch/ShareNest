@@ -92,21 +92,31 @@ export default function OnboardingScreen() {
   }
 
   const persist = async () => {
-    await saveProfile({
-      full_name: form.full_name.trim() || null,
-      username: form.username.trim().replace(/^@/, "") || null,
-      birth_year: form.birth_date ? form.birth_date.getFullYear() : null,
-      occupation: form.occupation.trim() || null,
-      avatar_url: form.avatar_url,
-      schedule: form.schedule,
-      cleanliness: form.cleanliness,
-      noise_level: form.noise_level,
-      has_pets: form.has_pets,
-      smokes: form.smokes,
-      works_from_home: form.works_from_home,
-      photos: form.photos.length ? form.photos : null,
-      looking_for: form.looking_for,
-    });
+    const stepPayloads: Record<StepKey, object> = {
+      profile: {
+        full_name: form.full_name.trim() || null,
+        username: form.username.trim().replace(/^@/, "") || null,
+        birth_year: form.birth_date ? form.birth_date.getFullYear() : null,
+        occupation: form.occupation.trim() || null,
+        avatar_url: form.avatar_url,
+      },
+      lifestyle: {
+        schedule: form.schedule,
+        cleanliness: form.cleanliness,
+        noise_level: form.noise_level,
+        has_pets: form.has_pets,
+        smokes: form.smokes,
+        works_from_home: form.works_from_home,
+      },
+      photos: {
+        photos: form.photos.length ? form.photos : null,
+      },
+      goal: {
+        looking_for: form.looking_for,
+      },
+      friendz: {},
+    };
+    await saveProfile(stepPayloads[currentStep]);
   };
 
   const validate = () => {
@@ -202,7 +212,27 @@ export default function OnboardingScreen() {
                   value={form.birth_date}
                   onChange={(date) => setForm((c) => ({ ...c, birth_date: date }))}
                 />
-                <Field label="OCUPACIÓN" value={form.occupation} onChangeText={(v) => setForm((c) => ({ ...c, occupation: v }))} placeholder="Desarrollador" autoCapitalize="words" />
+                <View>
+                  <Text style={s.label}>OCUPACIÓN</Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {(["Estudiante", "Trabajo", "Mixto"] as const).map((opt) => (
+                      <Pressable
+                        key={opt}
+                        onPress={() => setForm((c) => ({ ...c, occupation: opt }))}
+                        style={{
+                          flex: 1, height: 52, borderRadius: 12, alignItems: "center", justifyContent: "center",
+                          backgroundColor: form.occupation === opt ? "#F36A39" : "#1A1A1A",
+                          borderWidth: 1,
+                          borderColor: form.occupation === opt ? "#F36A39" : "#2A2A2A",
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: form.occupation === opt ? "#fff" : "#666" }}>
+                          {opt}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
               </View>
             </>
           )}
