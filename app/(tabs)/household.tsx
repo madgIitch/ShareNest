@@ -30,10 +30,8 @@ import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { consumeHouseholdAddExpenseRequest } from "../../src/state/householdIntents";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
-import type { Database } from "../../src/types/database";
+import type { ListingWithProperty } from "../../src/types/listingWithProperty";
 import { useFocusEffect } from "@react-navigation/native";
-
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
 
 export default function HouseholdScreen() {
   const [autoOpenAdd, setAutoOpenAdd] = useState(false);
@@ -105,7 +103,7 @@ function OwnerHomesDashboard({
   autoOpenAdd?: boolean;
   onAutoOpenConsumed?: () => void;
   properties: PropertyWithCity[];
-  listings: Listing[];
+  listings: ListingWithProperty[];
   receivedRequests: RequestWithDetails[];
   memberships: MyHouseholdMembership[];
 }) {

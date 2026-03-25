@@ -205,8 +205,8 @@ export default function CandidatesScreen() {
             {listing.title} · {listing.price} €/mes
           </Text>
           <Text style={styles.stripSub}>
-            {listing.city}
-            {listing.district ? ` · ${listing.district}` : ""} · {listingRequests.length} solicitudes
+            {listing.city_name ?? listing.city ?? ""}
+            {listing.district_name ?? listing.district ? ` · ${listing.district_name ?? listing.district}` : ""} · {listingRequests.length} solicitudes
           </Text>
         </View>
       )}

@@ -36,6 +36,22 @@ async function getSignedUrl(path: string): Promise<string | null> {
   return data.signedUrl;
 }
 
+function normalizePhotoPaths(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object") {
+        const candidate = (item as { path?: unknown; url?: unknown }).path
+          ?? (item as { path?: unknown; url?: unknown }).url;
+        return typeof candidate === "string" ? candidate : null;
+      }
+      return null;
+    })
+    .filter((item): item is string => Boolean(item));
+}
+
 const h = React.createElement;
 
 function infoRow(icon: string, label: string, detail: string | null) {
@@ -236,7 +252,9 @@ serve(async (req: Request) => {
 
     const { data: listing, error } = await supabaseAdmin
       .from("listings_with_property")
-      .select("id, title, city, district, price, type, rooms, size_m2, available_from, images")
+      .select(
+        "id, title, city, city_name, district, district_name, price, type, rooms, size_m2, available_from, room_photos, property_photos, images",
+      )
       .eq("id", listingId)
       .single();
 
@@ -247,11 +265,19 @@ serve(async (req: Request) => {
       });
     }
 
-    const rawImages: string[] = (listing.images as string[]) ?? [];
+    const roomImages = normalizePhotoPaths(listing.room_photos);
+    const propertyImages = normalizePhotoPaths(listing.property_photos);
+    const legacyImages = normalizePhotoPaths(listing.images);
+    const preferredImages =
+      roomImages.length > 0
+        ? roomImages
+        : propertyImages.length > 0
+          ? propertyImages
+          : legacyImages;
 
     // Build signed URLs for the first 4 photos
     const photoUrls = await Promise.all(
-      rawImages.slice(0, 4).map(async (path) => {
+      preferredImages.slice(0, 4).map(async (path) => {
         // If already a full URL, use directly; otherwise sign from storage
         if (path.startsWith("http")) return path;
         return await getSignedUrl(path);
@@ -261,8 +287,8 @@ serve(async (req: Request) => {
 
     const element = renderCard({
       title: listing.title,
-      city: listing.city,
-      district: listing.district ?? null,
+      city: listing.city_name ?? listing.city ?? "",
+      district: listing.district_name ?? listing.district ?? null,
       price: listing.price,
       type: listing.type,
       rooms: listing.rooms ?? null,

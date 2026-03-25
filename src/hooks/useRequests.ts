@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "../lib/supabase";
 import type { Database, RequestStatus } from "../types/database";
+import type { ListingWithProperty } from "../types/listingWithProperty";
 
 type Request = Database["public"]["Tables"]["requests"]["Row"];
 export const ACTIVE_REQUEST_STATUSES: RequestStatus[] = ["pending", "invited"];
@@ -34,13 +35,63 @@ export type RequestWithDetails = Request & {
   listing: {
     id: string;
     title: string;
-    city: string;
+    city: string | null;
+    city_name?: string | null;
+    district_name?: string | null;
     images: string[];
     price: number;
     available_from: string | null;
     min_stay_months: number | null;
   } | null;
 };
+
+type BaseRequestWithDetails = Request & {
+  requester?: RequestWithDetails["requester"];
+};
+
+async function enrichRequestsWithListingView(rows: BaseRequestWithDetails[]): Promise<RequestWithDetails[]> {
+  const listingIds = Array.from(new Set(rows.map((row) => row.listing_id).filter((id): id is string => !!id)));
+
+  if (listingIds.length === 0) {
+    return rows.map((row) => ({
+      ...row,
+      requester: row.requester ?? null,
+      listing: null,
+    }));
+  }
+
+  const { data, error } = await supabase
+    .from("listings_with_property")
+    .select("id, title, city, city_name, district_name, images, price, available_from, min_stay_months")
+    .in("id", listingIds);
+  if (error) throw error;
+
+  const byId = new Map<string, Pick<ListingWithProperty, "id" | "title" | "city" | "city_name" | "district_name" | "images" | "price" | "available_from" | "min_stay_months">>(
+    ((data ?? []) as ListingWithProperty[]).map((listing) => [listing.id, listing]),
+  );
+
+  return rows.map((row) => {
+    const listingId = row.listing_id;
+    const enriched = listingId ? byId.get(listingId) : null;
+    return {
+      ...row,
+      requester: row.requester ?? null,
+      listing: enriched
+        ? {
+            id: enriched.id,
+            title: enriched.title,
+            city: enriched.city_name ?? enriched.city ?? null,
+            city_name: enriched.city_name ?? null,
+            district_name: enriched.district_name ?? null,
+            images: (enriched.images as string[] | null) ?? [],
+            price: enriched.price,
+            available_from: enriched.available_from,
+            min_stay_months: enriched.min_stay_months,
+          }
+        : null,
+    };
+  });
+}
 
 export function useReceivedRequests(ownerId: string | undefined) {
   return useQuery<RequestWithDetails[]>({
@@ -50,13 +101,12 @@ export function useReceivedRequests(ownerId: string | undefined) {
         .from("requests")
         .select(`
           *,
-          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city, birth_year, occupation),
-          listing:listings!requests_listing_id_fkey(id, title, city, images, price, available_from, min_stay_months)
+          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city, birth_year, occupation)
         `)
         .eq("owner_id", ownerId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as RequestWithDetails[];
+      return enrichRequestsWithListingView((data ?? []) as unknown as BaseRequestWithDetails[]);
     },
     enabled: !!ownerId,
   });
@@ -69,13 +119,12 @@ export function useSentRequests(requesterId: string | undefined) {
       const { data, error } = await supabase
         .from("requests")
         .select(`
-          *,
-          listing:listings!requests_listing_id_fkey(id, title, city, images, price, available_from, min_stay_months)
+          *
         `)
         .eq("requester_id", requesterId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as unknown as RequestWithDetails[];
+      return enrichRequestsWithListingView((data ?? []) as unknown as BaseRequestWithDetails[]);
     },
     enabled: !!requesterId,
   });
@@ -106,13 +155,14 @@ export function useRequest(requestId: string | undefined) {
         .from("requests")
         .select(`
           *,
-          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city, birth_year, occupation),
-          listing:listings!requests_listing_id_fkey(id, title, city, images, price, available_from, min_stay_months)
+          requester:profiles!requests_requester_id_fkey(id, full_name, avatar_url, verified_at, bio, city, birth_year, occupation)
         `)
         .eq("id", requestId!)
         .maybeSingle();
       if (error) throw error;
-      return data as unknown as RequestWithDetails | null;
+      if (!data) return null;
+      const [enriched] = await enrichRequestsWithListingView([data as unknown as BaseRequestWithDetails]);
+      return enriched ?? null;
     },
     enabled: !!requestId,
   });

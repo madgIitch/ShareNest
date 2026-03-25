@@ -1,12 +1,7 @@
-export type CommonAreaType =
-  | "cocina"
-  | "bano"
-  | "salon"
-  | "terraza"
-  | "lavadero"
-  | "garaje"
-  | "entrada"
-  | "otro";
+export { COMMON_AREA_LABELS } from "./room";
+export type { CommonAreaType } from "./database";
+
+import type { CommonAreaType } from "./database";
 
 // PropertyPhotoRoom is kept as an alias for compatibility with the migration plan.
 export type PropertyPhotoRoom = CommonAreaType;
@@ -16,26 +11,15 @@ export type PropertyPhoto = {
   room: PropertyPhotoRoom;
 };
 
-export const COMMON_AREA_LABELS: Record<CommonAreaType, { label: string; icon: string }> = {
-  cocina: { label: "Cocina", icon: "🍳" },
-  bano: { label: "Baño", icon: "🚿" },
-  salon: { label: "Salón", icon: "🛋️" },
-  terraza: { label: "Terraza", icon: "🌿" },
-  lavadero: { label: "Lavadero", icon: "🧺" },
-  garaje: { label: "Garaje", icon: "🚗" },
-  entrada: { label: "Entrada", icon: "🚪" },
-  otro: { label: "Otro", icon: "📷" },
-};
-
 const ROOM_ALIAS_MAP: Record<string, CommonAreaType> = {
   cocina: "cocina",
   Cocina: "cocina",
-  "baño": "bano",
   bano: "bano",
-  Baño: "bano",
-  salón: "salon",
+  Bano: "bano",
+  BANO: "bano",
   salon: "salon",
-  Salón: "salon",
+  Salon: "salon",
+  SALON: "salon",
   terraza: "terraza",
   Terraza: "terraza",
   lavadero: "lavadero",

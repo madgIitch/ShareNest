@@ -437,7 +437,7 @@ function RequestItem({
         <Text style={styles.itemSub} numberOfLines={1}>
           {role === "owner"
             ? `Anuncio: ${request.listing?.title ?? "Sin titulo"}`
-            : `Ciudad: ${request.listing?.city ?? "Sin ciudad"}`}
+            : `Ciudad: ${request.listing?.city_name ?? request.listing?.city ?? "Sin ciudad"}`}
         </Text>
         <Text style={styles.itemTime}>{formatRelative(request.created_at)}</Text>
         {request.message && (

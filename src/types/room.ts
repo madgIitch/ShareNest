@@ -1,4 +1,6 @@
-import type { Json } from "./database";
+import type { CommonAreaType, Json } from "./database";
+
+export type { CommonAreaType } from "./database";
 
 export type BedType = "individual" | "doble" | "litera";
 
@@ -51,16 +53,6 @@ export type CommonAreaInsert = {
   is_shared_bath?: boolean;
   created_at?: string;
 };
-
-export type CommonAreaType =
-  | "cocina"
-  | "bano"
-  | "salon"
-  | "terraza"
-  | "lavadero"
-  | "garaje"
-  | "entrada"
-  | "otro";
 
 export const COMMON_AREA_LABELS: Record<CommonAreaType, { label: string; icon: string }> = {
   cocina: { label: "Cocina", icon: "🍳" },

@@ -21,9 +21,9 @@ import { getSavedListingIds } from "../../src/lib/savedListings";
 import { useIsSuperfriendz } from "../../src/hooks/useSubscription";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
-import type { Database, ListingStatus } from "../../src/types/database";
+import type { ListingStatus } from "../../src/types/database";
+import type { ListingWithProperty } from "../../src/types/listingWithProperty";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
 type Tab = ListingStatus | "saved";
 
 const TABS: { key: Tab; label: string }[] = [
@@ -182,7 +182,7 @@ function MyListingRow({
   onEdit,
   onToggleStatus,
 }: {
-  listing: Listing;
+  listing: ListingWithProperty;
   pendingRequests: number;
   onPress: () => void;
   onEdit?: () => void;
@@ -204,7 +204,7 @@ function MyListingRow({
 
       <View style={styles.rowInfo}>
         <Text style={styles.rowTitle} numberOfLines={1}>{listing.title}</Text>
-        <Text style={styles.rowCity}>{listing.city}</Text>
+        <Text style={styles.rowCity}>{listing.city_name ?? listing.city ?? ""}</Text>
         <Text style={styles.rowPrice}>EUR {listing.price}/mes</Text>
         <View style={styles.rowTags}>
           <TagBadge

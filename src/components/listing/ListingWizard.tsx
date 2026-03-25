@@ -28,6 +28,7 @@ import { pickListingImages, uploadAllListingImages, MAX_IMAGES } from "../../lib
 import { useAuth } from "../../providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../theme";
 import type { Database, ContractType } from "../../types/database";
+import type { ListingWithProperty } from "../../types/listingWithProperty";
 import {
   COMMON_AREA_LABELS,
   normalizePropertyPhotos,
@@ -36,8 +37,7 @@ import {
   type PropertyPhoto,
 } from "../../types/propertyPhoto";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"] & {
-  room_id?: string | null;
+type Listing = ListingWithProperty & {
   room_name?: string | null;
   room_photos?: unknown;
   common_area_types?: CommonAreaType[] | null;
@@ -294,7 +294,7 @@ function roomFromListing(listing: Listing): RoomRow | null {
   const privateBath = listing.has_private_bath;
   const wardrobe = listing.has_wardrobe;
   const desk = listing.has_desk;
-  const photos = listing.room_photos ?? listing.images;
+  const photos = listing.room_photos;
 
   if (
     size == null &&

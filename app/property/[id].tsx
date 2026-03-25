@@ -14,9 +14,10 @@ import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListin
 import { useReceivedRequests } from "../../src/hooks/useRequests";
 import { useAuth } from "../../src/providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../src/theme";
-import type { Database, ListingStatus } from "../../src/types/database";
+import type { ListingStatus } from "../../src/types/database";
+import type { ListingWithProperty } from "../../src/types/listingWithProperty";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
+type Listing = ListingWithProperty;
 
 // ─── Metric card ──────────────────────────────────────────────────────────────
 
@@ -194,9 +195,12 @@ export default function PropertyDashboardScreen() {
   // Property info (from first listing for now)
   const first = rooms[0];
   const address = first
-    ? `${first.street ?? ""} ${first.street_number ?? ""}`.trim() || first.city
+    ? (first.address?.trim()
+      || `${first.street ?? ""} ${first.street_number ?? ""}`.trim()
+      || first.city_name
+      || first.city)
     : "Mi piso";
-  const cityLabel = first?.city ?? "";
+  const cityLabel = first?.city_name ?? first?.city ?? "";
   const editablePropertyId = id === "mine" ? rooms[0]?.property_id ?? null : id;
 
   const handleMarkFree = (listing: Listing) => {
@@ -250,7 +254,7 @@ export default function PropertyDashboardScreen() {
         {/* Address */}
         <View style={styles.addressRow}>
           <Text style={styles.addressText}>
-            {address} · {first?.district ?? cityLabel}
+            {address} · {first?.district_name ?? first?.district ?? cityLabel}
           </Text>
           <Text style={styles.addressMeta}>
             {rooms.filter((r) => r.size_m2).length > 0

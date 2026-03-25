@@ -184,8 +184,8 @@ export default function PublicProfileScreen() {
               <Pressable key={listing.id} style={styles.listingCard} onPress={() => router.push(`/listing/${listing.id}`)}>
                 <Text style={styles.listingTitle} numberOfLines={1}>{listing.title}</Text>
                 <Text style={styles.listingMeta}>
-                  {listing.price} EUR/mes · {listing.city}
-                  {listing.district ? ` · ${listing.district}` : ""} · Activo
+                  {listing.price} EUR/mes · {listing.city_name ?? listing.city ?? ""}
+                  {listing.district_name ?? listing.district ? ` · ${listing.district_name ?? listing.district}` : ""} · Activo
                 </Text>
               </Pressable>
             ))}
