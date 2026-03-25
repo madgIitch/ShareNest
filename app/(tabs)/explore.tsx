@@ -27,11 +27,34 @@ import { getSavedListingIds, toggleSavedListing } from "../../src/lib/savedListi
 import { colors, fontSize, radius, spacing } from "../../src/theme";
 import { DEFAULT_FILTERS, countActiveFilters } from "../../src/types/filters";
 import type { ListingFilters } from "../../src/types/filters";
-import type { Database } from "../../src/types/database";
+import { COMMON_AREA_LABELS, type CommonAreaType } from "../../src/types/room";
+import type { ListingWithProperty } from "../../src/types/listingWithProperty";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
+type ListingRow = ListingWithProperty & {
+  city_name?: string | null;
+  room_photos?: unknown;
+  property_photos?: unknown;
+  images?: string[] | null;
+};
 
 type ViewMode = "list" | "map";
+
+function readImageUrls(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object" && typeof (item as Record<string, unknown>).url === "string") {
+        return String((item as Record<string, unknown>).url);
+      }
+      return "";
+    })
+    .filter(Boolean);
+}
+
+function getCoverImage(row: ListingRow): string | null {
+  return readImageUrls(row.room_photos)[0] ?? readImageUrls(row.property_photos)[0] ?? row.images?.[0] ?? null;
+}
 
 export default function ExploreScreen() {
   const { session } = useAuth();
@@ -41,10 +64,9 @@ export default function ExploreScreen() {
   const [filters, setFilters] = useState<ListingFilters>(DEFAULT_FILTERS);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const [queryInput, setQueryInput] = useState(""); // raw text input
+  const [queryInput, setQueryInput] = useState("");
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
 
-  // Debounced query — fires 400ms after typing stops
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleQueryChange = (text: string) => {
     setQueryInput(text);
@@ -54,11 +76,15 @@ export default function ExploreScreen() {
     }, 400);
   };
 
-  // Load saved filters on mount
   useEffect(() => {
     loadFilters().then((saved) => {
-      setFilters(saved);
-      setQueryInput(saved.query);
+      const normalized = {
+        ...DEFAULT_FILTERS,
+        ...saved,
+        commonAreas: saved.commonAreas ?? [],
+      };
+      setFilters(normalized);
+      setQueryInput(normalized.query);
     });
     getSavedListingIds().then(setSavedListingIds);
   }, []);
@@ -70,36 +96,30 @@ export default function ExploreScreen() {
 
   const activeFilterCount = countActiveFilters(filters);
 
-  // List view: cursor-based infinite query
-  const {
-    data,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-    refetch,
-  } = useSearchListings(filters);
-
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
+    useSearchListings(filters);
   const allListings = data?.pages.flatMap((p) => p.items) ?? [];
 
-  // Map view: bulk geo query (only when map is visible)
   const { data: mapListings = [] } = useListingsForMap(filters, viewMode === "map");
 
   const mapPins: ListingPinData[] = mapListings
     .filter((l) => l.lat != null && l.lng != null)
-    .map((l) => ({
-      id: l.id,
-      privacyLevel: 1,
-      location: { lat: l.lat!, lng: l.lng! },
-      price: l.price,
-      currency: "€",
-      metadata: {
-        title: l.title,
-        city: l.city,
-        type: l.type,
-        image_url: (l.images as string[])[0] ?? null,
-      },
-    }));
+    .map((l) => {
+      const row = l as ListingRow;
+      return {
+        id: l.id,
+        privacyLevel: 1,
+        location: { lat: l.lat!, lng: l.lng! },
+        price: l.price,
+        currency: "€",
+        metadata: {
+          title: l.title,
+          city: row.city_name ?? row.city ?? "",
+          type: l.type,
+          image_url: getCoverImage(row),
+        },
+      };
+    });
 
   const handleApplyFilters = (newFilters: ListingFilters) => {
     setFilters(newFilters);
@@ -108,10 +128,24 @@ export default function ExploreScreen() {
   };
 
   const removeFilter = (key: keyof ListingFilters) => {
-    const updated = { ...filters, [key]: DEFAULT_FILTERS[key] };
+    const updated =
+      key === "city"
+        ? { ...filters, city: "", cityId: undefined, placeId: undefined }
+        : key === "lat"
+          ? { ...filters, lat: undefined, lng: undefined }
+        : { ...filters, [key]: DEFAULT_FILTERS[key] };
     setFilters(updated);
     saveFilters(updated);
     if (key === "query") setQueryInput("");
+  };
+
+  const removeCommonArea = (area: CommonAreaType) => {
+    const updated = {
+      ...filters,
+      commonAreas: filters.commonAreas.filter((item) => item !== area),
+    };
+    setFilters(updated);
+    saveFilters(updated);
   };
 
   const handleEnableGeo = async () => {
@@ -134,7 +168,6 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* ── Search bar + filter button ─────────────────────────────── */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -148,8 +181,14 @@ export default function ExploreScreen() {
             autoCorrect={false}
           />
           {queryInput.length > 0 && (
-            <Pressable onPress={() => { setQueryInput(""); setFilters((f) => ({ ...f, query: "" })); }} hitSlop={8}>
-              <Text style={styles.clearIcon}>✕</Text>
+            <Pressable
+              onPress={() => {
+                setQueryInput("");
+                setFilters((f) => ({ ...f, query: "" }));
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.clearIcon}>×</Text>
             </Pressable>
           )}
         </View>
@@ -170,24 +209,19 @@ export default function ExploreScreen() {
         </Pressable>
       </View>
 
-      {/* ── View toggle + geo button ───────────────────────────────── */}
       <View style={styles.toolbar}>
         <View style={styles.viewToggle}>
           <Pressable
             style={[styles.toggleBtn, viewMode === "list" && styles.toggleBtnActive]}
             onPress={() => setViewMode("list")}
           >
-            <Text style={[styles.toggleText, viewMode === "list" && styles.toggleTextActive]}>
-              📋 Lista
-            </Text>
+            <Text style={[styles.toggleText, viewMode === "list" && styles.toggleTextActive]}>📋 Lista</Text>
           </Pressable>
           <Pressable
             style={[styles.toggleBtn, viewMode === "map" && styles.toggleBtnActive]}
             onPress={() => setViewMode("map")}
           >
-            <Text style={[styles.toggleText, viewMode === "map" && styles.toggleTextActive]}>
-              🗺 Mapa
-            </Text>
+            <Text style={[styles.toggleText, viewMode === "map" && styles.toggleTextActive]}>🗺 Mapa</Text>
           </Pressable>
         </View>
 
@@ -199,23 +233,27 @@ export default function ExploreScreen() {
         {filters.lat != null && (
           <Pressable style={[styles.geoBtn, styles.geoBtnActive]} onPress={() => removeFilter("lat")}>
             <Text style={[styles.geoBtnText, styles.geoBtnTextActive]}>
-              📍 {filters.radiusKm} km ✕
+              📍 {filters.radiusKm} km ×
             </Text>
           </Pressable>
         )}
       </View>
 
-      {/* ── Active filter chips ────────────────────────────────────── */}
       {activeFilterCount > 0 && (
-        <ActiveChips filters={filters} onRemove={removeFilter} />
+        <ActiveChips
+          filters={filters}
+          onRemove={removeFilter}
+          onRemoveCommonArea={removeCommonArea}
+        />
       )}
 
-      {/* ── Content ───────────────────────────────────────────────── */}
       {viewMode === "list" ? (
         <>
           {isLoading ? (
             <View style={styles.list}>
-              {[1, 2, 3].map((i) => <ListingCardSkeleton key={i} />)}
+              {[1, 2, 3].map((i) => (
+                <ListingCardSkeleton key={i} />
+              ))}
             </View>
           ) : (
             <FlatList
@@ -229,30 +267,33 @@ export default function ExploreScreen() {
                 if (hasNextPage && !isFetchingNextPage) fetchNextPage();
               }}
               onEndReachedThreshold={0.3}
-              renderItem={({ item }) => (
-                <ListingCard
-                  listing={{
-                    id: item.id,
-                    owner_id: item.owner_id,
-                    title: item.title,
-                    price: item.price,
-                    city: item.city,
-                    type: item.type,
-                    image_url: (item.images as string[])[0] ?? null,
-                  }}
-                  viewerId={session?.user?.id}
-                  connectionDegree={
-                    item.owner_id === session?.user?.id
-                      ? null
-                      : friendzIds.has(item.owner_id)
-                        ? 1
-                        : null
-                  }
-                  isSaved={savedListingIds.includes(item.id)}
-                  onToggleSaved={handleToggleSaved}
-                  onPress={() => router.push(`/listing/${item.id}`)}
-                />
-              )}
+              renderItem={({ item }) => {
+                const row = item as ListingRow;
+                return (
+                  <ListingCard
+                    listing={{
+                      id: item.id,
+                      owner_id: item.owner_id,
+                      title: item.title,
+                      price: item.price,
+                      city: row.city_name ?? row.city ?? "",
+                      type: item.type,
+                      image_url: getCoverImage(row),
+                    }}
+                    viewerId={session?.user?.id}
+                    connectionDegree={
+                      item.owner_id === session?.user?.id
+                        ? null
+                        : friendzIds.has(item.owner_id)
+                          ? 1
+                          : null
+                    }
+                    isSaved={savedListingIds.includes(item.id)}
+                    onToggleSaved={handleToggleSaved}
+                    onPress={() => router.push(`/listing/${item.id}`)}
+                  />
+                );
+              }}
               ListFooterComponent={
                 isFetchingNextPage ? (
                   <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing[4] }} />
@@ -278,10 +319,7 @@ export default function ExploreScreen() {
           )}
         </>
       ) : (
-        <ListingsMap
-          listings={mapPins}
-          onPinPress={(pin) => router.push(`/listing/${pin.id}`)}
-        />
+        <ListingsMap listings={mapPins} onPinPress={(pin) => router.push(`/listing/${pin.id}`)} />
       )}
 
       <FilterSheet
@@ -294,48 +332,97 @@ export default function ExploreScreen() {
   );
 }
 
-// ─── Active filter chips ───────────────────────────────────────────────────────
-
 function ActiveChips({
   filters,
   onRemove,
+  onRemoveCommonArea,
 }: {
   filters: ListingFilters;
   onRemove: (key: keyof ListingFilters) => void;
+  onRemoveCommonArea: (area: CommonAreaType) => void;
 }) {
-  const chips: { key: keyof ListingFilters; label: string }[] = [];
+  const chips: { key: string; label: string; onPress: () => void }[] = [];
 
-  if (filters.city) chips.push({ key: "city", label: `📍 ${filters.city}` });
-  if (filters.type) chips.push({ key: "type", label: filters.type === "offer" ? "Ofrezco" : "Busco" });
-  if (filters.priceMin !== undefined) chips.push({ key: "priceMin", label: `≥ €${filters.priceMin}` });
-  if (filters.priceMax !== undefined) chips.push({ key: "priceMax", label: `≤ €${filters.priceMax}` });
-  if (filters.sizeMin !== undefined) chips.push({ key: "sizeMin", label: `≥ ${filters.sizeMin} m²` });
-  if (filters.availableFrom) chips.push({ key: "availableFrom", label: `Hasta ${filters.availableFrom}` });
-  if (filters.petsAllowed !== undefined) chips.push({ key: "petsAllowed", label: filters.petsAllowed ? "🐾 Mascotas" : "🚫 Sin mascotas" });
-  if (filters.smokersAllowed !== undefined) chips.push({ key: "smokersAllowed", label: filters.smokersAllowed ? "🚬 Fumadores" : "🚭 No fumadores" });
+  if (filters.city) {
+    chips.push({ key: "city", label: `📍 ${filters.city}`, onPress: () => onRemove("city") });
+  }
+  if (filters.type) {
+    chips.push({
+      key: "type",
+      label: filters.type === "offer" ? "Ofrezco" : "Busco",
+      onPress: () => onRemove("type"),
+    });
+  }
+  if (filters.priceMin !== undefined) {
+    chips.push({
+      key: "priceMin",
+      label: `≥ €${filters.priceMin}`,
+      onPress: () => onRemove("priceMin"),
+    });
+  }
+  if (filters.priceMax !== undefined) {
+    chips.push({
+      key: "priceMax",
+      label: `≤ €${filters.priceMax}`,
+      onPress: () => onRemove("priceMax"),
+    });
+  }
+  if (filters.sizeMin !== undefined) {
+    chips.push({
+      key: "sizeMin",
+      label: `≥ ${filters.sizeMin} m²`,
+      onPress: () => onRemove("sizeMin"),
+    });
+  }
+  if (filters.availableFrom) {
+    chips.push({
+      key: "availableFrom",
+      label: `Hasta ${filters.availableFrom}`,
+      onPress: () => onRemove("availableFrom"),
+    });
+  }
+  if (filters.petsAllowed !== undefined) {
+    chips.push({
+      key: "petsAllowed",
+      label: filters.petsAllowed ? "🐾 Mascotas" : "🚫 Sin mascotas",
+      onPress: () => onRemove("petsAllowed"),
+    });
+  }
+  if (filters.smokersAllowed !== undefined) {
+    chips.push({
+      key: "smokersAllowed",
+      label: filters.smokersAllowed ? "🚬 Fumadores" : "🚭 No fumadores",
+      onPress: () => onRemove("smokersAllowed"),
+    });
+  }
 
-  if (chips.length === 0) return null;
+  if (chips.length === 0 && filters.commonAreas.length === 0) return null;
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.chips}
-    >
-      {chips.map(({ key, label }) => (
-        <Pressable key={key} style={styles.chip} onPress={() => onRemove(key)}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      {chips.map(({ key, label, onPress }) => (
+        <Pressable key={key} style={styles.chip} onPress={onPress}>
           <Text style={styles.chipText}>{label}</Text>
-          <Text style={styles.chipX}> ✕</Text>
+          <Text style={styles.chipX}> ×</Text>
         </Pressable>
       ))}
+      {filters.commonAreas.map((area) => {
+        const meta = COMMON_AREA_LABELS[area];
+        return (
+          <Pressable key={area} style={styles.chip} onPress={() => onRemoveCommonArea(area)}>
+            <Text style={styles.chipText}>
+              {meta.icon} {meta.label}
+            </Text>
+            <Text style={styles.chipX}> ×</Text>
+          </Pressable>
+        );
+      })}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-
-  // Search row
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -356,9 +443,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     gap: spacing[2],
   },
-  searchIcon: {
-    fontSize: 14,
-  },
+  searchIcon: { fontSize: 14 },
   searchInput: {
     flex: 1,
     fontSize: fontSize.sm,
@@ -413,8 +498,6 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "700",
   },
-
-  // Toolbar
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
@@ -471,8 +554,6 @@ const styles = StyleSheet.create({
   geoBtnTextActive: {
     color: colors.primaryDark,
   },
-
-  // Active filter chips
   chips: {
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
@@ -499,8 +580,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: "700",
   },
-
-  // List
   list: {
     padding: spacing[4],
     gap: spacing[3],

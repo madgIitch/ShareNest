@@ -68,9 +68,7 @@ export default function WorkspaceScreen() {
   const sentActive = sent.filter((r) => isActiveRequest(r.status));
   const pendingReceived = received.filter((r) => r.status === "pending");
 
-  const ownerHouseholdIds = Array.from(
-    new Set(properties.map((p) => p.household_id).filter((v): v is string => !!v)),
-  );
+  const ownerHouseholdIds = Array.from(new Set(ownedHouseholds.map((h) => h.id).filter((v): v is string => !!v)));
   const memberHouseholdIds = Array.from(
     new Set(memberships.map((m) => m.household_id).filter((v): v is string => !!v)),
   );
@@ -99,9 +97,13 @@ export default function WorkspaceScreen() {
   }, [defaultPropertyId, properties, selectedPropertyId]);
 
   const selectedProperty = properties.find((p) => p.id === selectedPropertyId) ?? properties[0] ?? null;
-  const ownerHouseholdId = selectedProperty?.household_id ?? null;
+  const ownerHouseholdId = ownedHouseholds.find((h) => h.property_id === selectedProperty?.id)?.id ?? null;
   const activeProperty =
-    properties.find((p) => p.household_id === selectedHouseholdId) ?? selectedProperty ?? properties[0] ?? null;
+    properties.find((p) => p.id === ownedHouseholds.find((h) => h.id === selectedHouseholdId)?.property_id)
+    ?? properties.find((p) => p.id === memberships.find((m) => m.households?.id === selectedHouseholdId)?.households?.property_id)
+    ?? selectedProperty
+    ?? properties[0]
+    ?? null;
 
   const { data: ownerHousehold } = useHouseholdById(ownerHouseholdId ?? undefined);
   const { data: activeHousehold } = useHouseholdById(selectedHouseholdId ?? undefined);
@@ -379,7 +381,7 @@ export default function WorkspaceScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectorRow}>
               {householdIds.map((id) => {
                 const membership = memberships.find((m) => m.household_id === id);
-                const property = properties.find((p) => p.household_id === id);
+                const property = properties.find((p) => p.id === ownedHouseholds.find((h) => h.id === id)?.property_id);
                 const owned = ownedHouseholds.find((h) => h.id === id);
                 const label = membership?.households?.name ?? owned?.name ?? property?.address ?? "Piso";
                 const active = selectedHouseholdId === id;

@@ -18,6 +18,7 @@ export type MyHousehold = {
   name: string;
   invite_code: string;
   listing_id: string | null;
+  property_id: string | null;
   created_by: string;
   created_at: string;
   member_role: string;
@@ -31,6 +32,7 @@ export type MyHouseholdMembership = {
     id: string;
     name: string;
     listing_id: string | null;
+    property_id: string | null;
     created_by: string | null;
     created_at: string;
   } | null;
@@ -40,6 +42,8 @@ export type HouseholdSummary = {
   id: string;
   name: string;
   invite_code: string;
+  listing_id?: string | null;
+  property_id?: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -87,7 +91,7 @@ export function useMyHouseholdMemberships(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("household_members")
-        .select("household_id, role, joined_at, households(id, name, listing_id, created_by, created_at)")
+        .select("household_id, role, joined_at, households(id, name, listing_id, property_id, created_by, created_at)")
         .eq("user_id", userId!)
         .order("joined_at", { ascending: false });
       if (error) throw error;
@@ -104,7 +108,7 @@ export function useHouseholdById(householdId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("households")
-        .select("id, name, invite_code, created_by, created_at")
+        .select("id, name, invite_code, listing_id, property_id, created_by, created_at")
         .eq("id", householdId!)
         .single();
       if (error) throw error;
@@ -121,7 +125,7 @@ export function useOwnedHouseholds(userId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("households")
-        .select("id, name, invite_code, created_by, created_at")
+        .select("id, name, invite_code, listing_id, property_id, created_by, created_at")
         .eq("created_by", userId!)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -150,10 +154,11 @@ export function useHouseholdInvite(householdId: string | undefined) {
 export function useCreateHousehold() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ name, listingId }: { name: string; listingId?: string }) => {
+    mutationFn: async ({ name, listingId, propertyId }: { name: string; listingId?: string; propertyId?: string | null }) => {
       const { data, error } = await supabase.rpc("create_household", {
         p_name: name,
         p_listing_id: listingId ?? null,
+        p_property_id: propertyId ?? null,
       });
       if (error) throw error;
       return { id: data as string };
@@ -206,7 +211,7 @@ export function useJoinHousehold() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (inviteCode: string) => {
-      const { data, error } = await supabase.rpc("join_household_by_code", { p_code: inviteCode.toUpperCase() });
+      const { data, error } = await supabase.rpc("join_household_by_code" as any, { p_code: inviteCode.toUpperCase() } as any);
       if (error) throw error;
       return data as string; // returns household_id
     },

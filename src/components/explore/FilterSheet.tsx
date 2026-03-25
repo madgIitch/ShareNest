@@ -1,16 +1,9 @@
-import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { BottomSheet } from "../ui/BottomSheet";
 import { CitySelector } from "../ui/CitySelector";
+import { COMMON_AREA_OPTIONS } from "../../types/room";
 import { colors, fontSize, radius, spacing } from "../../theme";
 import { DEFAULT_FILTERS } from "../../types/filters";
 import type { ListingFilters } from "../../types/filters";
@@ -22,18 +15,21 @@ type Props = {
   onApply: (filters: ListingFilters) => void;
 };
 
-type Tristate = boolean | undefined;
-
 export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
-  // Local draft state — applied only when user taps "Aplicar"
   const [draft, setDraft] = useState<ListingFilters>(filters);
-  const [cityPickerOpen, setCityPickerOpen] = useState(false);
 
-  // Sync draft when sheet opens with latest filters
-  const handleOpen = () => setDraft(filters);
+  useEffect(() => {
+    if (visible) setDraft(filters);
+  }, [filters, visible]);
 
   const set = <K extends keyof ListingFilters>(key: K, value: ListingFilters[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
+
+  const toggleCommonArea = (area: ListingFilters["commonAreas"][number]) => {
+    set("commonAreas", draft.commonAreas.includes(area)
+      ? draft.commonAreas.filter((item) => item !== area)
+      : [...draft.commonAreas, area]);
+  };
 
   const handleApply = () => {
     onApply(draft);
@@ -43,8 +39,7 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
   const handleReset = () => setDraft(DEFAULT_FILTERS);
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} snapPoint={620}>
-      {/* Header */}
+    <BottomSheet visible={visible} onClose={onClose} snapPoint={700}>
       <View style={styles.header}>
         <Text style={styles.title}>Filtros</Text>
         <Pressable onPress={handleReset} hitSlop={8}>
@@ -58,7 +53,6 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Tipo ─────────────────────────────────────────────── */}
         <FilterSection label="Tipo de anuncio">
           <View style={styles.chipRow}>
             {([undefined, "offer", "search"] as const).map((v) => (
@@ -75,32 +69,18 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
           </View>
         </FilterSection>
 
-        {/* ── Ciudad ───────────────────────────────────────────── */}
         <FilterSection label="Ciudad">
-          <Pressable
-            style={styles.cityBtn}
-            onPress={() => setCityPickerOpen(true)}
-          >
-            <Text style={[styles.cityBtnText, !draft.city && styles.placeholder]}>
-              📍 {draft.city || "Todas las ciudades"}
-            </Text>
-            {draft.city ? (
-              <Pressable onPress={() => set("city", "")} hitSlop={8}>
-                <Text style={styles.clearText}>✕</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.chevron}>›</Text>
-            )}
-          </Pressable>
-          {cityPickerOpen && (
-            <CitySelector
-              value={draft.city}
-              onChange={(v) => { set("city", v); setCityPickerOpen(false); }}
-            />
-          )}
+          <CitySelector
+            value={draft.city}
+            onSelect={(city) => {
+              set("city", city.name);
+              set("cityId", city.id);
+              set("placeId", undefined);
+            }}
+            placeholder="Todas las ciudades"
+          />
         </FilterSection>
 
-        {/* ── Precio ───────────────────────────────────────────── */}
         <FilterSection label="Precio (€/mes)">
           <View style={styles.rangeRow}>
             <TextInput
@@ -109,7 +89,7 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
               placeholder="Mín"
               placeholderTextColor={colors.textTertiary}
               value={draft.priceMin?.toString() ?? ""}
-              onChangeText={(t) => set("priceMin", t ? parseInt(t) : undefined)}
+              onChangeText={(t) => set("priceMin", t ? parseInt(t, 10) : undefined)}
             />
             <Text style={styles.rangeSep}>—</Text>
             <TextInput
@@ -118,12 +98,11 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
               placeholder="Máx"
               placeholderTextColor={colors.textTertiary}
               value={draft.priceMax?.toString() ?? ""}
-              onChangeText={(t) => set("priceMax", t ? parseInt(t) : undefined)}
+              onChangeText={(t) => set("priceMax", t ? parseInt(t, 10) : undefined)}
             />
           </View>
         </FilterSection>
 
-        {/* ── Tamaño mínimo ─────────────────────────────────────── */}
         <FilterSection label="Tamaño mínimo (m²)">
           <TextInput
             style={styles.singleInput}
@@ -131,11 +110,10 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
             placeholder="p.ej. 40"
             placeholderTextColor={colors.textTertiary}
             value={draft.sizeMin?.toString() ?? ""}
-            onChangeText={(t) => set("sizeMin", t ? parseInt(t) : undefined)}
+            onChangeText={(t) => set("sizeMin", t ? parseInt(t, 10) : undefined)}
           />
         </FilterSection>
 
-        {/* ── Disponible desde ──────────────────────────────────── */}
         <FilterSection label="Disponible antes de">
           <TextInput
             style={styles.singleInput}
@@ -147,23 +125,33 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
           />
         </FilterSection>
 
-        {/* ── Mascotas ──────────────────────────────────────────── */}
         <FilterSection label="Mascotas">
-          <TriStateRow
-            value={draft.petsAllowed}
-            onChange={(v) => set("petsAllowed", v)}
-          />
+          <TriStateRow value={draft.petsAllowed} onChange={(v) => set("petsAllowed", v)} />
         </FilterSection>
 
-        {/* ── Fumadores ─────────────────────────────────────────── */}
         <FilterSection label="Fumadores">
-          <TriStateRow
-            value={draft.smokersAllowed}
-            onChange={(v) => set("smokersAllowed", v)}
-          />
+          <TriStateRow value={draft.smokersAllowed} onChange={(v) => set("smokersAllowed", v)} />
         </FilterSection>
 
-        {/* ── Radio geo (only if lat/lng set) ───────────────────── */}
+        <FilterSection label="Zonas comunes">
+          <View style={styles.chipRow}>
+            {COMMON_AREA_OPTIONS.map(([area, meta]) => {
+              const active = draft.commonAreas.includes(area);
+              return (
+                <Pressable
+                  key={area}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => toggleCommonArea(area)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {meta.icon} {meta.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </FilterSection>
+
         {draft.lat != null && (
           <FilterSection label={`Radio: ${draft.radiusKm} km desde tu ubicación`}>
             <View style={styles.chipRow}>
@@ -183,7 +171,6 @@ export function FilterSheet({ visible, filters, onClose, onApply }: Props) {
         )}
       </ScrollView>
 
-      {/* Apply button */}
       <View style={styles.footer}>
         <Pressable style={styles.applyBtn} onPress={handleApply}>
           <Text style={styles.applyBtnText}>Aplicar filtros</Text>
@@ -222,9 +209,7 @@ function TriStateRow({
           style={[styles.chip, value === v && styles.chipActive]}
           onPress={() => onChange(v)}
         >
-          <Text style={[styles.chipText, value === v && styles.chipTextActive]}>
-            {label}
-          </Text>
+          <Text style={[styles.chipText, value === v && styles.chipTextActive]}>{label}</Text>
         </Pressable>
       ))}
     </View>
@@ -291,34 +276,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.primaryDark,
-  },
-  cityBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.gray100,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-  },
-  cityBtnText: {
-    fontSize: fontSize.sm,
-    fontWeight: "500",
-    color: colors.text,
-    flex: 1,
-  },
-  placeholder: {
-    color: colors.textTertiary,
-  },
-  clearText: {
-    color: colors.textTertiary,
-    fontSize: 14,
-    fontWeight: "600",
-    paddingLeft: spacing[2],
-  },
-  chevron: {
-    fontSize: 20,
-    color: colors.textTertiary,
   },
   rangeRow: {
     flexDirection: "row",

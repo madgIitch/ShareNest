@@ -24,7 +24,7 @@ import {
   type MyHouseholdMembership,
 } from "../../src/hooks/useHousehold";
 import { useMyListings, useUpdateListingStatus } from "../../src/hooks/useListings";
-import { useMyProperties, useUpdateProperty, type PropertyWithCity } from "../../src/hooks/useProperties";
+import { useMyProperties, type PropertyWithCity } from "../../src/hooks/useProperties";
 import { useReceivedRequests, type RequestWithDetails } from "../../src/hooks/useRequests";
 import { UserAvatar } from "../../src/components/ui/UserAvatar";
 import { useAuth } from "../../src/providers/AuthProvider";
@@ -73,6 +73,7 @@ export default function HouseholdScreen() {
         properties={myProperties}
         listings={myListings}
         receivedRequests={receivedRequests}
+        memberships={memberships}
       />
     );
   }
@@ -98,6 +99,7 @@ function OwnerHomesDashboard({
   properties,
   listings,
   receivedRequests,
+  memberships,
 }: {
   userId: string;
   autoOpenAdd?: boolean;
@@ -105,12 +107,12 @@ function OwnerHomesDashboard({
   properties: PropertyWithCity[];
   listings: Listing[];
   receivedRequests: RequestWithDetails[];
+  memberships: MyHouseholdMembership[];
 }) {
   const [selectedPropertyId, setSelectedPropertyId] = useState(properties[0]?.id ?? "");
   const [sheetOpen, setSheetOpen] = useState(false);
   const updateStatus = useUpdateListingStatus();
   const createHousehold = useCreateHousehold();
-  const updateProperty = useUpdateProperty();
 
   const selectedProperty = useMemo(
     () => properties.find((p) => p.id === selectedPropertyId) ?? properties[0],
@@ -118,7 +120,7 @@ function OwnerHomesDashboard({
   );
 
   const selectedHouseholdId =
-    (selectedProperty as unknown as { household_id?: string | null })?.household_id ?? null;
+    memberships.find((m) => m.households?.property_id === selectedProperty?.id)?.household_id ?? null;
   const { data: selectedHousehold } = useHouseholdById(selectedHouseholdId ?? undefined);
 
   const { data: expenses = [], isLoading: loadingExp, refetch } = useExpenses(selectedHouseholdId ?? undefined);
@@ -191,12 +193,7 @@ function OwnerHomesDashboard({
     }
     try {
       const name = selectedProperty.address?.trim() || "Piso compartido";
-      const created = await createHousehold.mutateAsync({ name });
-      await updateProperty.mutateAsync({
-        id: selectedProperty.id,
-        ownerId: userId,
-        updates: { household_id: created.id },
-      });
+      await createHousehold.mutateAsync({ name, propertyId: selectedProperty.id });
       Alert.alert("Listo", "Ya estas dentro del piso. Ahora puedes invitar a alguien.");
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
@@ -272,12 +269,12 @@ function OwnerHomesDashboard({
         <View style={styles.ownerFloorActions}>
           {!selectedHouseholdId && (
             <Pressable
-              style={[styles.primaryBtn, (createHousehold.isPending || updateProperty.isPending) && styles.outlineBtnDisabled]}
+              style={[styles.primaryBtn, createHousehold.isPending && styles.outlineBtnDisabled]}
               onPress={handleAddMeToFloor}
-              disabled={createHousehold.isPending || updateProperty.isPending}
+              disabled={createHousehold.isPending}
             >
               <Text style={styles.primaryBtnText}>
-                {createHousehold.isPending || updateProperty.isPending ? "Anadiendo..." : "Anadirme al piso"}
+                {createHousehold.isPending ? "Anadiendo..." : "Anadirme al piso"}
               </Text>
             </Pressable>
           )}

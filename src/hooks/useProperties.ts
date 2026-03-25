@@ -55,7 +55,7 @@ export function useUpdateProperty() {
       ownerId?: string;
       updates: PropertyUpdate;
     }) => {
-      const query = supabase.from("properties").update(updates).eq("id", id);
+      const query = supabase.from("properties" as any).update(updates as any).eq("id", id);
       const { error } = ownerId ? await query.eq("owner_id", ownerId) : await query;
       if (error) throw error;
     },

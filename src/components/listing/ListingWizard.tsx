@@ -22,18 +22,51 @@ import { DistrictSelector } from "../ui/DistrictSelector";
 import { MiniMapView } from "../ui/MiniMapView";
 import { supabase } from "../../lib/supabase";
 import { locationService, type City, type Place } from "../../services/locationService";
-import { useCreateListing, useUpdateListing } from "../../hooks/useListings";
 import { useMyProperties } from "../../hooks/useProperties";
 import { useIsSuperfriendz } from "../../hooks/useSubscription";
 import { pickListingImages, uploadAllListingImages, MAX_IMAGES } from "../../lib/listing-images";
 import { useAuth } from "../../providers/AuthProvider";
 import { colors, fontSize, radius, spacing } from "../../theme";
-import type { Database, BedType, ContractType } from "../../types/database";
+import type { Database, ContractType } from "../../types/database";
+import {
+  COMMON_AREA_LABELS,
+  normalizePropertyPhotos,
+  normalizeRoomPhotos,
+  type CommonAreaType,
+  type PropertyPhoto,
+} from "../../types/propertyPhoto";
 
-type Listing = Database["public"]["Tables"]["listings"]["Row"];
-type PropertyInsert = Database["public"]["Tables"]["properties"]["Insert"];
-type PropertyUpdate = Database["public"]["Tables"]["properties"]["Update"];
-type PropertyRow = Database["public"]["Tables"]["properties"]["Row"];
+type Listing = Database["public"]["Tables"]["listings"]["Row"] & {
+  room_id?: string | null;
+  room_name?: string | null;
+  room_photos?: unknown;
+  common_area_types?: CommonAreaType[] | null;
+  property_photos?: unknown;
+  owner_lives_here?: boolean | null;
+  allows_pets?: boolean | null;
+  allows_smoking?: boolean | null;
+  has_quiet_hours?: boolean | null;
+  no_parties?: boolean | null;
+};
+type PropertyRow = Database["public"]["Tables"]["properties"]["Row"] & {
+  owner_lives_here?: boolean | null;
+  allows_pets?: boolean | null;
+  allows_smoking?: boolean | null;
+  has_quiet_hours?: boolean | null;
+  no_parties?: boolean | null;
+};
+type RoomBedType = "individual" | "doble" | "litera";
+type RoomRow = {
+  id?: string;
+  property_id?: string;
+  name?: string | null;
+  size_m2?: number | null;
+  bed_type?: RoomBedType | "single" | "double" | "bunk" | null;
+  has_private_bath?: boolean | null;
+  has_wardrobe?: boolean | null;
+  has_desk?: boolean | null;
+  photos?: unknown;
+};
 
 // ─── Phase / step config ──────────────────────────────────────────────────────
 
@@ -96,7 +129,7 @@ type FormData = {
   // Step 6 — Habitación
   title: string;
   size_m2: string;
-  bed_type: BedType;
+  bed_type: RoomBedType;
   description: string;
   private_bath: boolean;
   wardrobe: boolean;
@@ -142,7 +175,7 @@ const EMPTY_FORM: FormData = {
   no_parties: false,
   title: "",
   size_m2: "",
-  bed_type: "double",
+  bed_type: "doble",
   description: "",
   private_bath: false,
   wardrobe: false,
@@ -155,10 +188,28 @@ const EMPTY_FORM: FormData = {
 
 function listingToForm(
   l: Listing,
-  opts?: { existingProperty?: PropertyRow | null; existingCityName?: string | null },
+  opts?: { existingProperty?: PropertyRow | null; existingCityName?: string | null; existingRoom?: RoomRow | null },
 ): FormData {
   const existingProperty = opts?.existingProperty ?? null;
   const existingCityName = opts?.existingCityName ?? null;
+  const existingRoom = opts?.existingRoom ?? null;
+  const legacyBedType = (raw: unknown): RoomBedType => {
+    if (raw === "individual" || raw === "single") return "individual";
+    if (raw === "doble" || raw === "double") return "doble";
+    if (raw === "litera" || raw === "bunk") return "litera";
+    return "doble";
+  };
+  const ruleFlags = (() => {
+    const legacyRules = existingProperty?.house_rules ?? [];
+    return {
+      no_smokers: existingProperty?.allows_smoking != null
+        ? !existingProperty.allows_smoking
+        : legacyRules.includes("no_fumadores"),
+      pets_ok: existingProperty?.allows_pets ?? legacyRules.includes("mascotas_ok"),
+      quiet_hours: existingProperty?.has_quiet_hours ?? legacyRules.includes("silencio"),
+      no_parties: existingProperty?.no_parties ?? legacyRules.includes("sin_fiestas"),
+    };
+  })();
   return {
     ...EMPTY_FORM,
     street: existingProperty?.address ?? l.street ?? "",
@@ -176,16 +227,20 @@ function listingToForm(
     has_elevator: existingProperty?.has_elevator ?? false,
     is_furnished: l.is_furnished,
     title: l.title,
-    size_m2: l.size_m2?.toString() ?? "",
-    bed_type: (l.bed_type as BedType) ?? "double",
+    size_m2: existingRoom?.size_m2?.toString() ?? l.size_m2?.toString() ?? "",
+    bed_type: legacyBedType(existingRoom?.bed_type ?? l.bed_type),
     description: l.description ?? "",
-    private_bath: l.has_private_bath ?? false,
-    wardrobe: l.has_wardrobe ?? false,
-    desk: l.has_desk ?? false,
+    private_bath: existingRoom?.has_private_bath ?? l.has_private_bath ?? false,
+    wardrobe: existingRoom?.has_wardrobe ?? l.has_wardrobe ?? false,
+    desk: existingRoom?.has_desk ?? l.has_desk ?? false,
     price: l.price.toString(),
     available_from: l.available_from ?? "",
     min_stay_months: l.min_stay_months?.toString() ?? "6",
     contract_type: (l.contract_type as ContractType) ?? "long_term",
+    no_smokers: ruleFlags.no_smokers,
+    pets_ok: ruleFlags.pets_ok,
+    quiet_hours: ruleFlags.quiet_hours,
+    no_parties: ruleFlags.no_parties,
   };
 }
 
@@ -199,25 +254,70 @@ const BILL_LABELS: Record<keyof BillsConfig, string> = {
   calefaccion: "Calefacción",
 };
 
-// ─── Photo zones ──────────────────────────────────────────────────────────────
+const COMMON_AREA_OPTIONS = (Object.entries(COMMON_AREA_LABELS) as [
+  CommonAreaType,
+  { label: string; icon: string },
+][]);
 
-const ZONE_OPTIONS = [
-  { label: "Salón",     emoji: "🛋️" },
-  { label: "Cocina",    emoji: "🍳" },
-  { label: "Baño",      emoji: "🚿" },
-  { label: "Terraza",   emoji: "🌿" },
-  { label: "Pasillo",   emoji: "🚪" },
-  { label: "Comedor",   emoji: "🍽️" },
-  { label: "Dormitorio",emoji: "🛏️" },
-  { label: "Jardín",    emoji: "🌳" },
-  { label: "Garaje",    emoji: "🚗" },
-  { label: "Otro",      emoji: "📷" },
-] as const;
+const ROOM_BED_OPTIONS: { key: RoomBedType; label: string }[] = [
+  { key: "individual", label: "Individual" },
+  { key: "doble", label: "Doble" },
+  { key: "litera", label: "Litera" },
+];
 
-type ZoneLabel = (typeof ZONE_OPTIONS)[number]["label"];
+function legacyListingBedType(value: RoomBedType): "single" | "double" | "bunk" {
+  if (value === "individual") return "single";
+  if (value === "doble") return "double";
+  return "bunk";
+}
 
-function zoneEmoji(label: string): string {
-  return ZONE_OPTIONS.find((z) => z.label === label)?.emoji ?? "📷";
+function normalizeRoomBedType(raw: unknown): RoomBedType {
+  if (raw === "individual" || raw === "single") return "individual";
+  if (raw === "doble" || raw === "double") return "doble";
+  if (raw === "litera" || raw === "bunk") return "litera";
+  return "doble";
+}
+
+function propertyRuleFlags(property: PropertyRow | null): Pick<FormData, "no_smokers" | "pets_ok" | "quiet_hours" | "no_parties"> {
+  const legacyRules = property?.house_rules ?? [];
+  return {
+    no_smokers: property?.allows_smoking != null ? !property.allows_smoking : legacyRules.includes("no_fumadores"),
+    pets_ok: property?.allows_pets ?? legacyRules.includes("mascotas_ok"),
+    quiet_hours: property?.has_quiet_hours ?? legacyRules.includes("silencio"),
+    no_parties: property?.no_parties ?? legacyRules.includes("sin_fiestas"),
+  };
+}
+
+function roomFromListing(listing: Listing): RoomRow | null {
+  const size = listing.size_m2;
+  const bed = listing.bed_type;
+  const privateBath = listing.has_private_bath;
+  const wardrobe = listing.has_wardrobe;
+  const desk = listing.has_desk;
+  const photos = listing.room_photos ?? listing.images;
+
+  if (
+    size == null &&
+    bed == null &&
+    privateBath == null &&
+    wardrobe == null &&
+    desk == null &&
+    !photos
+  ) {
+    return null;
+  }
+
+  return {
+    id: listing.room_id ?? undefined,
+    property_id: listing.property_id ?? undefined,
+    name: listing.room_name ?? null,
+    size_m2: size,
+    bed_type: normalizeRoomBedType(bed),
+    has_private_bath: privateBath,
+    has_wardrobe: wardrobe,
+    has_desk: desk,
+    photos,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -394,10 +494,9 @@ function Step2Piso({ form, set }: { form: FormData; set: (k: keyof FormData, v: 
 }
 
 function Step3CommonPhotos({
-  photos, zones, onAdd, onRemove, onMove, onZoneChange,
+  photos, onAdd, onRemove, onMove, onZoneChange,
 }: {
-  photos: string[];
-  zones: string[];
+  photos: PropertyPhoto[];
   onAdd: () => void;
   onRemove: (i: number) => void;
   onMove: (i: number, d: -1 | 1) => void;
@@ -410,14 +509,14 @@ function Step3CommonPhotos({
         Cocina, baño, terraza, salón... Toca la etiqueta para cambiar la zona.
       </Text>
 
-      {photos.map((uri, i) => {
-        const zone = zones[i] ?? "Salón";
+      {photos.map((photo, i) => {
+        const zone = COMMON_AREA_LABELS[photo.room] ?? COMMON_AREA_LABELS.otro;
         return (
-          <View key={uri + i} style={styles.photoRow}>
-            <Image source={{ uri }} style={styles.photoThumb} />
+          <View key={photo.url + i} style={styles.photoRow}>
+            <Image source={{ uri: photo.url }} style={styles.photoThumb} />
             <View style={styles.photoInfo}>
               <Pressable style={styles.zonePill} onPress={() => onZoneChange(i)}>
-                <Text style={styles.zonePillText}>{zoneEmoji(zone)} {zone}</Text>
+                <Text style={styles.zonePillText}>{zone.icon} {zone.label}</Text>
               </Pressable>
               <Text style={styles.photoMeta}>
                 {i === 0 ? "Portada · toca para cambiar zona" : `Foto ${i + 1} · toca para cambiar`}
@@ -446,7 +545,7 @@ function Step3CommonPhotos({
 
       <View style={styles.photoHint}>
         <Text style={styles.photoHintText}>
-          Cada foto tiene una etiqueta de zona. Los buscadores verán qué habitación es cada foto.
+          Cada foto tiene una etiqueta de zona. Los buscadores verán qué zona es cada foto.
         </Text>
       </View>
     </>
@@ -514,11 +613,6 @@ function Step5Rules({ form, set }: { form: FormData; set: (k: keyof FormData, v:
 }
 
 function Step6Room({ form, set }: { form: FormData; set: (k: keyof FormData, v: unknown) => void }) {
-  const bedTypes: { key: BedType; label: string }[] = [
-    { key: "single", label: "Individual" },
-    { key: "double", label: "Doble" },
-    { key: "bunk", label: "Litera" },
-  ];
   return (
     <>
       <Text style={styles.stepTitle}>Cuéntanos la habitación</Text>
@@ -541,7 +635,7 @@ function Step6Room({ form, set }: { form: FormData; set: (k: keyof FormData, v: 
         <View style={{ flex: 1 }}>
           <Label>Tipo de cama</Label>
           <View style={styles.chipRow}>
-            {bedTypes.map(({ key, label }) => (
+            {ROOM_BED_OPTIONS.map(({ key, label }) => (
               <Pressable
                 key={key}
                 style={[styles.chip, form.bed_type === key && styles.chipActive]}
@@ -743,7 +837,7 @@ function Step9Review({
   submitting,
 }: {
   form: FormData;
-  flatPhotos: string[];
+  flatPhotos: PropertyPhoto[];
   flatPhotoZones: string[];
   roomPhotos: string[];
   onPublish: () => void;
@@ -762,7 +856,9 @@ function Step9Review({
     },
     {
       label: `Fotos del piso (${flatPhotos.length})`,
-      detail: uniqueZones.length > 0 ? uniqueZones.map((z) => z.toLowerCase()).join(", ") : "Sin fotos",
+      detail: uniqueZones.length > 0
+        ? uniqueZones.map((z) => COMMON_AREA_LABELS[z as CommonAreaType]?.label ?? z).join(", ")
+        : "Sin fotos",
       done: flatPhotos.length >= 2,
     },
     {
@@ -788,7 +884,7 @@ function Step9Review({
     },
   ];
 
-  const coverPhoto = roomPhotos[0] ?? flatPhotos[0];
+  const coverPhoto = roomPhotos[0] ?? flatPhotos[0]?.url;
 
   return (
     <>
@@ -924,6 +1020,9 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
   const isEditing = !!initial;
   const { data: isSuper = false, isLoading: isSuperLoading } = useIsSuperfriendz();
   const { data: myProperties = [] } = useMyProperties(userId || undefined);
+  const roomFromInitial = initial ? roomFromListing(initial) : null;
+  const propertyPhotoSeed = normalizePropertyPhotos(existingProperty?.images ?? initial?.property_photos ?? []);
+  const roomPhotoSeed = normalizeRoomPhotos(initial?.room_photos ?? initial?.images ?? roomFromInitial?.photos ?? []);
 
   const [step, setStep] = useState(startAtStep);
   const [form, setForm] = useState<FormData>(() => {
@@ -945,7 +1044,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     });
 
     if (initial) {
-      const base = listingToForm(initial, { existingProperty, existingCityName });
+      const base = listingToForm(initial, { existingProperty, existingCityName, existingRoom: roomFromInitial });
       console.log("[ListingWizard] base form from listing:", {
         street: base.street,
         city: base.city,
@@ -957,18 +1056,18 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       if (!existingProperty) return base;
 
       const billsRaw = (existingProperty.bills_config ?? {}) as Partial<BillsConfig>;
-      const existingBills: BillsConfig = {
-        agua: billsRaw.agua ?? "extra",
-        luz: billsRaw.luz ?? "extra",
-        gas: billsRaw.gas ?? "extra",
-        internet: billsRaw.internet ?? "extra",
-        limpieza: billsRaw.limpieza ?? "extra",
-        comunidad: billsRaw.comunidad ?? "extra",
-        calefaccion: billsRaw.calefaccion ?? "extra",
-      };
-      const rules = existingProperty.house_rules ?? [];
+  const existingBills: BillsConfig = {
+    agua: billsRaw.agua ?? "extra",
+    luz: billsRaw.luz ?? "extra",
+    gas: billsRaw.gas ?? "extra",
+    internet: billsRaw.internet ?? "extra",
+    limpieza: billsRaw.limpieza ?? "extra",
+    comunidad: billsRaw.comunidad ?? "extra",
+    calefaccion: billsRaw.calefaccion ?? "extra",
+  };
       const baseCity = base.city?.trim() ?? "";
       const shouldUsePropertyCity = !baseCity || baseCity.toLowerCase() === "ciudad";
+      const rules = propertyRuleFlags(existingProperty);
 
       const merged = {
         ...base,
@@ -985,10 +1084,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         floor: existingProperty.floor ?? base.floor,
         has_elevator: existingProperty.has_elevator,
         bills: existingBills,
-        no_smokers: rules.includes("no_fumadores"),
-        pets_ok: rules.includes("mascotas_ok"),
-        quiet_hours: rules.includes("silencio"),
-        no_parties: rules.includes("sin_fiestas"),
+        ...rules,
       };
       console.log("[ListingWizard] merged form (listing + property):", {
         street: merged.street,
@@ -1011,10 +1107,10 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       gas: billsRaw.gas ?? "extra",
       internet: billsRaw.internet ?? "extra",
       limpieza: billsRaw.limpieza ?? "extra",
-      comunidad: billsRaw.comunidad ?? "extra",
-      calefaccion: billsRaw.calefaccion ?? "extra",
-    };
-    const rules = existingProperty.house_rules ?? [];
+        comunidad: billsRaw.comunidad ?? "extra",
+        calefaccion: billsRaw.calefaccion ?? "extra",
+      };
+    const rules = propertyRuleFlags(existingProperty);
 
     const fromProperty = {
       ...EMPTY_FORM,
@@ -1032,10 +1128,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       floor: existingProperty.floor ?? "",
       has_elevator: existingProperty.has_elevator,
       bills: existingBills,
-      no_smokers: rules.includes("no_fumadores"),
-      pets_ok: rules.includes("mascotas_ok"),
-      quiet_hours: rules.includes("silencio"),
-      no_parties: rules.includes("sin_fiestas"),
+      ...rules,
     };
     console.log("[ListingWizard] form from existingProperty:", {
       street: fromProperty.street,
@@ -1049,37 +1142,14 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
     });
     return fromProperty;
   });
-  // Flat photos (url + zone) — stored in properties.images as {url,zone}[]
-  const [photoUris, setPhotoUris] = useState<string[]>(() => {
-    const raw = existingProperty?.images;
-    if (!Array.isArray(raw)) return [];
-    return raw.map((item) => (typeof item === "string" ? item : String((item as Record<string, unknown>).url ?? "")));
-  });
-  const [photoZones, setPhotoZones] = useState<string[]>(() => {
-    const raw = existingProperty?.images;
-    if (!Array.isArray(raw)) return [];
-    return raw.map((item) => (typeof item === "string" ? "Salón" : String((item as Record<string, unknown>).zone ?? "Salón")));
-  });
-  // Room photos — stored in listings.images (room only, no flat photos)
-  const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>(() => {
-    if (!initial?.images) return [];
-    const raw = existingProperty?.images;
-    const flatUrls = new Set(
-      Array.isArray(raw)
-        ? raw.map((item) => (typeof item === "string" ? item : String((item as Record<string, unknown>).url ?? "")))
-        : [],
-    );
-    return (initial.images as string[]).filter((url) => !flatUrls.has(url));
-  });
+  const [propertyPhotos, setPropertyPhotos] = useState<PropertyPhoto[]>(propertyPhotoSeed);
+  const [roomPhotoUris, setRoomPhotoUris] = useState<string[]>(roomPhotoSeed);
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const postalSyncSeq = useRef(0);
   const cityDistrictSyncSeq = useRef(0);
   const cityDistrictDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didAutoHydrateFromPostalRef = useRef(false);
-
-  const createListing = useCreateListing();
-  const updateListing = useUpdateListing();
 
   const set = (key: keyof FormData, value: unknown, source: "user" | "sync" = "user") => {
     console.log("[ListingWizard] set()", { key, value, source });
@@ -1355,12 +1425,11 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
 
   // ── Photos ──
   const handleAddPhotos = async () => {
-    if (photoUris.length >= MAX_IMAGES) return;
+    if (propertyPhotos.length >= MAX_IMAGES) return;
     const uris = await pickListingImages();
-    const slots = MAX_IMAGES - photoUris.length;
+    const slots = MAX_IMAGES - propertyPhotos.length;
     const added = uris.slice(0, slots);
-    setPhotoUris((prev) => [...prev, ...added]);
-    setPhotoZones((prev) => [...prev, ...added.map(() => "Salón")]);
+    setPropertyPhotos((prev) => [...prev, ...added.map((url) => ({ url, room: "salon" as const }))]);
   };
 
   const handleZoneChange = (index: number) => {
@@ -1368,12 +1437,13 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       "¿Qué zona es esta foto?",
       undefined,
       [
-        ...ZONE_OPTIONS.map((opt) => ({
-          text: `${opt.emoji} ${opt.label}`,
+        ...COMMON_AREA_OPTIONS.map(([room, label]) => ({
+          text: `${label.icon} ${label.label}`,
           onPress: () =>
-            setPhotoZones((prev) => {
+            setPropertyPhotos((prev) => {
               const arr = [...prev];
-              arr[index] = opt.label;
+              if (!arr[index]) return prev;
+              arr[index] = { ...arr[index], room };
               return arr;
             }),
         })),
@@ -1412,26 +1482,31 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
       setSubmitting(true);
       const folder = initial?.id ?? `${Date.now().toString(36)}`;
 
-      // Flat / common-area photos — stored as {url, zone}[] in properties.images
-      const localFlatUris = photoUris.filter((u) => !u.startsWith("http"));
-      const existingFlatUris = photoUris.filter((u) => u.startsWith("http"));
-      const uploadedFlatUrls = localFlatUris.length > 0
-        ? await uploadAllListingImages(userId, folder, localFlatUris)
+      const sb = supabase as any;
+
+      const localPropertyPhotos = propertyPhotos.filter((photo) => !photo.url.startsWith("http"));
+      const uploadedPropertyUrls = localPropertyPhotos.length > 0
+        ? await uploadAllListingImages(userId, `${folder}_property`, localPropertyPhotos.map((photo) => photo.url))
         : [];
-      // Reconstruct ordered list preserving zones
-      const orderedFlatPhotos = photoUris.map((u, i) => {
-        const isLocal = !u.startsWith("http");
-        const url = isLocal ? uploadedFlatUrls[localFlatUris.indexOf(u)] ?? u : u;
-        return { url, zone: photoZones[i] ?? "Salón" };
+      let propertyUploadIndex = 0;
+      const orderedPropertyPhotos = propertyPhotos.map((photo) => {
+        if (!photo.url.startsWith("http")) {
+          const url = uploadedPropertyUrls[propertyUploadIndex++] ?? photo.url;
+          return { url, room: photo.room };
+        }
+        return { url: photo.url, room: photo.room };
       });
 
-      // Room photos — stored as string[] in listings.images (room only)
       const localRoomUris = roomPhotoUris.filter((u) => !u.startsWith("http"));
-      const existingRoomUrls = roomPhotoUris.filter((u) => u.startsWith("http"));
       const uploadedRoomUrls = localRoomUris.length > 0
         ? await uploadAllListingImages(userId, `${folder}_r`, localRoomUris)
         : [];
-      const allImages = [...existingRoomUrls, ...uploadedRoomUrls];
+      let roomUploadIndex = 0;
+      const allImages = roomPhotoUris.map((uri) => (
+        uri.startsWith("http")
+          ? uri
+          : uploadedRoomUrls[roomUploadIndex++] ?? uri
+      ));
 
       const houseRules: string[] = [
         form.no_smokers && "no_fumadores",
@@ -1440,7 +1515,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         form.no_parties && "sin_fiestas",
       ].filter(Boolean) as string[];
 
-      const propertyPayload: PropertyInsert = {
+      const propertyPayload = {
         owner_id: userId,
         address: form.street.trim() || `${form.city} ${form.district}`.trim(),
         street_number: form.street_number.trim() || null,
@@ -1453,9 +1528,14 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         has_elevator: form.has_elevator,
         total_m2: form.total_m2 ? Number(form.total_m2) : null,
         total_rooms: form.total_rooms ? Number(form.total_rooms) : null,
-        images: orderedFlatPhotos as unknown as string[],
+        images: orderedPropertyPhotos,
         bills_config: form.bills,
         house_rules: houseRules,
+        owner_lives_here: existingProperty?.owner_lives_here ?? initial?.owner_lives_here ?? false,
+        allows_pets: form.pets_ok,
+        allows_smoking: !form.no_smokers,
+        has_quiet_hours: form.quiet_hours,
+        no_parties: form.no_parties,
       };
 
       let propertyId: string | null = initial?.property_id ?? existingProperty?.id ?? null;
@@ -1476,7 +1556,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
 
       if (propertyId) {
         if (canEditPropertyBlock) {
-          const propertyUpdates: PropertyUpdate = {
+          const propertyUpdates = {
             address: propertyPayload.address,
             street_number: propertyPayload.street_number,
             floor: propertyPayload.floor,
@@ -1486,8 +1566,13 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
             images: propertyPayload.images,
             bills_config: propertyPayload.bills_config,
             house_rules: propertyPayload.house_rules,
+            owner_lives_here: propertyPayload.owner_lives_here,
+            allows_pets: propertyPayload.allows_pets,
+            allows_smoking: propertyPayload.allows_smoking,
+            has_quiet_hours: propertyPayload.has_quiet_hours,
+            no_parties: propertyPayload.no_parties,
           };
-          const { error: propertyUpdateError } = await supabase
+          const { error: propertyUpdateError } = await sb
             .from("properties")
             .update(propertyUpdates)
             .eq("id", propertyId)
@@ -1495,7 +1580,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
           if (propertyUpdateError) throw propertyUpdateError;
         }
       } else {
-        const { data: property, error: propertyInsertError } = await supabase
+        const { data: property, error: propertyInsertError } = await sb
           .from("properties")
           .insert(propertyPayload)
           .select("id")
@@ -1504,9 +1589,38 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         propertyId = property.id;
       }
 
+      const roomPayload = {
+        property_id: propertyId,
+        name: form.title.trim() || null,
+        size_m2: form.size_m2 ? Number(form.size_m2) : null,
+        bed_type: form.bed_type,
+        has_private_bath: form.private_bath,
+        has_wardrobe: form.wardrobe,
+        has_desk: form.desk,
+        photos: allImages,
+      };
+
+      let roomId = initial?.room_id ?? null;
+      if (roomId) {
+        const { error: roomUpdateError } = await sb
+          .from("rooms")
+          .update(roomPayload)
+          .eq("id", roomId);
+        if (roomUpdateError) throw roomUpdateError;
+      } else {
+        const { data: room, error: roomInsertError } = await sb
+          .from("rooms")
+          .insert(roomPayload)
+          .select("id")
+          .single();
+        if (roomInsertError) throw roomInsertError;
+        roomId = room.id;
+      }
+
       const payload = {
         owner_id: userId,
         property_id: propertyId,
+        room_id: roomId,
         type: "offer" as const,
         title: form.title.trim(),
         description: form.description.trim() || null,
@@ -1531,18 +1645,27 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         // New fields (gracefully ignored if column doesn't exist yet)
         min_stay_months: form.min_stay_months ? Number(form.min_stay_months) : null,
         contract_type: form.contract_type,
-        bed_type: form.bed_type,
+        bed_type: legacyListingBedType(form.bed_type),
         has_private_bath: form.private_bath,
         has_wardrobe: form.wardrobe,
         has_desk: form.desk,
       };
 
       if (isEditing && initial) {
-        await updateListing.mutateAsync({ id: initial.id, updates: payload });
+        const { error: listingUpdateError } = await sb
+          .from("listings")
+          .update(payload)
+          .eq("id", initial.id);
+        if (listingUpdateError) throw listingUpdateError;
         router.replace(`/listing/${initial.id}`);
       } else {
-        const newId = await createListing.mutateAsync(payload);
-        router.replace(`/listing/${newId}`);
+        const { data: listing, error: listingInsertError } = await sb
+          .from("listings")
+          .insert(payload)
+          .select("id")
+          .single();
+        if (listingInsertError) throw listingInsertError;
+        router.replace(`/listing/${listing.id}`);
       }
     } catch (err) {
       Alert.alert("Error", (err as Error).message);
@@ -1597,24 +1720,21 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 2 && <Step2Piso form={form} set={set} />}
         {step === 3 && (
           <Step3CommonPhotos
-            photos={photoUris}
-            zones={photoZones}
+            photos={propertyPhotos}
             onAdd={handleAddPhotos}
             onZoneChange={handleZoneChange}
             onRemove={(i) => {
-              setPhotoUris((p) => p.filter((_, idx) => idx !== i));
-              setPhotoZones((z) => z.filter((_, idx) => idx !== i));
+              setPropertyPhotos((p) => p.filter((_, idx) => idx !== i));
             }}
             onMove={(i, d) => {
-              const swap = (arr: string[]) => {
+              const swap = (arr: PropertyPhoto[]) => {
                 const a = [...arr];
                 const next = i + d;
                 if (next < 0 || next >= a.length) return a;
                 [a[i], a[next]] = [a[next], a[i]];
                 return a;
               };
-              setPhotoUris((p) => swap(p));
-              setPhotoZones((z) => swap(z));
+              setPropertyPhotos((p) => swap(p));
             }}
           />
         )}
@@ -1624,7 +1744,7 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 7 && (
           <Step7RoomPhotos
             photos={roomPhotoUris}
-            flatPhotosCount={photoUris.length}
+            flatPhotosCount={propertyPhotos.length}
             onAdd={handleAddRoomPhotos}
             onRemove={(i) => setRoomPhotoUris((p) => p.filter((_, idx) => idx !== i))}
             onMove={(i, d) => setRoomPhotoUris((p) => {
@@ -1640,8 +1760,8 @@ export function ListingWizard({ initial, startAtStep = 1, existingProperty = nul
         {step === 9 && (
           <Step9Review
             form={form}
-            flatPhotos={photoUris}
-            flatPhotoZones={photoZones}
+            flatPhotos={propertyPhotos}
+            flatPhotoZones={propertyPhotos.map((photo) => photo.room)}
             roomPhotos={roomPhotoUris}
             onPublish={() => handleSubmit(false)}
             onDraft={() => handleSubmit(true)}

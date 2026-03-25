@@ -5,7 +5,8 @@ export type ListingStatus = "active" | "paused" | "rented" | "draft";
 export type RequestStatus = "pending" | "invited" | "offered" | "accepted" | "assigned" | "denied";
 export type ConnectionStatus = "pending" | "accepted";
 export type ContractType = "long_term" | "temporary" | "flexible";
-export type BedType = "single" | "double" | "bunk";
+export type BedType = "individual" | "doble" | "litera";
+export type CommonAreaType = "cocina" | "bano" | "salon" | "terraza" | "lavadero" | "garaje" | "entrada" | "otro";
 
 export type Database = {
   public: {
@@ -128,7 +129,11 @@ export type Database = {
           images: Json; // common area photos
           bills_config: Json; // { agua, luz, gas, internet, limpieza, comunidad, calefaccion }
           house_rules: string[] | null;
-          household_id: string | null;
+          owner_lives_here: boolean;
+          allows_pets: boolean;
+          allows_smoking: boolean;
+          has_quiet_hours: boolean;
+          no_parties: boolean;
           created_at: string;
         };
         Insert: {
@@ -149,7 +154,11 @@ export type Database = {
           images?: Json;
           bills_config?: Json;
           house_rules?: string[] | null;
-          household_id?: string | null;
+          owner_lives_here?: boolean;
+          allows_pets?: boolean;
+          allows_smoking?: boolean;
+          has_quiet_hours?: boolean;
+          no_parties?: boolean;
         };
         Update: {
           name?: string | null;
@@ -163,7 +172,81 @@ export type Database = {
           images?: Json;
           bills_config?: Json;
           house_rules?: string[] | null;
-          household_id?: string | null;
+          owner_lives_here?: boolean;
+          allows_pets?: boolean;
+          allows_smoking?: boolean;
+          has_quiet_hours?: boolean;
+          no_parties?: boolean;
+        };
+        Relationships: [];
+      };
+      rooms: {
+        Row: {
+          id: string;
+          property_id: string;
+          name: string | null;
+          size_m2: number | null;
+          bed_type: BedType | null;
+          has_private_bath: boolean;
+          has_wardrobe: boolean;
+          has_desk: boolean;
+          photos: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          name?: string | null;
+          size_m2?: number | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean;
+          has_wardrobe?: boolean;
+          has_desk?: boolean;
+          photos?: Json;
+          created_at?: string;
+        };
+        Update: {
+          property_id?: string;
+          name?: string | null;
+          size_m2?: number | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean;
+          has_wardrobe?: boolean;
+          has_desk?: boolean;
+          photos?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      common_areas: {
+        Row: {
+          id: string;
+          property_id: string;
+          type: CommonAreaType;
+          photos: Json;
+          description: string | null;
+          amenities: string[];
+          is_shared_bath: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          type: CommonAreaType;
+          photos?: Json;
+          description?: string | null;
+          amenities?: string[];
+          is_shared_bath?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          property_id?: string;
+          type?: CommonAreaType;
+          photos?: Json;
+          description?: string | null;
+          amenities?: string[];
+          is_shared_bath?: boolean;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -172,6 +255,7 @@ export type Database = {
           id: string;
           owner_id: string;
           property_id: string | null; // new - links to properties table
+          room_id: string | null;
           type: ListingType;
           title: string;
           description: string | null;
@@ -207,6 +291,7 @@ export type Database = {
           id?: string;
           owner_id: string;
           property_id?: string | null;
+          room_id?: string | null;
           type?: ListingType;
           title: string;
           description?: string | null;
@@ -237,6 +322,7 @@ export type Database = {
         };
         Update: {
           property_id?: string | null;
+          room_id?: string | null;
           type?: ListingType;
           title?: string;
           description?: string | null;
@@ -394,6 +480,7 @@ export type Database = {
         Row: {
           id: string;
           listing_id: string | null;
+          property_id: string | null;
           name: string;
           created_by: string | null;
           invite_code: string;
@@ -402,12 +489,13 @@ export type Database = {
         Insert: {
           id?: string;
           listing_id?: string | null;
+          property_id?: string | null;
           name: string;
           created_by?: string | null;
           invite_code?: string;
           created_at?: string;
         };
-        Update: { name?: string; listing_id?: string | null };
+        Update: { name?: string; listing_id?: string | null; property_id?: string | null };
         Relationships: [];
       };
       household_members: {
@@ -500,37 +588,41 @@ export type Database = {
         Row: {
           id: string;
           owner_id: string;
+          room_id: string | null;
           type: ListingType;
           title: string;
           description: string | null;
           price: number;
-          size_m2: number | null;
-          rooms: number | null;
           available_from: string | null;
+          min_stay_months: number | null;
+          contract_type: ContractType | null;
+          status: ListingStatus;
+          created_at: string;
+          updated_at: string;
+          search_vector: unknown | null;
+          property_id: string | null;
+          city_id: string | null;
+          place_id: string | null;
+          lat: number | null;
+          lng: number | null;
+          postal_code: string | null;
+          address: string | null;
+          city_name: string | null;
+          district_name: string | null;
+          city: string;
+          district: string | null;
+          street: string | null;
+          street_number: string | null;
+          rooms: number | null;
           is_furnished: boolean;
           pets_allowed: boolean;
           smokers_allowed: boolean;
-          status: ListingStatus;
+          size_m2: number | null;
           images: string[];
-          created_at: string;
-          updated_at: string;
-          search_vector: unknown;
-          min_stay_months: number | null;
-          contract_type: ContractType | null;
           bed_type: BedType | null;
           has_private_bath: boolean | null;
           has_wardrobe: boolean | null;
           has_desk: boolean | null;
-          city: string;
-          district: string | null;
-          city_id: string | null;
-          place_id: string | null;
-          street: string | null;
-          street_number: string | null;
-          postal_code: string | null;
-          lat: number | null;
-          lng: number | null;
-          property_id: string;
           property_name: string | null;
           property_address: string | null;
           property_street_number: string | null;
@@ -547,6 +639,16 @@ export type Database = {
           property_house_rules: string[] | null;
           property_images: Json;
           property_household_id: string | null;
+          owner_lives_here: boolean;
+          allows_pets: boolean;
+          allows_smoking: boolean;
+          has_quiet_hours: boolean;
+          no_parties: boolean;
+          bills_config: Json | null;
+          property_photos: Json | null;
+          room_name: string | null;
+          room_photos: Json | null;
+          common_area_types: CommonAreaType[] | null;
         };
       };
     };
@@ -568,12 +670,12 @@ export type Database = {
         Returns: string;
       };
       create_household: {
-        Args: { p_name: string; p_listing_id?: string | null };
+        Args: { p_name: string; p_listing_id?: string | null; p_property_id?: string | null };
         Returns: string;
       };
       my_household: {
         Args: Record<string, never>;
-        Returns: { id: string; name: string; invite_code: string; listing_id: string | null; created_by: string; created_at: string; member_role: string }[];
+        Returns: { id: string; name: string; invite_code: string; listing_id: string | null; property_id: string | null; created_by: string; created_at: string; member_role: string }[];
       };
       send_offer: {
         Args: { p_request_id: string; p_offer_terms?: Json };
@@ -605,20 +707,26 @@ export type Database = {
       };
       search_listings: {
         Args: {
-          p_query?:          string | null;
-          p_city?:           string | null;
-          p_type?:           "offer" | "search" | null;
-          p_price_min?:      number | null;
-          p_price_max?:      number | null;
-          p_size_min?:       number | null;
-          p_pets?:           boolean | null;
-          p_smokers?:        boolean | null;
+          p_query?: string | null;
+          p_city?: string | null;
+          p_city_id?: string | null;
+          p_place_id?: string | null;
+          p_type?: "offer" | "search" | null;
+          p_price_min?: number | null;
+          p_price_max?: number | null;
+          p_size_min?: number | null;
+          p_pets?: boolean | null;
+          p_smokers?: boolean | null;
+          p_allows_pets?: boolean | null;
+          p_allows_smoking?: boolean | null;
+          p_common_areas?: CommonAreaType[] | null;
           p_available_from?: string | null;
-          p_lat?:            number | null;
-          p_lng?:            number | null;
-          p_radius_km?:      number | null;
-          p_cursor?:         string | null;
-          p_limit?:          number | null;
+          p_lat?: number | null;
+          p_lng?: number | null;
+          p_radius_km?: number | null;
+          p_cursor?: string | null;
+          p_offset?: number | null;
+          p_limit?: number | null;
         };
         Returns: Database["public"]["Views"]["listings_with_property"]["Row"][];
       };

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "../lib/supabase";
 import type { Database, ListingStatus } from "../types/database";
-import type { Listing, ListingWithProperty } from "../types/listingWithProperty";
+import type { ListingWithProperty } from "../types/listingWithProperty";
 
 type ListingInsert = Database["public"]["Tables"]["listings"]["Insert"];
 type ListingUpdate = Database["public"]["Tables"]["listings"]["Update"];
@@ -87,11 +87,11 @@ export function useCreateListing() {
 
   return useMutation({
     mutationFn: async (payload: ListingInsert) => {
-      const { data, error } = await supabase
-        .from("listings")
-        .insert(payload)
+      const { data, error } = await (supabase
+        .from("listings" as any)
+        .insert(payload as any)
         .select("id")
-        .single();
+        .single() as any);
       if (error) throw error;
       return (data as { id: string }).id;
     },
@@ -107,7 +107,7 @@ export function useUpdateListing() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: ListingUpdate }) => {
-      const { error } = await supabase.from("listings").update(updates).eq("id", id);
+      const { error } = await supabase.from("listings" as any).update(updates as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, { id }) => {
@@ -122,7 +122,7 @@ export function useUpdateListingStatus() {
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ListingStatus }) => {
-      const { error } = await supabase.from("listings").update({ status }).eq("id", id);
+      const { error } = await supabase.from("listings" as any).update({ status } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: (_, { id }) => {
@@ -137,7 +137,7 @@ export function useDeleteListing() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("listings").delete().eq("id", id);
+      const { error } = await supabase.from("listings" as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
