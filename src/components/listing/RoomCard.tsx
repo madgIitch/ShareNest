@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import type { RoomListing } from "../../types";
 import { formatPrice } from "../../utils/format";
 
@@ -10,39 +10,31 @@ interface RoomCardProps {
 
 export default function RoomCard({ listing, onPress, compact }: RoomCardProps) {
   return (
-    <TouchableOpacity
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-3 overflow-hidden"
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View className="h-48 bg-gray-100" />
-      <View className="p-4">
-        <View className="flex-row justify-between items-start">
-          <Text className="text-lg font-bold text-gray-900 flex-1 mr-2" numberOfLines={1}>
-            {listing.title}
-          </Text>
-          <Text className="text-lg font-bold text-indigo-600">
-            {formatPrice(listing.price)}
-          </Text>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+      <View style={styles.image} />
+      <View style={styles.body}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>{listing.title}</Text>
+          <Text style={styles.price}>{formatPrice(listing.price)}</Text>
         </View>
         {listing.address_approx && (
-          <Text className="text-sm text-gray-500 mt-1">{listing.address_approx}</Text>
+          <Text style={styles.address}>{listing.address_approx}</Text>
         )}
         {!compact && (
-          <View className="flex-row gap-2 mt-3 flex-wrap">
+          <View style={styles.tagsRow}>
             {listing.allows_pets && (
-              <View className="bg-green-50 rounded-full px-2 py-1">
-                <Text className="text-xs text-green-700">🐾 Mascotas</Text>
+              <View style={[styles.tag, styles.tagGreen]}>
+                <Text style={[styles.tagText, styles.tagTextGreen]}>🐾 Mascotas</Text>
               </View>
             )}
             {listing.has_private_bath && (
-              <View className="bg-blue-50 rounded-full px-2 py-1">
-                <Text className="text-xs text-blue-700">🚿 Baño privado</Text>
+              <View style={[styles.tag, styles.tagBlue]}>
+                <Text style={[styles.tagText, styles.tagTextBlue]}>🚿 Baño privado</Text>
               </View>
             )}
             {listing.is_furnished && (
-              <View className="bg-amber-50 rounded-full px-2 py-1">
-                <Text className="text-xs text-amber-700">🛋️ Amueblada</Text>
+              <View style={[styles.tag, styles.tagAmber]}>
+                <Text style={[styles.tagText, styles.tagTextAmber]}>🛋️ Amueblada</Text>
               </View>
             )}
           </View>
@@ -51,3 +43,34 @@ export default function RoomCard({ listing, onPress, compact }: RoomCardProps) {
     </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    marginBottom: 12,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  image: { height: 192, backgroundColor: "#F3F4F6" },
+  body: { padding: 16 },
+  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  title: { fontSize: 18, fontWeight: "700", color: "#111827", flex: 1, marginRight: 8 },
+  price: { fontSize: 18, fontWeight: "700", color: "#4F46E5" },
+  address: { fontSize: 14, color: "#6B7280", marginTop: 4 },
+  tagsRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
+  tag: { borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 4 },
+  tagText: { fontSize: 12 },
+  tagGreen: { backgroundColor: "#F0FDF4" },
+  tagTextGreen: { color: "#15803D" },
+  tagBlue: { backgroundColor: "#EFF6FF" },
+  tagTextBlue: { color: "#1D4ED8" },
+  tagAmber: { backgroundColor: "#FFFBEB" },
+  tagTextAmber: { color: "#B45309" },
+});

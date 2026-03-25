@@ -1,4 +1,5 @@
-import { View, Text } from "react-native";
-export default function StepLocation() {
-  return <View className="flex-1 bg-white justify-center items-center"><Text>Paso 2: Ubicación</Text></View>;
+import { View, StyleSheet } from "react-native";
+export default function Screen() {
+  return <View style={styles.c} />;
 }
+const styles = StyleSheet.create({ c: { flex: 1, backgroundColor: "#fff" } });

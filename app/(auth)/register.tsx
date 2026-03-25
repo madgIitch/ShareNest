@@ -1,12 +1,7 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
+  Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -23,108 +18,60 @@ export default function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const handleRegister = async () => {
-    if (!email || !password || !confirmPassword) {
-      setError("Completa los tres campos para crear tu cuenta.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("La contrasena debe tener al menos 6 caracteres.");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Las contrasenas no coinciden.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const { error: signUpError } = await signUp(email.trim(), password);
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-
+    if (!email || !password || !confirmPassword) { setError("Completa todos los campos."); return; }
+    if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
+    if (password !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+    setLoading(true); setError(null);
+    const { error: e } = await signUp(email.trim(), password);
+    if (e) { setError(e.message); setLoading(false); return; }
     setLoading(false);
     router.replace("/(auth)/onboarding");
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#151515" }}>
+    <SafeAreaView style={s.root}>
       <StatusBar style="light" />
-      <KeyboardAvoidingView
-        className="flex-1 px-6 pb-6"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View
-          className="flex-1 rounded-[40px] px-7 py-6"
-          style={{ borderWidth: 1, borderColor: "#4F4F4F", backgroundColor: "#343331" }}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-[18px] font-semibold text-white">9:41</Text>
-            <View className="flex-row items-center gap-1">
-              <View className="h-5 w-1 rounded-full bg-white" />
-              <View className="h-6 w-1 rounded-full bg-white" />
-              <View className="h-7 w-1 rounded-full bg-white" />
-              <View className="ml-1 h-7 w-9 rounded-md border border-white" />
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() => router.back()}
-            className="mt-10 h-12 w-12 items-center justify-center"
-            hitSlop={12}
-          >
-            <Ionicons name="arrow-back" size={34} color="#FFFFFF" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <View style={s.header}>
+          <Pressable onPress={() => router.back()} hitSlop={16} style={s.backBtn}>
+            <Ionicons name="arrow-back" size={26} color="#fff" />
           </Pressable>
+        </View>
 
-          <Text className="mt-4 text-[28px] font-extrabold text-white">
-            Crea tu cuenta
-          </Text>
-          <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-            En menos de un minuto podras completar tu perfil y empezar a explorar.
-          </Text>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={s.title}>Crea tu{"\n"}cuenta</Text>
+          <Text style={s.subtitle}>En menos de un minuto estarás explorando pisos.</Text>
 
-          <View className="mt-10 gap-6">
+          <View style={s.fields}>
             <View>
-              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">EMAIL</Text>
+              <Text style={s.label}>EMAIL</Text>
               <TextInput
-                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
-                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
+                style={s.input}
                 placeholder="tu@email.com"
-                placeholderTextColor="#E7E0DB"
+                placeholderTextColor="#555"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
               />
             </View>
-
             <View>
-              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">CONTRASENA</Text>
+              <Text style={s.label}>CONTRASEÑA</Text>
               <TextInput
-                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
-                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
-                placeholder="Minimo 6 caracteres"
-                placeholderTextColor="#B5AEA9"
+                style={s.input}
+                placeholder="Mínimo 6 caracteres"
+                placeholderTextColor="#555"
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
               />
             </View>
-
             <View>
-              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">
-                REPITE LA CONTRASENA
-              </Text>
+              <Text style={s.label}>REPITE LA CONTRASEÑA</Text>
               <TextInput
-                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
-                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
-                placeholder="Confirma tu contrasena"
-                placeholderTextColor="#B5AEA9"
+                style={s.input}
+                placeholder="Confirma tu contraseña"
+                placeholderTextColor="#555"
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -132,40 +79,47 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          {error ? (
-            <View
-              className="mt-5 rounded-2xl px-4 py-3"
-              style={{ borderWidth: 1, borderColor: "#8A4B37", backgroundColor: "#402920" }}
-            >
-              <Text className="text-[14px] text-[#FFD2C5]">{error}</Text>
-            </View>
-          ) : null}
+          {error ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
 
-          <View className="flex-1" />
-
-          <Pressable
-            onPress={handleRegister}
-            disabled={loading}
-            className="h-20 items-center justify-center rounded-[18px]"
-            style={{ borderWidth: 1, borderColor: "#5A5A5A" }}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="text-[20px] font-bold text-white">Continuar</Text>
-            )}
-          </Pressable>
-
-          <View className="mt-6 flex-row justify-center">
-            <Text className="text-[16px] text-[#C0B8B2]">Ya tienes cuenta? </Text>
+          <View style={s.loginRow}>
+            <Text style={s.loginLabel}>¿Ya tienes cuenta? </Text>
             <Link href="/(auth)/login" asChild>
-              <Pressable>
-                <Text className="text-[16px] font-medium text-[#F36A39]">Entrar</Text>
-              </Pressable>
+              <Pressable><Text style={s.loginLink}>Entrar</Text></Pressable>
             </Link>
           </View>
+        </ScrollView>
+
+        <View style={s.footer}>
+          <Pressable style={[s.submitBtn, loading && { opacity: 0.6 }]} onPress={handleRegister} disabled={loading}>
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={s.submitText}>Continuar</Text>}
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#111111" },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  scroll: { paddingHorizontal: 24, paddingBottom: 24 },
+  title: { fontSize: 36, fontWeight: "800", color: "#fff", lineHeight: 42, marginTop: 8 },
+  subtitle: { marginTop: 10, fontSize: 15, color: "#8A8480", lineHeight: 22 },
+  fields: { marginTop: 36, gap: 24 },
+  label: { fontSize: 11, fontWeight: "600", color: "#666", letterSpacing: 1, marginBottom: 10 },
+  input: {
+    height: 56, borderRadius: 14, paddingHorizontal: 18, fontSize: 16, color: "#fff",
+    backgroundColor: "#1E1E1E", borderWidth: 1, borderColor: "#2E2E2E",
+  },
+  errorBox: { marginTop: 20, borderRadius: 12, padding: 14, backgroundColor: "#2A1A14", borderWidth: 1, borderColor: "#5A2E20" },
+  errorText: { fontSize: 13, color: "#FF9980" },
+  loginRow: { flexDirection: "row", justifyContent: "center", marginTop: 32 },
+  loginLabel: { fontSize: 14, color: "#666" },
+  loginLink: { fontSize: 14, fontWeight: "600", color: "#F36A39" },
+  footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8 },
+  submitBtn: { height: 58, borderRadius: 16, backgroundColor: "#F36A39", alignItems: "center", justifyContent: "center" },
+  submitText: { fontSize: 17, fontWeight: "700", color: "#fff" },
+});

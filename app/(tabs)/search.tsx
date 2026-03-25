@@ -1,9 +1,14 @@
-import { View, Text } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 
 export default function SearchScreen() {
   return (
-    <View className="flex-1 bg-gray-50 justify-center items-center">
-      <Text className="text-gray-400">Buscar compañero</Text>
+    <View style={styles.container}>
+      <Text style={styles.text}>Buscar compañero</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F9FAFB", justifyContent: "center", alignItems: "center" },
+  text: { color: "#9CA3AF" },
+});

@@ -1,25 +1,28 @@
-import { View } from "react-native";
+import { View, StyleSheet, ViewStyle } from "react-native";
 
 interface SkeletonProps {
   width?: number | string;
   height?: number;
   rounded?: boolean;
-  className?: string;
+  style?: ViewStyle;
 }
 
-export default function Skeleton({
-  width,
-  height = 16,
-  rounded = false,
-  className = "",
-}: SkeletonProps) {
+export default function Skeleton({ width, height = 16, rounded = false, style }: SkeletonProps) {
   return (
     <View
-      className={`bg-gray-200 ${rounded ? "rounded-full" : "rounded-lg"} ${className}`}
       style={[
-        typeof width === "number" ? { width } : {},
+        styles.base,
+        rounded ? styles.rounded : styles.rect,
+        typeof width === "number" ? { width } : width ? { width } : undefined,
         { height },
+        style,
       ]}
     />
   );
 }
+
+const styles = StyleSheet.create({
+  base: { backgroundColor: "#E5E7EB" },
+  rounded: { borderRadius: 9999 },
+  rect: { borderRadius: 8 },
+});

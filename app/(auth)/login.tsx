@@ -1,13 +1,7 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  Text,
-  TextInput,
-  View,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -23,149 +17,127 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      setError("Introduce tu email y tu contrasena.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    const { error: signInError } = await signIn(email.trim(), password);
-    if (signInError) setError(signInError.message);
+    if (!email || !password) { setError("Introduce tu email y contraseña."); return; }
+    setLoading(true); setError(null);
+    const { error: e } = await signIn(email.trim(), password);
+    if (e) setError(e.message);
     setLoading(false);
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#151515" }}>
+    <SafeAreaView style={s.root}>
       <StatusBar style="light" />
-      <KeyboardAvoidingView
-        className="flex-1 px-6 pb-6"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View
-          className="flex-1 rounded-[40px] px-7 py-6"
-          style={{ borderWidth: 1, borderColor: "#4F4F4F", backgroundColor: "#343331" }}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-[18px] font-semibold text-white">9:41</Text>
-            <View className="flex-row items-center gap-1">
-              <View className="h-5 w-1 rounded-full bg-white" />
-              <View className="h-6 w-1 rounded-full bg-white" />
-              <View className="h-7 w-1 rounded-full bg-white" />
-              <View className="ml-1 h-7 w-9 rounded-md border border-white" />
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() => router.back()}
-            className="mt-14 h-12 w-12 items-center justify-center"
-            hitSlop={12}
-          >
-            <Ionicons name="arrow-back" size={34} color="#FFFFFF" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        {/* header */}
+        <View style={s.header}>
+          <Pressable onPress={() => router.back()} hitSlop={16} style={s.backBtn}>
+            <Ionicons name="arrow-back" size={26} color="#fff" />
           </Pressable>
+        </View>
 
-          <Text className="mt-4 text-[28px] font-extrabold text-white">
-            Bienvenido de nuevo
-          </Text>
-          <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-            Entra para ver tus solicitudes y mensajes
-          </Text>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={s.title}>Bienvenido{"\n"}de nuevo</Text>
+          <Text style={s.subtitle}>Entra para ver tus solicitudes y mensajes</Text>
 
-          <View className="mt-12 gap-6">
+          <View style={s.fields}>
             <View>
-              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">EMAIL</Text>
+              <Text style={s.label}>EMAIL</Text>
               <TextInput
-                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
-                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
+                style={s.input}
                 placeholder="tu@email.com"
-                placeholderTextColor="#E7E0DB"
+                placeholderTextColor="#555"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
                 onChangeText={setEmail}
               />
             </View>
-
             <View>
-              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">CONTRASENA</Text>
+              <Text style={s.label}>CONTRASEÑA</Text>
               <TextInput
-                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
-                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
+                style={s.input}
                 placeholder="••••••••"
-                placeholderTextColor="#E7E0DB"
+                placeholderTextColor="#555"
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
               />
-            </View>
-          </View>
-
-          <Pressable
-            onPress={() =>
-              Alert.alert(
-                "Proximamente",
-                "La recuperacion de contrasena llegara en la siguiente iteracion."
-              )
-            }
-            className="mt-4 self-end"
-          >
-            <Text className="text-[17px] font-medium text-[#F36A39]">La olvidaste?</Text>
-          </Pressable>
-
-          {error ? (
-            <View
-              className="mt-4 rounded-2xl px-4 py-3"
-              style={{ borderWidth: 1, borderColor: "#8A4B37", backgroundColor: "#402920" }}
-            >
-              <Text className="text-[14px] text-[#FFD2C5]">{error}</Text>
-            </View>
-          ) : null}
-
-          <View className="mt-8 flex-row items-center">
-            <View className="h-px flex-1" style={{ backgroundColor: "#4D4D4D" }} />
-            <Text className="mx-5 text-[16px] text-[#B9B0A9]">o</Text>
-            <View className="h-px flex-1" style={{ backgroundColor: "#4D4D4D" }} />
-          </View>
-
-          <Pressable
-            onPress={() =>
-              Alert.alert(
-                "Proximamente",
-                "Google Sign-In todavia no esta conectado en esta version."
-              )
-            }
-            className="mt-8 h-20 flex-row items-center justify-center rounded-[18px]"
-            style={{ borderWidth: 1, borderColor: "#4F4F4F" }}
-          >
-            <Text className="mr-4 text-[30px] font-bold text-[#4285F4]">G</Text>
-            <Text className="text-[18px] font-medium text-white">Continuar con Google</Text>
-          </Pressable>
-
-          <View className="mt-8 flex-row justify-center">
-            <Text className="text-[16px] text-[#C0B8B2]">No tienes cuenta? </Text>
-            <Link href="/(auth)/register" asChild>
-              <Pressable>
-                <Text className="text-[16px] font-medium text-[#F36A39]">Registrate</Text>
+              <Pressable
+                onPress={() => Alert.alert("Próximamente", "Recuperación de contraseña en la próxima versión.")}
+                style={s.forgotBtn}
+              >
+                <Text style={s.forgotText}>¿La olvidaste?</Text>
               </Pressable>
+            </View>
+          </View>
+
+          {error ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
+
+          <View style={s.divider}>
+            <View style={s.dividerLine} />
+            <Text style={s.dividerText}>o</Text>
+            <View style={s.dividerLine} />
+          </View>
+
+          <Pressable
+            style={s.googleBtn}
+            onPress={() => Alert.alert("Próximamente", "Google Sign-In llegará pronto.")}
+          >
+            <Text style={s.googleG}>G</Text>
+            <Text style={s.googleText}>Continuar con Google</Text>
+          </Pressable>
+
+          <View style={s.registerRow}>
+            <Text style={s.registerLabel}>¿No tienes cuenta? </Text>
+            <Link href="/(auth)/register" asChild>
+              <Pressable><Text style={s.registerLink}>Regístrate</Text></Pressable>
             </Link>
           </View>
+        </ScrollView>
 
-          <View className="flex-1" />
-
-          <Pressable
-            onPress={handleLogin}
-            disabled={loading}
-            className="h-20 items-center justify-center rounded-[18px]"
-            style={{ borderWidth: 1, borderColor: "#5A5A5A" }}
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="text-[20px] font-bold text-white">Entrar</Text>
-            )}
+        {/* pinned submit */}
+        <View style={s.footer}>
+          <Pressable style={[s.submitBtn, loading && { opacity: 0.6 }]} onPress={handleLogin} disabled={loading}>
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={s.submitText}>Entrar</Text>}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#111111" },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
+  backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  scroll: { paddingHorizontal: 24, paddingBottom: 24 },
+  title: { fontSize: 36, fontWeight: "800", color: "#fff", lineHeight: 42, marginTop: 8 },
+  subtitle: { marginTop: 10, fontSize: 15, color: "#8A8480", lineHeight: 22 },
+  fields: { marginTop: 36, gap: 24 },
+  label: { fontSize: 11, fontWeight: "600", color: "#666", letterSpacing: 1, marginBottom: 10 },
+  input: {
+    height: 56, borderRadius: 14, paddingHorizontal: 18, fontSize: 16, color: "#fff",
+    backgroundColor: "#1E1E1E", borderWidth: 1, borderColor: "#2E2E2E",
+  },
+  forgotBtn: { alignSelf: "flex-end", marginTop: 10 },
+  forgotText: { fontSize: 14, color: "#F36A39" },
+  errorBox: { marginTop: 16, borderRadius: 12, padding: 14, backgroundColor: "#2A1A14", borderWidth: 1, borderColor: "#5A2E20" },
+  errorText: { fontSize: 13, color: "#FF9980" },
+  divider: { flexDirection: "row", alignItems: "center", marginTop: 32, gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "#222" },
+  dividerText: { fontSize: 13, color: "#555" },
+  googleBtn: {
+    marginTop: 16, height: 56, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    borderRadius: 14, backgroundColor: "#1A1A1A", borderWidth: 1, borderColor: "#2E2E2E", gap: 12,
+  },
+  googleG: { fontSize: 22, fontWeight: "800", color: "#4285F4" },
+  googleText: { fontSize: 15, fontWeight: "500", color: "#ccc" },
+  registerRow: { flexDirection: "row", justifyContent: "center", marginTop: 28 },
+  registerLabel: { fontSize: 14, color: "#666" },
+  registerLink: { fontSize: 14, fontWeight: "600", color: "#F36A39" },
+  footer: { paddingHorizontal: 24, paddingBottom: 12, paddingTop: 8 },
+  submitBtn: { height: 58, borderRadius: 16, backgroundColor: "#F36A39", alignItems: "center", justifyContent: "center" },
+  submitText: { fontSize: 17, fontWeight: "700", color: "#fff" },
+});

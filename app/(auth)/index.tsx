@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-const initials = [
+const AVATARS = [
   { letter: "M", color: "#F36A39" },
   { letter: "L", color: "#458CE8" },
   { letter: "A", color: "#45C980" },
@@ -13,87 +13,89 @@ const initials = [
 
 export default function AuthSplashScreen() {
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: "#151515" }}>
+    <SafeAreaView style={s.root}>
       <StatusBar style="light" />
-      <View className="flex-1 px-6 pb-6">
-        <View
-          className="flex-1 overflow-hidden rounded-[40px] px-7 py-6"
-          style={{ borderWidth: 1, borderColor: "#4F4F4F", backgroundColor: "#1C1C1C" }}
-        >
-          <View
-            className="absolute h-72 w-72 rounded-full"
-            style={{ left: -70, top: -30, backgroundColor: "rgba(143,67,42,0.45)" }}
-          />
-          <View
-            className="absolute h-72 w-72 rounded-full"
-            style={{ right: -20, bottom: -80, backgroundColor: "rgba(29,58,90,0.55)" }}
-          />
 
-          <View className="flex-row items-center justify-between">
-            <Text className="text-[18px] font-semibold text-white">9:41</Text>
-            <View className="flex-row items-center gap-1">
-              <View className="h-5 w-1 rounded-full bg-white" />
-              <View className="h-6 w-1 rounded-full bg-white" />
-              <View className="h-7 w-1 rounded-full bg-white" />
-              <View className="ml-1 h-7 w-9 rounded-md border border-white" />
-            </View>
-          </View>
+      {/* decorative blobs */}
+      <View style={[s.blob, { top: -60, left: -80, backgroundColor: "rgba(143,67,42,0.35)" }]} />
+      <View style={[s.blob, { bottom: -80, right: -60, backgroundColor: "rgba(29,58,90,0.45)" }]} />
 
-          <View className="flex-1 items-center pt-28">
-            <Text className="text-[46px] font-extrabold text-white">
-              homi<Text className="text-[#F36A39]">match</Text>
-            </Text>
-            <Text className="mt-8 max-w-[290px] text-center text-[18px] leading-8 text-[#AFA6A1]">
-              Encuentra habitación entre personas que ya conoces
-            </Text>
+      {/* logo */}
+      <View style={s.top}>
+        <Text style={s.logo}>
+          homi<Text style={s.logoAccent}>match</Text>
+        </Text>
+        <Text style={s.tagline}>Encuentra habitación entre{"\n"}personas que ya conoces</Text>
+      </View>
 
-            <View className="mt-28 flex-row">
-              {initials.map((item, index) => (
-                <View
-                  key={item.letter}
-                  className="h-16 w-16 items-center justify-center rounded-full border-2"
-                  style={{
-                    backgroundColor: item.color,
-                    zIndex: initials.length - index,
-                    marginRight: -8,
-                    borderColor: "#1C1C1C",
-                  }}
-                >
-                  <Text className="text-[21px] font-bold text-white">{item.letter}</Text>
-                </View>
-              ))}
-            </View>
-
-            <Text className="mt-8 text-center text-[16px] text-[#A9A9A9]">
-              <Text className="font-bold text-white">+2.400 personas</Text> ya encontraron piso en Madrid
-            </Text>
-          </View>
-
-          <View className="gap-5">
-            <Pressable
-              onPress={() => router.push("/(auth)/register")}
-              className="h-20 items-center justify-center rounded-[18px]"
-              style={{ borderWidth: 1, borderColor: "#5A5A5A", backgroundColor: "#232323" }}
+      {/* social proof */}
+      <View style={s.mid}>
+        <View style={s.avatarRow}>
+          {AVATARS.map((a, i) => (
+            <View
+              key={a.letter}
+              style={[s.avatar, { backgroundColor: a.color, marginLeft: i === 0 ? 0 : -12, zIndex: AVATARS.length - i }]}
             >
-              <Text className="text-[19px] font-bold text-white">Crear cuenta</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => router.push("/(auth)/login")}
-              className="h-20 items-center justify-center rounded-[18px]"
-              style={{ borderWidth: 1, borderColor: "#5A5A5A", backgroundColor: "#232323" }}
-            >
-              <Text className="text-[19px] font-bold text-white">Ya tengo cuenta</Text>
-            </Pressable>
-          </View>
-
-          <Text className="pt-10 text-center text-[14px] leading-6 text-[#6F6F6F]">
-            Al registrarte aceptas los{" "}
-            <Text className="text-[#A5A5A5] underline">Términos de uso</Text> y la{" "}
-            <Text className="text-[#A5A5A5] underline">Privacidad</Text>
-          </Text>
+              <Text style={s.avatarLetter}>{a.letter}</Text>
+            </View>
+          ))}
         </View>
+        <Text style={s.proof}>
+          <Text style={s.proofBold}>+2.400 personas</Text> ya encontraron piso en Madrid
+        </Text>
+      </View>
+
+      {/* actions */}
+      <View style={s.bottom}>
+        <Pressable style={s.btnPrimary} onPress={() => router.push("/(auth)/register")}>
+          <Text style={s.btnPrimaryText}>Crear cuenta</Text>
+        </Pressable>
+        <Pressable style={s.btnSecondary} onPress={() => router.push("/(auth)/login")}>
+          <Text style={s.btnSecondaryText}>Ya tengo cuenta</Text>
+        </Pressable>
+        <Text style={s.legal}>
+          Al registrarte aceptas los{" "}
+          <Text style={s.legalLink}>Términos de uso</Text>
+          {" "}y la{" "}
+          <Text style={s.legalLink}>Privacidad</Text>
+        </Text>
       </View>
     </SafeAreaView>
   );
 }
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#111111" },
+  blob: { position: "absolute", width: 320, height: 320, borderRadius: 160 },
+
+  top: { flex: 1, alignItems: "center", justifyContent: "center" },
+  logo: { fontSize: 48, fontWeight: "800", color: "#FFFFFF", letterSpacing: -1 },
+  logoAccent: { color: "#F36A39" },
+  tagline: { marginTop: 16, fontSize: 17, lineHeight: 26, color: "#8A8480", textAlign: "center" },
+
+  mid: { alignItems: "center", paddingBottom: 40 },
+  avatarRow: { flexDirection: "row", alignItems: "center" },
+  avatar: {
+    width: 52, height: 52, borderRadius: 26,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 3, borderColor: "#111111",
+  },
+  avatarLetter: { fontSize: 18, fontWeight: "700", color: "#fff" },
+  proof: { marginTop: 16, fontSize: 14, color: "#7A7470", textAlign: "center" },
+  proofBold: { color: "#FFFFFF", fontWeight: "700" },
+
+  bottom: { paddingHorizontal: 24, paddingBottom: 16, gap: 12 },
+  btnPrimary: {
+    height: 58, borderRadius: 16, backgroundColor: "#F36A39",
+    alignItems: "center", justifyContent: "center",
+  },
+  btnPrimaryText: { fontSize: 17, fontWeight: "700", color: "#fff" },
+  btnSecondary: {
+    height: 58, borderRadius: 16, backgroundColor: "#222222",
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "#333333",
+  },
+  btnSecondaryText: { fontSize: 17, fontWeight: "600", color: "#CCCCCC" },
+  legal: { textAlign: "center", fontSize: 12, color: "#555555", marginTop: 4 },
+  legalLink: { color: "#888888", textDecorationLine: "underline" },
+});

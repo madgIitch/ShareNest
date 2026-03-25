@@ -1,4 +1,4 @@
-import { TouchableOpacity, Text, ActivityIndicator } from "react-native";
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from "react-native";
 
 interface ButtonProps {
   title: string;
@@ -6,39 +6,35 @@ interface ButtonProps {
   variant?: "primary" | "secondary" | "outline";
   disabled?: boolean;
   loading?: boolean;
-  className?: string;
 }
 
-export default function Button({
-  title,
-  onPress,
-  variant = "primary",
-  disabled,
-  loading,
-}: ButtonProps) {
-  const baseClass = "rounded-xl px-4 py-3 items-center justify-center";
-  const variantClass =
-    variant === "primary"
-      ? "bg-indigo-500"
-      : variant === "outline"
-        ? "border border-indigo-500 bg-transparent"
-        : "bg-amber-400";
+export default function Button({ title, onPress, variant = "primary", disabled, loading }: ButtonProps) {
+  const btnStyle = [
+    styles.base,
+    variant === "primary" ? styles.primary : variant === "outline" ? styles.outline : styles.secondary,
+    (disabled || loading) && styles.disabled,
+  ];
 
   return (
-    <TouchableOpacity
-      className={`${baseClass} ${variantClass} ${disabled || loading ? "opacity-50" : ""}`}
-      onPress={onPress}
-      disabled={disabled || loading}
-    >
+    <TouchableOpacity style={btnStyle} onPress={onPress} disabled={disabled || loading}>
       {loading ? (
         <ActivityIndicator color={variant === "outline" ? "#6366F1" : "white"} />
       ) : (
-        <Text
-          className={`font-semibold text-base ${variant === "outline" ? "text-indigo-500" : "text-white"}`}
-        >
+        <Text style={[styles.text, variant === "outline" ? styles.textOutline : styles.textSolid]}>
           {title}
         </Text>
       )}
     </TouchableOpacity>
   );
 }
+
+const styles = StyleSheet.create({
+  base: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, alignItems: "center", justifyContent: "center" },
+  primary: { backgroundColor: "#6366F1" },
+  outline: { borderWidth: 1, borderColor: "#6366F1", backgroundColor: "transparent" },
+  secondary: { backgroundColor: "#FBBF24" },
+  disabled: { opacity: 0.5 },
+  text: { fontWeight: "600", fontSize: 16 },
+  textSolid: { color: "#fff" },
+  textOutline: { color: "#6366F1" },
+});

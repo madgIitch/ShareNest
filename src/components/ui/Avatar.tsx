@@ -1,4 +1,4 @@
-import { Image, View, Text } from "react-native";
+import { Image, View, Text, StyleSheet } from "react-native";
 
 interface AvatarProps {
   uri?: string | null;
@@ -16,21 +16,18 @@ export default function Avatar({ uri, name, size = 40 }: AvatarProps) {
 
   if (uri) {
     return (
-      <Image
-        source={{ uri }}
-        style={{ width: size, height: size, borderRadius: size / 2 }}
-      />
+      <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
     );
   }
 
   return (
-    <View
-      className="bg-indigo-100 items-center justify-center"
-      style={{ width: size, height: size, borderRadius: size / 2 }}
-    >
-      <Text className="text-indigo-600 font-semibold" style={{ fontSize: size * 0.4 }}>
-        {initials ?? "?"}
-      </Text>
+    <View style={[styles.wrap, { width: size, height: size, borderRadius: size / 2 }]}>
+      <Text style={[styles.initials, { fontSize: size * 0.4 }]}>{initials ?? "?"}</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { backgroundColor: "#E0E7FF", alignItems: "center", justifyContent: "center" },
+  initials: { color: "#4F46E5", fontWeight: "600" },
+});

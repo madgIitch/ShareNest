@@ -1,4 +1,4 @@
-import { TextInput, View, Text } from "react-native";
+import { TextInput, View, Text, StyleSheet } from "react-native";
 
 interface InputProps {
   label?: string;
@@ -12,22 +12,14 @@ interface InputProps {
 }
 
 export default function Input({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  secureTextEntry,
-  error,
-  keyboardType = "default",
-  autoCapitalize = "sentences",
+  label, value, onChangeText, placeholder, secureTextEntry, error,
+  keyboardType = "default", autoCapitalize = "sentences",
 }: InputProps) {
   return (
-    <View className="mb-4">
-      {label && (
-        <Text className="text-sm font-medium text-gray-700 mb-1">{label}</Text>
-      )}
+    <View style={styles.wrap}>
+      {label && <Text style={styles.label}>{label}</Text>}
       <TextInput
-        className={`border rounded-xl px-4 py-3 text-base bg-white ${error ? "border-red-400" : "border-gray-200"}`}
+        style={[styles.input, error ? styles.inputError : styles.inputNormal]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -35,7 +27,19 @@ export default function Input({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
       />
-      {error && <Text className="text-red-500 text-xs mt-1">{error}</Text>}
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  wrap: { marginBottom: 16 },
+  label: { fontSize: 14, fontWeight: "500", color: "#374151", marginBottom: 4 },
+  input: {
+    borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+    fontSize: 16, backgroundColor: "#fff",
+  },
+  inputNormal: { borderColor: "#E5E7EB" },
+  inputError: { borderColor: "#F87171" },
+  errorText: { color: "#EF4444", fontSize: 12, marginTop: 4 },
+});
