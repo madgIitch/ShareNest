@@ -253,6 +253,13 @@ export default function ListingDetailScreen() {
     getSavedListingIds().then((ids) => setIsSaved(ids.includes(id)));
   }, [id]);
 
+  const openGallery = useCallback((nextImages: string[], index: number) => {
+    if (nextImages.length === 0) return;
+    setGalleryImages(nextImages);
+    setGalleryIndex(index);
+    setGalleryVisible(true);
+  }, []);
+
   if (isLoading || !detail) {
     return (
       <View style={styles.centered}>
@@ -307,13 +314,6 @@ export default function ListingDetailScreen() {
       Alert.alert("Error", "No se pudo compartir el anuncio.");
     }
   };
-
-  const openGallery = useCallback((nextImages: string[], index: number) => {
-    if (nextImages.length === 0) return;
-    setGalleryImages(nextImages);
-    setGalleryIndex(index);
-    setGalleryVisible(true);
-  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

@@ -155,15 +155,45 @@ export function useCreateHousehold() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ name, listingId, propertyId }: { name: string; listingId?: string; propertyId?: string | null }) => {
-      const { data, error } = await supabase.rpc("create_household", {
+      const { data, error } = await supabase.rpc("create_household" as any, {
         p_name: name,
         p_listing_id: listingId ?? null,
         p_property_id: propertyId ?? null,
-      });
-      if (error) throw error;
-      return { id: data as string };
+      } as any);
+
+      const missingNewSignature =
+        !!error &&
+        typeof error.message === "string" &&
+        error.message.includes("create_household(p_listing_id, p_name, p_property_id)");
+
+      if (!missingNewSignature) {
+        if (error) throw error;
+        return { id: data as string };
+      }
+
+      const legacyCall = await supabase.rpc("create_household" as any, {
+        p_name: name,
+        p_listing_id: listingId ?? null,
+      } as any);
+      if (legacyCall.error) throw legacyCall.error;
+
+      const householdId = legacyCall.data as string;
+
+      if (propertyId) {
+        const { error: attachError } = await (supabase
+          .from("households" as any)
+          .update({ property_id: propertyId } as any)
+          .eq("id", householdId) as any);
+        if (attachError) throw attachError;
+      }
+
+      return { id: householdId };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY });
+      qc.invalidateQueries({ queryKey: ["household"] });
+      qc.invalidateQueries({ queryKey: ["properties"] });
+    },
   });
 }
 
