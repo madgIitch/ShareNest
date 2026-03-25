@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuthStore } from "../stores/authStore";
+import type { Database } from "../types/database";
 
 export function useAuth() {
   const { user, session, loading, setUser, setSession, setLoading, clear } =
@@ -21,9 +22,9 @@ export function useAuth() {
       setLoading(false);
 
       if (session?.user) {
-        await supabase.from("profiles").upsert({
+        await (supabase.from("profiles") as any).upsert({
           id: session.user.id,
-        });
+        } satisfies Database["public"]["Tables"]["profiles"]["Insert"]);
       }
     });
 

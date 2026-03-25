@@ -16,6 +16,7 @@ import RoomCardSkeleton from "../../src/components/listing/RoomCardSkeleton";
 import Sheet from "../../src/components/ui/Sheet";
 import type { RoomListing } from "../../src/types";
 import { DEFAULT_CENTER } from "../../src/constants/config";
+import MapView from "../../src/components/map/MapView";
 
 type ViewMode = "map" | "list";
 
@@ -188,15 +189,7 @@ function MapViewLoader({
   markers: any[];
   onMarkerPress: (id: string) => void;
 }) {
-  const [MapViewComponent, setMapViewComponent] = useState<React.ComponentType<any> | null>(null);
-
-  if (Platform.OS === "web" && !MapViewComponent) {
-    import("../../src/components/map/MapView").then((m) =>
-      setMapViewComponent(() => m.default)
-    );
-  }
-
-  if (!MapViewComponent) {
+  if (Platform.OS === "web" && !MapView) {
     return (
       <View className="flex-1 items-center justify-center">
         <Text className="text-gray-400">Cargando mapa...</Text>
@@ -205,7 +198,7 @@ function MapViewLoader({
   }
 
   return (
-    <MapViewComponent
+    <MapView
       initialRegion={{
         latitude: DEFAULT_CENTER.lat,
         longitude: DEFAULT_CENTER.lng,

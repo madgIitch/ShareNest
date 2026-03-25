@@ -1,67 +1,165 @@
 import { useState } from "react";
-import { View, Text, KeyboardAvoidingView, Platform } from "react-native";
-import { Link } from "expo-router";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { Link, router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../src/hooks/useAuth";
-import Button from "../../src/components/ui/Button";
-import Input from "../../src/components/ui/Input";
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleRegister = async () => {
+    if (!email || !password || !confirmPassword) {
+      setError("Completa los tres campos para crear tu cuenta.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    const { error } = await signUp(email, password);
-    if (error) setError(error.message);
+
+    const { error: signUpError } = await signUp(email.trim(), password);
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
     setLoading(false);
+    router.replace("/(auth)/onboarding");
   };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-white"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View className="flex-1 justify-center px-6">
-        <Text className="text-3xl font-bold text-gray-900 mb-2">Crear cuenta</Text>
-        <Text className="text-gray-500 mb-8">
-          Únete a HomiMatch
-        </Text>
-
-        {error && (
-          <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
-            <Text className="text-red-600 text-sm">{error}</Text>
+    <SafeAreaView className="flex-1 bg-[#151515]">
+      <StatusBar style="light" />
+      <KeyboardAvoidingView
+        className="flex-1 px-6 pb-6"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View className="flex-1 rounded-[40px] border border-white/20 bg-[#343331] px-7 py-6">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[18px] font-semibold text-white">9:41</Text>
+            <View className="flex-row items-center gap-1">
+              <View className="h-5 w-1 rounded-full bg-white/75" />
+              <View className="h-6 w-1 rounded-full bg-white/75" />
+              <View className="h-7 w-1 rounded-full bg-white/75" />
+              <View className="ml-1 h-7 w-9 rounded-md border border-white/75" />
+            </View>
           </View>
-        )}
 
-        <Input
-          label="Correo electrónico"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="tu@email.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <Input
-          label="Contraseña"
-          value={password}
-          onChangeText={setPassword}
-          placeholder="••••••••"
-          secureTextEntry
-        />
+          <Pressable
+            onPress={() => router.back()}
+            className="mt-10 h-12 w-12 items-center justify-center"
+            hitSlop={12}
+          >
+            <Ionicons name="arrow-back" size={34} color="#FFFFFF" />
+          </Pressable>
 
-        <Button title="Crear cuenta" onPress={handleRegister} loading={loading} />
+          <Text className="mt-4 text-[28px] font-extrabold text-white">
+            Crea tu cuenta
+          </Text>
+          <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
+            En menos de un minuto podrás completar tu perfil y empezar a explorar.
+          </Text>
 
-        <View className="mt-4 flex-row justify-center">
-          <Text className="text-gray-500">¿Ya tienes cuenta? </Text>
-          <Link href="/(auth)/login">
-            <Text className="text-indigo-600 font-semibold">Iniciar sesión</Text>
-          </Link>
+          <View className="mt-10 gap-6">
+            <View>
+              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
+                EMAIL
+              </Text>
+              <TextInput
+                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
+                placeholder="tu@email.com"
+                placeholderTextColor="#E7E0DB"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
+
+            <View>
+              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
+                CONTRASEÑA
+              </Text>
+              <TextInput
+                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
+                placeholder="Mínimo 6 caracteres"
+                placeholderTextColor="#B5AEA9"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
+
+            <View>
+              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
+                REPITE LA CONTRASEÑA
+              </Text>
+              <TextInput
+                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
+                placeholder="Confirma tu contraseña"
+                placeholderTextColor="#B5AEA9"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+            </View>
+          </View>
+
+          {error ? (
+            <View className="mt-5 rounded-2xl border border-[#F36A39]/40 bg-[#402920] px-4 py-3">
+              <Text className="text-[14px] text-[#FFD2C5]">{error}</Text>
+            </View>
+          ) : null}
+
+          <View className="flex-1" />
+
+          <Pressable
+            onPress={handleRegister}
+            disabled={loading}
+            className="h-20 items-center justify-center rounded-[18px] border border-white/25"
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text className="text-[20px] font-bold text-white">Continuar</Text>
+            )}
+          </Pressable>
+
+          <View className="mt-6 flex-row justify-center">
+            <Text className="text-[16px] text-[#C0B8B2]">¿Ya tienes cuenta? </Text>
+            <Link href="/(auth)/login" asChild>
+              <Pressable>
+                <Text className="text-[16px] font-medium text-[#F36A39]">Entrar</Text>
+              </Pressable>
+            </Link>
+          </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
