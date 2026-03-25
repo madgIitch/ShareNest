@@ -29,12 +29,12 @@ export default function RegisterScreen() {
     }
 
     if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
+      setError("La contrasena debe tener al menos 6 caracteres.");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden.");
+      setError("Las contrasenas no coinciden.");
       return;
     }
 
@@ -53,20 +53,23 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#151515]">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#151515" }}>
       <StatusBar style="light" />
       <KeyboardAvoidingView
         className="flex-1 px-6 pb-6"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View className="flex-1 rounded-[40px] border border-white/20 bg-[#343331] px-7 py-6">
+        <View
+          className="flex-1 rounded-[40px] px-7 py-6"
+          style={{ borderWidth: 1, borderColor: "#4F4F4F", backgroundColor: "#343331" }}
+        >
           <View className="flex-row items-center justify-between">
             <Text className="text-[18px] font-semibold text-white">9:41</Text>
             <View className="flex-row items-center gap-1">
-              <View className="h-5 w-1 rounded-full bg-white/75" />
-              <View className="h-6 w-1 rounded-full bg-white/75" />
-              <View className="h-7 w-1 rounded-full bg-white/75" />
-              <View className="ml-1 h-7 w-9 rounded-md border border-white/75" />
+              <View className="h-5 w-1 rounded-full bg-white" />
+              <View className="h-6 w-1 rounded-full bg-white" />
+              <View className="h-7 w-1 rounded-full bg-white" />
+              <View className="ml-1 h-7 w-9 rounded-md border border-white" />
             </View>
           </View>
 
@@ -82,16 +85,15 @@ export default function RegisterScreen() {
             Crea tu cuenta
           </Text>
           <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-            En menos de un minuto podrás completar tu perfil y empezar a explorar.
+            En menos de un minuto podras completar tu perfil y empezar a explorar.
           </Text>
 
           <View className="mt-10 gap-6">
             <View>
-              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                EMAIL
-              </Text>
+              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">EMAIL</Text>
               <TextInput
-                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
+                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
+                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
                 placeholder="tu@email.com"
                 placeholderTextColor="#E7E0DB"
                 keyboardType="email-address"
@@ -102,12 +104,11 @@ export default function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                CONTRASEÑA
-              </Text>
+              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">CONTRASENA</Text>
               <TextInput
-                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
-                placeholder="Mínimo 6 caracteres"
+                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
+                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
+                placeholder="Minimo 6 caracteres"
                 placeholderTextColor="#B5AEA9"
                 secureTextEntry
                 value={password}
@@ -116,12 +117,13 @@ export default function RegisterScreen() {
             </View>
 
             <View>
-              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                REPITE LA CONTRASEÑA
+              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">
+                REPITE LA CONTRASENA
               </Text>
               <TextInput
-                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
-                placeholder="Confirma tu contraseña"
+                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
+                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
+                placeholder="Confirma tu contrasena"
                 placeholderTextColor="#B5AEA9"
                 secureTextEntry
                 value={confirmPassword}
@@ -131,7 +133,10 @@ export default function RegisterScreen() {
           </View>
 
           {error ? (
-            <View className="mt-5 rounded-2xl border border-[#F36A39]/40 bg-[#402920] px-4 py-3">
+            <View
+              className="mt-5 rounded-2xl px-4 py-3"
+              style={{ borderWidth: 1, borderColor: "#8A4B37", backgroundColor: "#402920" }}
+            >
               <Text className="text-[14px] text-[#FFD2C5]">{error}</Text>
             </View>
           ) : null}
@@ -141,7 +146,8 @@ export default function RegisterScreen() {
           <Pressable
             onPress={handleRegister}
             disabled={loading}
-            className="h-20 items-center justify-center rounded-[18px] border border-white/25"
+            className="h-20 items-center justify-center rounded-[18px]"
+            style={{ borderWidth: 1, borderColor: "#5A5A5A" }}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -151,7 +157,7 @@ export default function RegisterScreen() {
           </Pressable>
 
           <View className="mt-6 flex-row justify-center">
-            <Text className="text-[16px] text-[#C0B8B2]">¿Ya tienes cuenta? </Text>
+            <Text className="text-[16px] text-[#C0B8B2]">Ya tienes cuenta? </Text>
             <Link href="/(auth)/login" asChild>
               <Pressable>
                 <Text className="text-[16px] font-medium text-[#F36A39]">Entrar</Text>

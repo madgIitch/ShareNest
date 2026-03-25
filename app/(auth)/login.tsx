@@ -24,7 +24,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError("Introduce tu email y tu contraseña.");
+      setError("Introduce tu email y tu contrasena.");
       return;
     }
 
@@ -36,20 +36,23 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#151515]">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#151515" }}>
       <StatusBar style="light" />
       <KeyboardAvoidingView
         className="flex-1 px-6 pb-6"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View className="flex-1 rounded-[40px] border border-white/20 bg-[#343331] px-7 py-6">
+        <View
+          className="flex-1 rounded-[40px] px-7 py-6"
+          style={{ borderWidth: 1, borderColor: "#4F4F4F", backgroundColor: "#343331" }}
+        >
           <View className="flex-row items-center justify-between">
             <Text className="text-[18px] font-semibold text-white">9:41</Text>
             <View className="flex-row items-center gap-1">
-              <View className="h-5 w-1 rounded-full bg-white/75" />
-              <View className="h-6 w-1 rounded-full bg-white/75" />
-              <View className="h-7 w-1 rounded-full bg-white/75" />
-              <View className="ml-1 h-7 w-9 rounded-md border border-white/75" />
+              <View className="h-5 w-1 rounded-full bg-white" />
+              <View className="h-6 w-1 rounded-full bg-white" />
+              <View className="h-7 w-1 rounded-full bg-white" />
+              <View className="ml-1 h-7 w-9 rounded-md border border-white" />
             </View>
           </View>
 
@@ -70,11 +73,10 @@ export default function LoginScreen() {
 
           <View className="mt-12 gap-6">
             <View>
-              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                EMAIL
-              </Text>
+              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">EMAIL</Text>
               <TextInput
-                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
+                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
+                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
                 placeholder="tu@email.com"
                 placeholderTextColor="#E7E0DB"
                 keyboardType="email-address"
@@ -85,11 +87,10 @@ export default function LoginScreen() {
             </View>
 
             <View>
-              <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                CONTRASEÑA
-              </Text>
+              <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">CONTRASENA</Text>
               <TextInput
-                className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
+                className="h-16 rounded-[14px] px-5 text-[18px] text-white"
+                style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
                 placeholder="••••••••"
                 placeholderTextColor="#E7E0DB"
                 secureTextEntry
@@ -102,45 +103,49 @@ export default function LoginScreen() {
           <Pressable
             onPress={() =>
               Alert.alert(
-                "Próximamente",
-                "La recuperación de contraseña llegará en la siguiente iteración."
+                "Proximamente",
+                "La recuperacion de contrasena llegara en la siguiente iteracion."
               )
             }
             className="mt-4 self-end"
           >
-            <Text className="text-[17px] font-medium text-[#F36A39]">¿La olvidaste?</Text>
+            <Text className="text-[17px] font-medium text-[#F36A39]">La olvidaste?</Text>
           </Pressable>
 
           {error ? (
-            <View className="mt-4 rounded-2xl border border-[#F36A39]/40 bg-[#402920] px-4 py-3">
+            <View
+              className="mt-4 rounded-2xl px-4 py-3"
+              style={{ borderWidth: 1, borderColor: "#8A4B37", backgroundColor: "#402920" }}
+            >
               <Text className="text-[14px] text-[#FFD2C5]">{error}</Text>
             </View>
           ) : null}
 
           <View className="mt-8 flex-row items-center">
-            <View className="h-px flex-1 bg-white/12" />
+            <View className="h-px flex-1" style={{ backgroundColor: "#4D4D4D" }} />
             <Text className="mx-5 text-[16px] text-[#B9B0A9]">o</Text>
-            <View className="h-px flex-1 bg-white/12" />
+            <View className="h-px flex-1" style={{ backgroundColor: "#4D4D4D" }} />
           </View>
 
           <Pressable
             onPress={() =>
               Alert.alert(
-                "Próximamente",
-                "Google Sign-In todavía no está conectado en esta versión."
+                "Proximamente",
+                "Google Sign-In todavia no esta conectado en esta version."
               )
             }
-            className="mt-8 h-20 flex-row items-center justify-center rounded-[18px] border border-white/20"
+            className="mt-8 h-20 flex-row items-center justify-center rounded-[18px]"
+            style={{ borderWidth: 1, borderColor: "#4F4F4F" }}
           >
             <Text className="mr-4 text-[30px] font-bold text-[#4285F4]">G</Text>
             <Text className="text-[18px] font-medium text-white">Continuar con Google</Text>
           </Pressable>
 
           <View className="mt-8 flex-row justify-center">
-            <Text className="text-[16px] text-[#C0B8B2]">¿No tienes cuenta? </Text>
+            <Text className="text-[16px] text-[#C0B8B2]">No tienes cuenta? </Text>
             <Link href="/(auth)/register" asChild>
               <Pressable>
-                <Text className="text-[16px] font-medium text-[#F36A39]">Regístrate</Text>
+                <Text className="text-[16px] font-medium text-[#F36A39]">Registrate</Text>
               </Pressable>
             </Link>
           </View>
@@ -150,7 +155,8 @@ export default function LoginScreen() {
           <Pressable
             onPress={handleLogin}
             disabled={loading}
-            className="h-20 items-center justify-center rounded-[18px] border border-white/25"
+            className="h-20 items-center justify-center rounded-[18px]"
+            style={{ borderWidth: 1, borderColor: "#5A5A5A" }}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />

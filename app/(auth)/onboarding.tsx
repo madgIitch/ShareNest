@@ -40,37 +40,17 @@ type FormState = {
 
 const steps: StepKey[] = ["profile", "lifestyle", "photos", "goal", "friendz"];
 
-const scheduleCards: Array<{
-  value: ScheduleOption | "works_from_home";
-  title: string;
-  subtitle: string;
-  emoji: string;
-}> = [
-  { value: "madrugador", title: "Madrugador", subtitle: "Me levanto pronto", emoji: "🌅" },
-  { value: "nocturno", title: "Nocturno", subtitle: "Me acuesto tarde", emoji: "🌙" },
-  { value: "flexible", title: "Flexible", subtitle: "Me adapto", emoji: "🔄" },
-  { value: "works_from_home", title: "Teletrabajo", subtitle: "Trabajo desde casa", emoji: "🏠" },
+const scheduleCards = [
+  { value: "madrugador" as const, title: "Madrugador", subtitle: "Me levanto pronto", icon: "sunny-outline" as const },
+  { value: "nocturno" as const, title: "Nocturno", subtitle: "Me acuesto tarde", icon: "moon-outline" as const },
+  { value: "flexible" as const, title: "Flexible", subtitle: "Me adapto", icon: "swap-horizontal-outline" as const },
+  { value: "works_from_home" as const, title: "Teletrabajo", subtitle: "Trabajo desde casa", icon: "home-outline" as const },
 ];
 
 const goalCards = [
-  {
-    value: "room" as const,
-    title: "Busco habitación",
-    subtitle: "Quiero encontrar un piso donde vivir",
-    emoji: "🔎",
-  },
-  {
-    value: "flatmate" as const,
-    title: "Tengo habitación libre",
-    subtitle: "Quiero encontrar compañero de piso",
-    emoji: "🏠",
-  },
-  {
-    value: "both" as const,
-    title: "Ambas cosas",
-    subtitle: "Busco y también tengo habitación libre",
-    emoji: "↔️",
-  },
+  { value: "room" as const, title: "Busco habitacion", subtitle: "Quiero encontrar un piso donde vivir", icon: "search-outline" as const },
+  { value: "flatmate" as const, title: "Tengo habitacion libre", subtitle: "Quiero encontrar companero de piso", icon: "home-outline" as const },
+  { value: "both" as const, title: "Ambas cosas", subtitle: "Busco y tambien tengo habitacion libre", icon: "repeat-outline" as const },
 ];
 
 const avatarPalette = ["#F07B2E", "#EF6C3B", "#458CE8", "#45C980", "#9450B8"];
@@ -81,9 +61,42 @@ function ProgressDots({ step }: { step: number }) {
       {steps.map((item, index) => (
         <View
           key={item}
-          className={`h-1.5 flex-1 rounded-full ${index <= step ? "bg-[#F36A39]" : "bg-black/30"}`}
+          className="h-1.5 flex-1 rounded-full"
+          style={{ backgroundColor: index <= step ? "#F36A39" : "#262626" }}
         />
       ))}
+    </View>
+  );
+}
+
+function LabeledInput({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  autoCapitalize,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  keyboardType?: "default" | "numeric" | "email-address";
+  autoCapitalize?: "none" | "words";
+}) {
+  return (
+    <View>
+      <Text className="mb-3 text-[14px] font-medium text-[#C8C1BB]">{label}</Text>
+      <TextInput
+        className="h-16 rounded-[14px] px-5 text-[18px] text-white"
+        style={{ borderWidth: 1, borderColor: "#494949", backgroundColor: "#333230" }}
+        placeholder={placeholder}
+        placeholderTextColor="#B5AEA9"
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+      />
     </View>
   );
 }
@@ -108,7 +121,8 @@ function RangeBar({
           <Pressable
             key={item}
             onPress={() => onChange(item)}
-            className={`h-3 flex-1 rounded-full ${item <= value ? "bg-[#F36A39]" : "bg-white/15"}`}
+            className="h-3 flex-1 rounded-full"
+            style={{ backgroundColor: item <= value ? "#F36A39" : "#585858" }}
           />
         ))}
       </View>
@@ -123,16 +137,22 @@ function AvatarBadge({ uri, name }: { uri?: string | null; name: string }) {
   return (
     <View className="items-center">
       <View
-        className="h-44 w-44 items-center justify-center rounded-full"
+        className="h-40 w-40 items-center justify-center rounded-full"
         style={{ backgroundColor: avatarPalette[index] }}
       >
         {uri ? (
-          <View className="h-44 w-44 rounded-full border-2 border-white/15 bg-white/10" />
+          <View
+            className="h-40 w-40 rounded-full"
+            style={{ borderWidth: 2, borderColor: "#5A5A5A", backgroundColor: "#2A2A2A" }}
+          />
         ) : (
-          <Text className="text-[62px] font-extrabold text-white">{initial}</Text>
+          <Text className="text-[60px] font-extrabold text-white">{initial}</Text>
         )}
       </View>
-      <View className="-mt-10 ml-28 h-14 w-14 items-center justify-center rounded-full bg-[#1E1E1E]">
+      <View
+        className="h-14 w-14 items-center justify-center rounded-full"
+        style={{ marginTop: -32, marginLeft: 110, backgroundColor: "#1E1E1E" }}
+      >
         <Ionicons name="camera" size={24} color="#FFFFFF" />
       </View>
     </View>
@@ -189,7 +209,7 @@ export default function OnboardingScreen() {
         profile: "Tu perfil",
         lifestyle: "Tu estilo de vida",
         photos: "Tus fotos",
-        goal: "Qué buscas",
+        goal: "Que buscas",
         friendz: "Tu red",
       })[currentStep],
     [currentStep]
@@ -197,14 +217,15 @@ export default function OnboardingScreen() {
 
   if (!user) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-[#151515] px-8">
+      <SafeAreaView className="flex-1 items-center justify-center px-8" style={{ backgroundColor: "#151515" }}>
         <StatusBar style="light" />
         <Text className="text-center text-[18px] leading-8 text-white">
-          Crea tu cuenta o inicia sesión antes de completar el onboarding.
+          Crea tu cuenta o inicia sesion antes de completar el onboarding.
         </Text>
         <Pressable
           onPress={() => router.replace("/(auth)")}
-          className="mt-8 rounded-2xl border border-white/20 px-6 py-4"
+          className="mt-8 rounded-2xl px-6 py-4"
+          style={{ borderWidth: 1, borderColor: "#4F4F4F" }}
         >
           <Text className="text-[17px] font-semibold text-white">Volver</Text>
         </Pressable>
@@ -232,24 +253,20 @@ export default function OnboardingScreen() {
 
   const validateCurrentStep = () => {
     if (currentStep !== "profile") return true;
-
     if (!form.full_name.trim() || !form.username.trim() || !form.occupation.trim()) {
-      Alert.alert("Faltan datos", "Completa nombre, username y ocupación.");
+      Alert.alert("Faltan datos", "Completa nombre, username y ocupacion.");
       return false;
     }
-
     const birthYear = Number(form.birth_year);
     if (!birthYear || birthYear < 1940 || birthYear > new Date().getFullYear() - 16) {
-      Alert.alert("Año inválido", "Introduce un año de nacimiento válido.");
+      Alert.alert("Ano invalido", "Introduce un ano de nacimiento valido.");
       return false;
     }
-
     return true;
   };
 
   const handleContinue = async () => {
     if (!validateCurrentStep()) return;
-
     try {
       await persistCurrentStep();
       if (step === steps.length - 1) {
@@ -258,14 +275,14 @@ export default function OnboardingScreen() {
         setStep((current) => current + 1);
       }
     } catch (error) {
-      Alert.alert("No se pudo guardar", error instanceof Error ? error.message : "Inténtalo de nuevo.");
+      Alert.alert("No se pudo guardar", error instanceof Error ? error.message : "Intentalo de nuevo.");
     }
   };
 
   const pickImage = async (index?: number) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permiso necesario", "Necesitamos acceso a tu galería para añadir fotos.");
+      Alert.alert("Permiso necesario", "Necesitamos acceso a tu galeria para anadir fotos.");
       return;
     }
 
@@ -301,22 +318,25 @@ export default function OnboardingScreen() {
     try {
       await connect(targetId);
     } catch (error) {
-      Alert.alert("No se pudo conectar", error instanceof Error ? error.message : "Inténtalo de nuevo.");
+      Alert.alert("No se pudo conectar", error instanceof Error ? error.message : "Intentalo de nuevo.");
     }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#151515]">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#151515" }}>
       <StatusBar style="light" />
       <View className="flex-1 px-6 pb-6">
-        <View className="flex-1 rounded-[40px] border border-white/20 bg-[#343331] px-7 py-6">
+        <View
+          className="flex-1 rounded-[40px] px-7 py-6"
+          style={{ borderWidth: 1, borderColor: "#4F4F4F", backgroundColor: "#343331" }}
+        >
           <View className="flex-row items-center justify-between">
             <Text className="text-[18px] font-semibold text-white">9:41</Text>
             <View className="flex-row items-center gap-1">
-              <View className="h-5 w-1 rounded-full bg-white/75" />
-              <View className="h-6 w-1 rounded-full bg-white/75" />
-              <View className="h-7 w-1 rounded-full bg-white/75" />
-              <View className="ml-1 h-7 w-9 rounded-md border border-white/75" />
+              <View className="h-5 w-1 rounded-full bg-white" />
+              <View className="h-6 w-1 rounded-full bg-white" />
+              <View className="h-7 w-1 rounded-full bg-white" />
+              <View className="ml-1 h-7 w-9 rounded-md border border-white" />
             </View>
           </View>
 
@@ -336,9 +356,9 @@ export default function OnboardingScreen() {
               <ScrollView className="mt-6 flex-1" showsVerticalScrollIndicator={false}>
                 {currentStep === "profile" ? (
                   <>
-                    <Text className="text-[28px] font-extrabold text-white">Cuéntanos quién eres</Text>
+                    <Text className="text-[28px] font-extrabold text-white">Cuentanos quien eres</Text>
                     <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-                      Tu perfil genera confianza entre potenciales compañeros
+                      Tu perfil genera confianza entre potenciales companeros.
                     </Text>
 
                     <Pressable onPress={() => pickImage()} className="mt-10 items-center">
@@ -346,87 +366,53 @@ export default function OnboardingScreen() {
                     </Pressable>
 
                     <View className="mt-10 gap-5">
-                      <View>
-                        <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                          NOMBRE COMPLETO
-                        </Text>
-                        <TextInput
-                          className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
-                          placeholder="Pepe García"
-                          placeholderTextColor="#B5AEA9"
-                          value={form.full_name}
-                          onChangeText={(value) =>
-                            setForm((current) => ({ ...current, full_name: value }))
-                          }
-                        />
-                      </View>
-
-                      <View>
-                        <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                          USERNAME
-                        </Text>
-                        <TextInput
-                          className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
-                          placeholder="@pepegarcia"
-                          placeholderTextColor="#B5AEA9"
-                          autoCapitalize="none"
-                          value={form.username}
-                          onChangeText={(value) =>
-                            setForm((current) => ({
-                              ...current,
-                              username: value.startsWith("@") ? value : `@${value.replace(/^@/, "")}`,
-                            }))
-                          }
-                        />
-                      </View>
-
-                      <View>
-                        <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                          AÑO DE NACIMIENTO
-                        </Text>
-                        <TextInput
-                          className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
-                          placeholder="1998"
-                          placeholderTextColor="#B5AEA9"
-                          keyboardType="numeric"
-                          value={form.birth_year}
-                          onChangeText={(value) =>
-                            setForm((current) => ({
-                              ...current,
-                              birth_year: value.replace(/[^0-9]/g, ""),
-                            }))
-                          }
-                        />
-                      </View>
-
-                      <View>
-                        <Text className="mb-3 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                          OCUPACIÓN
-                        </Text>
-                        <TextInput
-                          className="h-16 rounded-[14px] border border-white/10 bg-[#333230] px-5 text-[18px] text-white"
-                          placeholder="Desarrollador"
-                          placeholderTextColor="#B5AEA9"
-                          value={form.occupation}
-                          onChangeText={(value) =>
-                            setForm((current) => ({ ...current, occupation: value }))
-                          }
-                        />
-                      </View>
+                      <LabeledInput
+                        label="NOMBRE COMPLETO"
+                        value={form.full_name}
+                        onChangeText={(value) => setForm((current) => ({ ...current, full_name: value }))}
+                        placeholder="Pepe Garcia"
+                        autoCapitalize="words"
+                      />
+                      <LabeledInput
+                        label="USERNAME"
+                        value={form.username}
+                        onChangeText={(value) =>
+                          setForm((current) => ({
+                            ...current,
+                            username: value.startsWith("@") ? value : `@${value.replace(/^@/, "")}`,
+                          }))
+                        }
+                        placeholder="@pepegarcia"
+                        autoCapitalize="none"
+                      />
+                      <LabeledInput
+                        label="ANO DE NACIMIENTO"
+                        value={form.birth_year}
+                        onChangeText={(value) =>
+                          setForm((current) => ({ ...current, birth_year: value.replace(/[^0-9]/g, "") }))
+                        }
+                        placeholder="1998"
+                        keyboardType="numeric"
+                      />
+                      <LabeledInput
+                        label="OCUPACION"
+                        value={form.occupation}
+                        onChangeText={(value) => setForm((current) => ({ ...current, occupation: value }))}
+                        placeholder="Desarrollador"
+                        autoCapitalize="words"
+                      />
                     </View>
                   </>
                 ) : null}
 
                 {currentStep === "lifestyle" ? (
                   <>
-                    <Text className="text-[28px] font-extrabold text-white">¿Cómo eres en casa?</Text>
+                    <Text className="text-[28px] font-extrabold text-white">Como eres en casa?</Text>
                     <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-                      Esto ayuda a encontrar compañeros compatibles
+                      Esto ayuda a encontrar companeros compatibles.
                     </Text>
 
-                    <Text className="mt-10 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                      HORARIO
-                    </Text>
+                    <Text className="mt-10 text-[14px] font-medium text-[#C8C1BB]">HORARIO</Text>
                     <View className="mt-4 flex-row flex-wrap justify-between gap-y-4">
                       {scheduleCards.map((card) => {
                         const active =
@@ -437,6 +423,13 @@ export default function OnboardingScreen() {
                         return (
                           <Pressable
                             key={card.title}
+                            className="rounded-[22px] px-5 py-5"
+                            style={{
+                              width: "48%",
+                              borderWidth: 1,
+                              borderColor: active ? "#F36A39" : "#555555",
+                              backgroundColor: active ? "#453932" : "transparent",
+                            }}
                             onPress={() =>
                               card.value === "works_from_home"
                                 ? setForm((current) => ({
@@ -448,15 +441,11 @@ export default function OnboardingScreen() {
                                     schedule: card.value as ScheduleOption,
                                   }))
                             }
-                            className={`w-[48%] rounded-[22px] border px-6 py-6 ${
-                              active ? "border-[#F36A39] bg-[#453932]" : "border-white/12"
-                            }`}
                           >
-                            <Text className="text-[28px]">{card.emoji}</Text>
+                            <Ionicons name={card.icon} size={28} color={active ? "#F36A39" : "#FFFFFF"} />
                             <Text
-                              className={`mt-4 text-[18px] font-semibold ${
-                                active ? "text-[#F36A39]" : "text-white"
-                              }`}
+                              className="mt-4 text-[18px] font-semibold"
+                              style={{ color: active ? "#F36A39" : "#FFFFFF" }}
                             >
                               {card.title}
                             </Text>
@@ -468,36 +457,29 @@ export default function OnboardingScreen() {
                       })}
                     </View>
 
-                    <Text className="mt-10 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                      NIVELES
-                    </Text>
+                    <Text className="mt-10 text-[14px] font-medium text-[#C8C1BB]">NIVELES</Text>
                     <RangeBar
                       label="Limpieza"
                       value={form.cleanliness}
-                      onChange={(value) =>
-                        setForm((current) => ({ ...current, cleanliness: value }))
-                      }
+                      onChange={(value) => setForm((current) => ({ ...current, cleanliness: value }))}
                     />
                     <RangeBar
                       label="Ruido"
                       value={form.noise_level}
-                      onChange={(value) =>
-                        setForm((current) => ({ ...current, noise_level: value }))
-                      }
+                      onChange={(value) => setForm((current) => ({ ...current, noise_level: value }))}
                     />
 
                     <View className="mt-8 flex-row justify-between">
                       {[
-                        { key: "has_pets", label: "Mascotas", emoji: "🐾" },
-                        { key: "smokes", label: "Fumo", emoji: "🚬" },
+                        { key: "has_pets", label: "Mascotas" },
+                        { key: "smokes", label: "Fumo" },
                       ].map((item) => (
                         <View
                           key={item.key}
-                          className="w-[48%] flex-row items-center justify-between rounded-[18px] bg-black/20 px-5 py-5"
+                          className="flex-row items-center justify-between rounded-[18px] px-5 py-5"
+                          style={{ width: "48%", backgroundColor: "#252525" }}
                         >
-                          <Text className="text-[18px] font-medium text-white">
-                            {item.emoji} {item.label}
-                          </Text>
+                          <Text className="text-[18px] font-medium text-white">{item.label}</Text>
                           <Switch
                             value={form[item.key as "has_pets" | "smokes"]}
                             onValueChange={(value) =>
@@ -516,7 +498,7 @@ export default function OnboardingScreen() {
                   <>
                     <Text className="text-[28px] font-extrabold text-white">Pon cara al nombre</Text>
                     <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-                      Los perfiles con foto reciben 5× más solicitudes
+                      Los perfiles con foto reciben mas solicitudes.
                     </Text>
 
                     <View className="mt-10 flex-row flex-wrap justify-between gap-y-4">
@@ -526,36 +508,42 @@ export default function OnboardingScreen() {
                           <Pressable
                             key={index}
                             onPress={() => pickImage(index)}
-                            className={`h-44 w-[31%] items-center justify-center rounded-[18px] border ${
-                              photo
-                                ? "border-transparent bg-[#D7D0C8]"
-                                : "border-dashed border-white/20 bg-black/10"
-                            }`}
+                            className="h-40 items-center justify-center rounded-[18px]"
+                            style={{
+                              width: "31%",
+                              borderWidth: 1,
+                              borderColor: photo ? "transparent" : "#4F4F4F",
+                              borderStyle: photo ? "solid" : "dashed",
+                              backgroundColor: photo ? "#D7D0C8" : "#252525",
+                            }}
                           >
                             {photo ? (
                               <>
                                 <View className="absolute right-3 top-3">
                                   <Pressable
                                     onPress={() => removePhoto(index)}
-                                    className="h-7 w-7 items-center justify-center rounded-full bg-black/40"
-                                    hitSlop={8}
+                                    className="h-7 w-7 items-center justify-center rounded-full"
+                                    style={{ backgroundColor: "#1A1A1A" }}
                                   >
                                     <Ionicons name="close" size={18} color="#FFFFFF" />
                                   </Pressable>
                                 </View>
-                                <Text className="text-[12px] text-black/55">Foto añadida</Text>
+                                <Text className="text-[12px] text-[#707070]">Foto anadida</Text>
                               </>
                             ) : (
-                              <Ionicons name="add" size={32} color="#AAA29A" />
+                              <Ionicons name="add" size={32} color="#AAAAAA" />
                             )}
                           </Pressable>
                         );
                       })}
                     </View>
 
-                    <View className="mt-8 rounded-[20px] border border-[#8A452C] bg-[#43352F] px-5 py-5">
+                    <View
+                      className="mt-8 rounded-[20px] px-5 py-5"
+                      style={{ borderWidth: 1, borderColor: "#8A452C", backgroundColor: "#43352F" }}
+                    >
                       <Text className="text-[16px] leading-8 text-[#D8CEC7]">
-                        💡 Las fotos son tuyas y solo se usan para que tu perfil inspire confianza dentro de tu red.
+                        Las fotos son tuyas y se usan para dar confianza a tu perfil dentro de tu red.
                       </Text>
                     </View>
 
@@ -567,9 +555,9 @@ export default function OnboardingScreen() {
 
                 {currentStep === "goal" ? (
                   <>
-                    <Text className="text-[28px] font-extrabold text-white">¿Qué vas a hacer?</Text>
+                    <Text className="text-[28px] font-extrabold text-white">Que vas a hacer?</Text>
                     <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-                      Puedes cambiar esto en cualquier momento
+                      Puedes cambiar esto en cualquier momento.
                     </Text>
 
                     <View className="mt-10 gap-4">
@@ -578,22 +566,25 @@ export default function OnboardingScreen() {
                         return (
                           <Pressable
                             key={card.value}
-                            onPress={() =>
-                              setForm((current) => ({ ...current, looking_for: card.value }))
-                            }
-                            className={`rounded-[24px] border px-6 py-6 ${
-                              active ? "border-[#F36A39] bg-[#453932]" : "border-white/12"
-                            }`}
+                            className="rounded-[24px] px-6 py-6"
+                            style={{
+                              borderWidth: 1,
+                              borderColor: active ? "#F36A39" : "#555555",
+                              backgroundColor: active ? "#453932" : "transparent",
+                            }}
+                            onPress={() => setForm((current) => ({ ...current, looking_for: card.value }))}
                           >
                             <View className="flex-row items-center">
-                              <View className="h-20 w-20 items-center justify-center rounded-[20px] bg-black/20">
-                                <Text className="text-[34px]">{card.emoji}</Text>
+                              <View
+                                className="h-20 w-20 items-center justify-center rounded-[20px]"
+                                style={{ backgroundColor: "#252525" }}
+                              >
+                                <Ionicons name={card.icon} size={34} color={active ? "#F36A39" : "#FFFFFF"} />
                               </View>
                               <View className="ml-6 flex-1">
                                 <Text
-                                  className={`text-[20px] font-bold ${
-                                    active ? "text-[#F36A39]" : "text-white"
-                                  }`}
+                                  className="text-[20px] font-bold"
+                                  style={{ color: active ? "#F36A39" : "#FFFFFF" }}
                                 >
                                   {card.title}
                                 </Text>
@@ -602,15 +593,14 @@ export default function OnboardingScreen() {
                                 </Text>
                               </View>
                               <View
-                                className={`h-11 w-11 items-center justify-center rounded-full border ${
-                                  active
-                                    ? "border-[#F36A39] bg-[#F36A39]"
-                                    : "border-white/25"
-                                }`}
+                                className="h-11 w-11 items-center justify-center rounded-full"
+                                style={{
+                                  borderWidth: 1,
+                                  borderColor: active ? "#F36A39" : "#5A5A5A",
+                                  backgroundColor: active ? "#F36A39" : "transparent",
+                                }}
                               >
-                                {active ? (
-                                  <Ionicons name="checkmark" size={24} color="#FFFFFF" />
-                                ) : null}
+                                {active ? <Ionicons name="checkmark" size={24} color="#FFFFFF" /> : null}
                               </View>
                             </View>
                           </Pressable>
@@ -622,21 +612,20 @@ export default function OnboardingScreen() {
 
                 {currentStep === "friendz" ? (
                   <>
-                    <Text className="text-[28px] font-extrabold text-white">
-                      Conecta con quien conoces
-                    </Text>
+                    <Text className="text-[28px] font-extrabold text-white">Conecta con quien conoces</Text>
                     <Text className="mt-3 text-[18px] leading-7 text-[#B9B0A9]">
-                      Los anuncios muestran cuántos amigos en común tienes con el publicador. Eso genera confianza.
+                      Los anuncios muestran cuantos amigos en comun tienes con el publicador.
                     </Text>
 
-                    <Pressable className="mt-10 flex-row items-center rounded-[24px] bg-black/20 px-6 py-6">
-                      <View className="h-20 w-20 items-center justify-center rounded-[20px] bg-black/30">
+                    <Pressable className="mt-10 flex-row items-center rounded-[24px] px-6 py-6" style={{ backgroundColor: "#252525" }}>
+                      <View
+                        className="h-20 w-20 items-center justify-center rounded-[20px]"
+                        style={{ backgroundColor: "#1F1F1F" }}
+                      >
                         <Ionicons name="people-outline" size={34} color="#FFFFFF" />
                       </View>
                       <View className="ml-5 flex-1">
-                        <Text className="text-[18px] font-semibold text-white">
-                          Importar contactos
-                        </Text>
+                        <Text className="text-[18px] font-semibold text-white">Importar contactos</Text>
                         <Text className="mt-1 text-[16px] leading-6 text-[#A89F99]">
                           Encuentra a quienes ya conoces
                         </Text>
@@ -644,9 +633,7 @@ export default function OnboardingScreen() {
                       <Ionicons name="chevron-forward" size={28} color="#A89F99" />
                     </Pressable>
 
-                    <Text className="mt-10 text-[14px] font-medium tracking-[1.5px] text-[#C8C1BB]">
-                      SUGERENCIAS
-                    </Text>
+                    <Text className="mt-10 text-[14px] font-medium text-[#C8C1BB]">SUGERENCIAS</Text>
 
                     <View className="mt-4 gap-4">
                       {loadingSuggestions ? (
@@ -657,34 +644,26 @@ export default function OnboardingScreen() {
                         suggestions.map((person, index) => (
                           <View
                             key={person.id}
-                            className="flex-row items-center rounded-[20px] bg-black/20 px-5 py-5"
+                            className="flex-row items-center rounded-[20px] px-5 py-5"
+                            style={{ backgroundColor: "#252525" }}
                           >
                             <View
                               className="h-16 w-16 items-center justify-center rounded-full"
-                              style={{
-                                backgroundColor:
-                                  avatarPalette[(index + 1) % avatarPalette.length],
-                              }}
+                              style={{ backgroundColor: avatarPalette[(index + 1) % avatarPalette.length] }}
                             >
                               <Text className="text-[24px] font-bold text-white">
                                 {(person.full_name ?? "?").charAt(0).toUpperCase()}
                               </Text>
                             </View>
                             <View className="ml-4 flex-1">
-                              <Text className="text-[18px] font-semibold text-white">
-                                {person.full_name}
-                              </Text>
-                              <Text className="mt-1 text-[16px] text-[#A89F99]">
-                                {person.subtitle}
-                              </Text>
+                              <Text className="text-[18px] font-semibold text-white">{person.full_name}</Text>
+                              <Text className="mt-1 text-[16px] text-[#A89F99]">{person.subtitle}</Text>
                             </View>
                             <Pressable
-                              disabled={
-                                person.status !== "none" ||
-                                (connecting && connectingTo === person.id)
-                              }
+                              disabled={person.status !== "none" || (connecting && connectingTo === person.id)}
                               onPress={() => handleConnect(person.id)}
-                              className="rounded-[16px] border border-white/25 px-6 py-4"
+                              className="rounded-[16px] px-6 py-4"
+                              style={{ borderWidth: 1, borderColor: "#5A5A5A" }}
                             >
                               {connecting && connectingTo === person.id ? (
                                 <ActivityIndicator color="#FFFFFF" />
@@ -704,7 +683,7 @@ export default function OnboardingScreen() {
                     </View>
 
                     <Pressable onPress={() => router.replace("/(tabs)")} className="mt-8 self-center">
-                      <Text className="text-[16px] text-[#A89F99]">Saltar, lo hago después</Text>
+                      <Text className="text-[16px] text-[#A89F99]">Saltar, lo hago despues</Text>
                     </Pressable>
                   </>
                 ) : null}
@@ -713,7 +692,8 @@ export default function OnboardingScreen() {
               <Pressable
                 onPress={handleContinue}
                 disabled={saving}
-                className="mt-5 h-20 items-center justify-center rounded-[18px] border border-white/25"
+                className="mt-5 h-20 items-center justify-center rounded-[18px]"
+                style={{ borderWidth: 1, borderColor: "#5A5A5A" }}
               >
                 {saving ? (
                   <ActivityIndicator color="#FFFFFF" />
