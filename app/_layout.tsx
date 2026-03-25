@@ -27,6 +27,7 @@ export default function RootLayout() {
                 <Stack.Screen name="profile/[id]" options={{ title: "Perfil" }} />
                 <Stack.Screen name="settings" options={{ title: "Configuración" }} />
                 <Stack.Screen name="components-demo" options={{ title: "UI Components" }} />
+                <Stack.Screen name="property/new" options={{ title: "Nuevo piso" }} />
                 <Stack.Screen name="listing/new" options={{ title: "Nuevo anuncio" }} />
                 <Stack.Screen name="listing/[id]/index" options={{ title: "Anuncio" }} />
                 <Stack.Screen name="listing/[id]/edit" options={{ title: "Editar anuncio" }} />

@@ -283,7 +283,7 @@ export default function ConversationScreen() {
         Alert.alert("Asignacion completada", "La habitacion ha quedado asignada y el piso ya esta creado.", [
           {
             text: "Ir al piso",
-            onPress: () => router.push("/(tabs)/household"),
+            onPress: () => router.push({ pathname: "/(tabs)/workspace", params: { tab: "household" } }),
           },
           { text: "Cerrar", style: "cancel" },
         ]);

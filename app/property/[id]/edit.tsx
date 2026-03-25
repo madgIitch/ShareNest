@@ -190,7 +190,7 @@ export default function EditPropertyScreen() {
       router.back();
       return;
     }
-    router.replace(`/(tabs)/property/${property.id}`);
+    router.replace({ pathname: "/(tabs)/workspace", params: { propertyId: property.id, tab: "owner" } });
   };
 
   if (isLoading || !property) {
@@ -207,7 +207,13 @@ export default function EditPropertyScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace(`/(tabs)/property/${property.id}`))}>
+        <Pressable
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace({ pathname: "/(tabs)/workspace", params: { propertyId: property.id, tab: "owner" } })
+          }
+        >
           <Text style={styles.back}>Atras</Text>
         </Pressable>
         <Text style={styles.title}>Editar piso</Text>
@@ -369,7 +375,14 @@ export default function EditPropertyScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { bottom: footerBottom }]}>
-        <Pressable style={styles.cancelBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace(`/(tabs)/property/${property.id}`))}>
+        <Pressable
+          style={styles.cancelBtn}
+          onPress={() =>
+            router.canGoBack()
+              ? router.back()
+              : router.replace({ pathname: "/(tabs)/workspace", params: { propertyId: property.id, tab: "owner" } })
+          }
+        >
           <Text style={styles.cancelText}>Cancelar</Text>
         </Pressable>
         <Pressable style={[styles.saveBtn, !canSave && styles.disabled]} onPress={onSave} disabled={!canSave}>

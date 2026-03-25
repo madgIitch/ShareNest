@@ -56,6 +56,10 @@ export type HouseholdInviteData = {
 
 const HOUSEHOLD_KEY = ["household", "mine"];
 
+function isMissingHouseholdPropertyId(error: { message?: string } | null | undefined): boolean {
+  return !!error && typeof error.message === "string" && error.message.includes("property_id");
+}
+
 export function useMyHousehold() {
   return useQuery({
     queryKey: HOUSEHOLD_KEY,
@@ -89,13 +93,32 @@ export function useMyHouseholdMemberships(userId: string | undefined) {
     queryKey: ["household", "memberships", userId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const withProperty = await supabase
         .from("household_members")
         .select("household_id, role, joined_at, households(id, name, listing_id, property_id, created_by, created_at)")
         .eq("user_id", userId!)
         .order("joined_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as MyHouseholdMembership[];
+      if (!withProperty.error) {
+        return (withProperty.data ?? []) as unknown as MyHouseholdMembership[];
+      }
+
+      if (!isMissingHouseholdPropertyId(withProperty.error)) throw withProperty.error;
+
+      const fallback = await supabase
+        .from("household_members")
+        .select("household_id, role, joined_at, households(id, name, listing_id, created_by, created_at)")
+        .eq("user_id", userId!)
+        .order("joined_at", { ascending: false });
+      if (fallback.error) throw fallback.error;
+
+      return ((fallback.data ?? []) as Array<
+        Omit<MyHouseholdMembership, "households"> & {
+          households: Omit<NonNullable<MyHouseholdMembership["households"]>, "property_id"> | null;
+        }
+      >).map((row) => ({
+        ...row,
+        households: row.households ? { ...row.households, property_id: null } : null,
+      }));
     },
     staleTime: 1000 * 60,
   });
@@ -106,13 +129,21 @@ export function useHouseholdById(householdId: string | undefined) {
     queryKey: ["household", "by-id", householdId],
     enabled: !!householdId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const withProperty = await supabase
         .from("households")
         .select("id, name, invite_code, listing_id, property_id, created_by, created_at")
         .eq("id", householdId!)
         .single();
-      if (error) throw error;
-      return data as HouseholdSummary;
+      if (!withProperty.error) return withProperty.data as HouseholdSummary;
+      if (!isMissingHouseholdPropertyId(withProperty.error)) throw withProperty.error;
+
+      const fallback = await supabase
+        .from("households")
+        .select("id, name, invite_code, listing_id, created_by, created_at")
+        .eq("id", householdId!)
+        .single();
+      if (fallback.error) throw fallback.error;
+      return { ...(fallback.data as Omit<HouseholdSummary, "property_id">), property_id: null } as HouseholdSummary;
     },
     staleTime: 1000 * 60,
   });
@@ -123,13 +154,26 @@ export function useOwnedHouseholds(userId: string | undefined) {
     queryKey: ["household", "owned", userId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const withProperty = await supabase
         .from("households")
         .select("id, name, invite_code, listing_id, property_id, created_by, created_at")
         .eq("created_by", userId!)
         .order("created_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as HouseholdSummary[];
+      if (!withProperty.error) {
+        return (withProperty.data ?? []) as HouseholdSummary[];
+      }
+      if (!isMissingHouseholdPropertyId(withProperty.error)) throw withProperty.error;
+
+      const fallback = await supabase
+        .from("households")
+        .select("id, name, invite_code, listing_id, created_by, created_at")
+        .eq("created_by", userId!)
+        .order("created_at", { ascending: false });
+      if (fallback.error) throw fallback.error;
+      return ((fallback.data ?? []) as Array<Omit<HouseholdSummary, "property_id">>).map((row) => ({
+        ...row,
+        property_id: null,
+      }));
     },
     staleTime: 1000 * 60,
   });
@@ -177,17 +221,7 @@ export function useCreateHousehold() {
       } as any);
       if (legacyCall.error) throw legacyCall.error;
 
-      const householdId = legacyCall.data as string;
-
-      if (propertyId) {
-        const { error: attachError } = await (supabase
-          .from("households" as any)
-          .update({ property_id: propertyId } as any)
-          .eq("id", householdId) as any);
-        if (attachError) throw attachError;
-      }
-
-      return { id: householdId };
+      return { id: legacyCall.data as string };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY });
@@ -245,7 +279,11 @@ export function useJoinHousehold() {
       if (error) throw error;
       return data as string; // returns household_id
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: HOUSEHOLD_KEY });
+      qc.invalidateQueries({ queryKey: ["household"] });
+      qc.invalidateQueries({ queryKey: ["properties"] });
+    },
   });
 }
 

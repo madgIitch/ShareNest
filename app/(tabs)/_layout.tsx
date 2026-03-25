@@ -51,13 +51,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="property/[id]"
-        options={{
-          href: null,
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
         name="property/[id]/edit"
         options={{
           href: null,
@@ -66,12 +59,6 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="listings"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="household"
         options={{
           href: null,
         }}

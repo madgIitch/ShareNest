@@ -35,7 +35,7 @@ export default function CreateHouseholdScreen() {
       if (created?.household_id) {
         router.replace({ pathname: "/household/invite", params: { householdId: created.household_id } });
       } else {
-        router.replace("/(tabs)/household");
+        router.replace({ pathname: "/(tabs)/workspace", params: { tab: "household" } });
       }
     } catch (err) {
       Alert.alert("Error", (err as Error).message);

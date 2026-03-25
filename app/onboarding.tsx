@@ -107,7 +107,7 @@ export default function OnboardingScreen() {
       });
       if (error) throw error;
       await refreshProfile();
-      router.replace("/home");
+      router.replace("/(tabs)/explore");
     } catch (error) {
       Alert.alert("No se pudo guardar tu perfil", (error as Error).message);
     } finally {

@@ -95,6 +95,19 @@ export default function ExploreScreen() {
   };
 
   const activeFilterCount = countActiveFilters(filters);
+  const hasZoneContext = Boolean(filters.city || filters.cityId || filters.placeId || filters.lat != null);
+  const emptyStateTitle =
+    activeFilterCount > 0 || hasZoneContext ? "Sin resultados" : "Todavia no hay pisos publicados";
+  const emptyStateSubtitle = hasZoneContext
+    ? "Todavia no hay anuncios en esta zona. Prueba con otra ciudad o activa las notificaciones para cuando aparezcan."
+    : activeFilterCount > 0
+      ? "No hemos encontrado pisos con esos filtros. Ajusta la busqueda o prueba con otra ciudad."
+      : "Todavia no hay pisos disponibles en ShareNest. Vuelve mas tarde cuando se publiquen los primeros anuncios.";
+  const emptyStateAction = hasZoneContext
+    ? { label: "Cambiar ciudad", onPress: () => setFilterSheetOpen(true) }
+    : activeFilterCount > 0
+      ? { label: "Limpiar filtros", onPress: () => handleApplyFilters(DEFAULT_FILTERS) }
+      : undefined;
 
   const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
     useSearchListings(filters);
