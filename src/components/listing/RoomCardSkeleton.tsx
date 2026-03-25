@@ -18,8 +18,8 @@ export default function RoomCardSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#F3F4F6", marginBottom: 12, overflow: "hidden" },
-  image: { height: 192, backgroundColor: "#E5E7EB" },
+  card: { backgroundColor: "#1A1A1A", borderRadius: 18, borderWidth: 1, borderColor: "#222", marginBottom: 16, overflow: "hidden" },
+  image: { height: 200, backgroundColor: "#222" },
   body: { padding: 16, gap: 8 },
   skeletonTitle: { width: "75%" as any },
   skeletonSubtitle: { width: "50%" as any },

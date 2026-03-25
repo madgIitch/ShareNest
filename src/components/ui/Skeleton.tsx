@@ -22,7 +22,7 @@ export default function Skeleton({ width, height = 16, rounded = false, style }:
 }
 
 const styles = StyleSheet.create({
-  base: { backgroundColor: "#E5E7EB" },
+  base: { backgroundColor: "#2A2A2A" },
   rounded: { borderRadius: 9999 },
   rect: { borderRadius: 8 },
 });

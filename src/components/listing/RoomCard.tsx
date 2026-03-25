@@ -1,76 +1,291 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { RoomListing } from "../../types";
-import { formatPrice } from "../../utils/format";
 
 interface RoomCardProps {
   listing: RoomListing;
   onPress?: () => void;
+  onSave?: () => void;
   compact?: boolean;
+  saved?: boolean;
 }
 
-export default function RoomCard({ listing, onPress, compact }: RoomCardProps) {
-  return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <View style={styles.image} />
-      <View style={styles.body}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>{listing.title}</Text>
-          <Text style={styles.price}>{formatPrice(listing.price)}</Text>
+export default function RoomCard({ listing, onPress, onSave, compact, saved }: RoomCardProps) {
+  if (compact) {
+    return (
+      <TouchableOpacity style={s.compactCard} onPress={onPress} activeOpacity={0.85}>
+        <View style={s.compactImage} />
+        <View style={s.compactBody}>
+          <Text style={s.compactTitle} numberOfLines={1}>{listing.title}</Text>
+          {listing.address_approx && (
+            <Text style={s.compactAddress} numberOfLines={1}>{listing.address_approx}</Text>
+          )}
+          <Text style={s.compactPrice}>€{listing.price}<Text style={s.compactMes}>/mes</Text></Text>
         </View>
+        <Ionicons name="chevron-forward" size={18} color="#444" />
+      </TouchableOpacity>
+    );
+  }
+
+  const bedLabel =
+    listing.bed_type === "doble" ? "Hab. doble"
+    : listing.bed_type === "litera" ? "Litera"
+    : listing.bed_type === "individual" ? "Hab. individual"
+    : null;
+
+  const isNew = (() => {
+    if (!listing.created_at) return false;
+    const diff = Date.now() - new Date(listing.created_at).getTime();
+    return diff < 1000 * 60 * 60 * 24 * 3; // 3 days
+  })();
+
+  return (
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.88}>
+      {/* Image area */}
+      <View style={s.imageWrap}>
+        <View style={s.image} />
+
+        {/* Top-left badges */}
+        <View style={s.badges}>
+          {isNew && (
+            <View style={[s.badge, s.badgeOrange]}>
+              <Text style={s.badgeTextOrange}>Nuevo</Text>
+            </View>
+          )}
+          {listing.has_private_bath && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>Baño privado</Text>
+            </View>
+          )}
+          {bedLabel && (
+            <View style={s.badge}>
+              <Text style={s.badgeText}>{bedLabel}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Save button */}
+        <Pressable style={s.saveBtn} onPress={onSave} hitSlop={8}>
+          <Ionicons
+            name={saved ? "bookmark" : "bookmark-outline"}
+            size={18}
+            color={saved ? "#F36A39" : "#fff"}
+          />
+        </Pressable>
+      </View>
+
+      {/* Body */}
+      <View style={s.body}>
+        {/* Price */}
+        <View style={s.priceRow}>
+          <Text style={s.price}>€{listing.price}</Text>
+          <Text style={s.mes}>/mes</Text>
+          {listing.size_m2 && (
+            <Text style={s.size}> · {listing.size_m2} m²</Text>
+          )}
+        </View>
+
+        {/* Title */}
+        <Text style={s.title} numberOfLines={1}>{listing.title}</Text>
+
+        {/* Location */}
         {listing.address_approx && (
-          <Text style={styles.address}>{listing.address_approx}</Text>
-        )}
-        {!compact && (
-          <View style={styles.tagsRow}>
-            {listing.allows_pets && (
-              <View style={[styles.tag, styles.tagGreen]}>
-                <Text style={[styles.tagText, styles.tagTextGreen]}>🐾 Mascotas</Text>
-              </View>
-            )}
-            {listing.has_private_bath && (
-              <View style={[styles.tag, styles.tagBlue]}>
-                <Text style={[styles.tagText, styles.tagTextBlue]}>🚿 Baño privado</Text>
-              </View>
-            )}
-            {listing.is_furnished && (
-              <View style={[styles.tag, styles.tagAmber]}>
-                <Text style={[styles.tagText, styles.tagTextAmber]}>🛋️ Amueblada</Text>
-              </View>
-            )}
+          <View style={s.locationRow}>
+            <Ionicons name="location-outline" size={13} color="#666" />
+            <Text style={s.location} numberOfLines={1}>{listing.address_approx}</Text>
           </View>
+        )}
+
+        {/* Tags */}
+        <View style={s.tagsRow}>
+          {listing.allows_pets && <Tag label="🐾 Mascotas" />}
+          {listing.is_furnished && <Tag label="🛋️ Amueblada" />}
+          {listing.has_quiet_hours && <Tag label="🔇 Silencio" />}
+          {!listing.allows_smoking && <Tag label="🚭 No fumadores" />}
+          {listing.owner_lives_here && <Tag label="👤 Con propietario" />}
+        </View>
+
+        {/* Footer: availability */}
+        {listing.available_from && (
+          <Text style={s.available}>
+            Disponible desde {new Date(listing.available_from).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+          </Text>
         )}
       </View>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+function Tag({ label }: { label: string }) {
+  return (
+    <View style={s.tag}>
+      <Text style={s.tagText}>{label}</Text>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#F3F4F6",
-    marginBottom: 12,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 18,
+    marginBottom: 16,
     overflow: "hidden",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: "#222",
   },
-  image: { height: 192, backgroundColor: "#F3F4F6" },
-  body: { padding: 16 },
-  titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  title: { fontSize: 18, fontWeight: "700", color: "#111827", flex: 1, marginRight: 8 },
-  price: { fontSize: 18, fontWeight: "700", color: "#4F46E5" },
-  address: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  tagsRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
-  tag: { borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 4 },
-  tagText: { fontSize: 12 },
-  tagGreen: { backgroundColor: "#F0FDF4" },
-  tagTextGreen: { color: "#15803D" },
-  tagBlue: { backgroundColor: "#EFF6FF" },
-  tagTextBlue: { color: "#1D4ED8" },
-  tagAmber: { backgroundColor: "#FFFBEB" },
-  tagTextAmber: { color: "#B45309" },
+  imageWrap: {
+    height: 200,
+    position: "relative",
+  },
+  image: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#2A2A2A",
+  },
+  badges: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    flexDirection: "row",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  badge: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+  },
+  badgeOrange: {
+    backgroundColor: "#F36A39",
+    borderColor: "#F36A39",
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  badgeTextOrange: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  saveBtn: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  body: {
+    padding: 16,
+  },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    marginBottom: 4,
+  },
+  price: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  mes: {
+    fontSize: 14,
+    fontWeight: "400",
+    color: "#888",
+    marginLeft: 2,
+  },
+  size: {
+    fontSize: 13,
+    color: "#666",
+    marginLeft: 4,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#ccc",
+    marginBottom: 6,
+  },
+  locationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 12,
+  },
+  location: {
+    fontSize: 13,
+    color: "#666",
+    flex: 1,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
+  },
+  tag: {
+    backgroundColor: "#222",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  tagText: {
+    fontSize: 12,
+    color: "#aaa",
+  },
+  available: {
+    fontSize: 12,
+    color: "#555",
+    marginTop: 2,
+  },
+  // Compact styles
+  compactCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1A1A1A",
+    borderRadius: 14,
+    overflow: "hidden",
+    gap: 12,
+    padding: 12,
+  },
+  compactImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: "#2A2A2A",
+  },
+  compactBody: {
+    flex: 1,
+    gap: 3,
+  },
+  compactTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  compactAddress: {
+    fontSize: 12,
+    color: "#666",
+  },
+  compactPrice: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#F36A39",
+    marginTop: 2,
+  },
+  compactMes: {
+    fontSize: 12,
+    fontWeight: "400",
+    color: "#888",
+  },
 });
