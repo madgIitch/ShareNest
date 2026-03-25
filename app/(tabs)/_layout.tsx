@@ -1,53 +1,72 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
+import { colors, fontSize } from "../../src/theme";
+
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: "#6366F1",
-        tabBarInactiveTintColor: "#9CA3AF",
+        headerTitleAlign: "center",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          borderTopColor: "#E5E7EB",
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 60,
+          paddingBottom: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: fontSize.xs,
+          fontWeight: "600",
         },
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="explore"
         options={{
           title: "Explorar",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="search-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="messages"
         options={{
-          title: "Buscar compañero",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
-          ),
+          title: "Mensajes",
+          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="requests"
+        name="workspace"
         options={{
-          title: "Solicitudes",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications-outline" size={size} color={color} />
-          ),
+          title: "Mi espacio",
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="account"
         options={{
-          title: "Mi perfil",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
+          title: "Perfil",
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="property/[id]/edit"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="listings"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="friendz"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

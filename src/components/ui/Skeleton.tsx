@@ -1,28 +1,78 @@
-import { View, StyleSheet, ViewStyle } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, StyleSheet, View } from "react-native";
+import type { ViewStyle } from "react-native";
 
-interface SkeletonProps {
-  width?: number | string;
+import { colors, radius } from "../../theme";
+
+type Props = {
+  width?: number | `${number}%`;
   height?: number;
-  rounded?: boolean;
+  borderRadius?: number;
   style?: ViewStyle;
-}
+};
 
-export default function Skeleton({ width, height = 16, rounded = false, style }: SkeletonProps) {
+export function Skeleton({ width = "100%", height = 16, borderRadius = radius.sm, style }: Props) {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+
   return (
-    <View
+    <Animated.View
       style={[
-        styles.base,
-        rounded ? styles.rounded : styles.rect,
-        typeof width === "number" ? { width } : width ? { width } : undefined,
-        { height },
+        styles.skeleton,
+        { width, height, borderRadius, opacity },
         style,
       ]}
     />
   );
 }
 
+// Skeleton precompuesto para ListingCard
+export function ListingCardSkeleton() {
+  return (
+    <View style={styles.card}>
+      <Skeleton height={200} borderRadius={0} />
+      <View style={styles.body}>
+        <Skeleton width="40%" height={12} />
+        <Skeleton width="80%" height={16} />
+        <Skeleton width="60%" height={16} />
+        <View style={styles.row}>
+          <Skeleton width={60} height={20} borderRadius={radius.full} />
+          <Skeleton width={28} height={28} borderRadius={radius.full} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  base: { backgroundColor: "#2A2A2A" },
-  rounded: { borderRadius: 9999 },
-  rect: { borderRadius: 8 },
+  skeleton: {
+    backgroundColor: colors.gray200,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: "hidden",
+  },
+  body: {
+    padding: 12,
+    gap: 10,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
 });

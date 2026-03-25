@@ -1,66 +1,43 @@
-import { useEffect } from "react";
-import { Stack, router, useSegments } from "expo-router";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { queryClient } from "../src/lib/queryClient";
-import { useAuth } from "../src/hooks/useAuth";
-import { useAuthStore } from "../src/stores/authStore";
-import { isProfileComplete, useProfile } from "../src/hooks/useProfile";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-function AuthRedirect() {
-  useAuth();
-  const { user, loading } = useAuthStore();
-  const segments = useSegments();
-  const { profile, isLoading: loadingProfile } = useProfile(user?.id);
-
-  useEffect(() => {
-    if (loading || (user && loadingProfile)) {
-      return;
-    }
-
-    const inAuthGroup = segments[0] === "(auth)";
-    const nextRoute = !user
-      ? "/(auth)"
-      : isProfileComplete(profile)
-        ? "/(tabs)"
-        : "/(auth)/onboarding";
-
-    const authChild = segments.slice(1)[0] ?? null;
-    const alreadyThere =
-      (nextRoute === "/(auth)" && inAuthGroup) ||
-      (nextRoute === "/(tabs)" && segments[0] === "(tabs)") ||
-      (nextRoute === "/(auth)/onboarding" &&
-        segments[0] === "(auth)" &&
-        authChild === "onboarding");
-
-    if (!alreadyThere) {
-      router.replace(nextRoute);
-    }
-  }, [loading, loadingProfile, profile, segments, user]);
-
-  return null;
-}
+import { AuthProvider } from "../src/providers/AuthProvider";
+import { QueryProvider } from "../src/providers/QueryProvider";
+import { ToastProvider } from "../src/providers/ToastProvider";
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthRedirect />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="listing/[id]" />
-            <Stack.Screen name="seeker/[id]" />
-            <Stack.Screen name="household/index" />
-            <Stack.Screen name="household/expenses" />
-            <Stack.Screen name="household/[id]/index" />
-            <Stack.Screen name="user/[id]" />
-            <Stack.Screen name="publish" />
-            <Stack.Screen name="conversation/[id]" />
-          </Stack>
-        </QueryClientProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <Stack
+                screenOptions={{
+                  headerTitleAlign: "center",
+                }}
+              >
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="verify-phone" options={{ title: "Verificar móvil" }} />
+                <Stack.Screen name="onboarding" options={{ title: "Bienvenido/a" }} />
+                <Stack.Screen name="profile" options={{ title: "Mi perfil" }} />
+                <Stack.Screen name="profile/[id]" options={{ title: "Perfil" }} />
+                <Stack.Screen name="settings" options={{ title: "Configuración" }} />
+                <Stack.Screen name="components-demo" options={{ title: "UI Components" }} />
+                <Stack.Screen name="property/new" options={{ title: "Nuevo piso" }} />
+                <Stack.Screen name="listing/new" options={{ title: "Nuevo anuncio" }} />
+                <Stack.Screen name="listing/[id]/index" options={{ title: "Anuncio" }} />
+                <Stack.Screen name="listing/[id]/edit" options={{ title: "Editar anuncio" }} />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+                <Stack.Screen name="conversation/[id]" options={{ title: "Chat" }} />
+                <Stack.Screen name="requests/[id]" options={{ title: "Solicitud" }} />
+              </Stack>
+            </ToastProvider>
+          </AuthProvider>
+        </QueryProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

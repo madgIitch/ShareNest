@@ -1,10 +1,12 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+export type ListingType = "offer" | "search";
+export type ListingStatus = "active" | "paused" | "rented" | "draft";
+export type RequestStatus = "pending" | "invited" | "offered" | "accepted" | "assigned" | "denied";
+export type ConnectionStatus = "pending" | "accepted";
+export type ContractType = "long_term" | "temporary" | "flexible";
+export type BedType = "individual" | "doble" | "litera";
+export type CommonAreaType = "cocina" | "bano" | "salon" | "terraza" | "lavadero" | "garaje" | "entrada" | "otro";
 
 export type Database = {
   public: {
@@ -19,63 +21,33 @@ export type Database = {
           phone: string | null;
           city: string | null;
           verified_at: string | null;
-          created_at: string;
           push_token: string | null;
           notif_messages: boolean;
           notif_requests: boolean;
           notif_friendz: boolean;
-          stripe_customer_id: string | null;
+          created_at: string;
+          // Lifestyle fields
           birth_year: number | null;
           occupation: string | null;
           languages: string[] | null;
           photos: string[] | null;
-          schedule: string | null;
-          cleanliness: number | null;
-          noise_level: number | null;
+          schedule: "madrugador" | "nocturno" | "flexible" | null;
+          cleanliness: number | null; // 1-5
+          noise_level: number | null; // 1-5
           has_pets: boolean | null;
           smokes: boolean | null;
           works_from_home: boolean | null;
-          guests_frequency: string | null;
-          looking_for: string | null;
+          guests_frequency: "nunca" | "a veces" | "frecuente" | null;
+          // Search preferences
+          looking_for: "room" | "flat" | "both" | null;
           budget_min: number | null;
           budget_max: number | null;
           move_in_date: string | null;
           preferred_cities: string[] | null;
+          flatmate_prefs: Json | null;
         };
         Insert: {
           id: string;
-          username?: string | null;
-          full_name?: string | null;
-          avatar_url?: string | null;
-          bio?: string | null;
-          phone?: string | null;
-          city?: string | null;
-          verified_at?: string | null;
-          created_at?: string;
-          push_token?: string | null;
-          notif_messages?: boolean;
-          notif_requests?: boolean;
-          notif_friendz?: boolean;
-          stripe_customer_id?: string | null;
-          birth_year?: number | null;
-          occupation?: string | null;
-          languages?: string[] | null;
-          photos?: string[] | null;
-          schedule?: string | null;
-          cleanliness?: number | null;
-          noise_level?: number | null;
-          has_pets?: boolean | null;
-          smokes?: boolean | null;
-          works_from_home?: boolean | null;
-          guests_frequency?: string | null;
-          looking_for?: string | null;
-          budget_min?: number | null;
-          budget_max?: number | null;
-          move_in_date?: string | null;
-          preferred_cities?: string[] | null;
-        };
-        Update: {
-          id?: string;
           username?: string | null;
           full_name?: string | null;
           avatar_url?: string | null;
@@ -87,260 +59,310 @@ export type Database = {
           notif_messages?: boolean;
           notif_requests?: boolean;
           notif_friendz?: boolean;
-          stripe_customer_id?: string | null;
+          created_at?: string;
           birth_year?: number | null;
           occupation?: string | null;
           languages?: string[] | null;
           photos?: string[] | null;
-          schedule?: string | null;
+          schedule?: "madrugador" | "nocturno" | "flexible" | null;
           cleanliness?: number | null;
           noise_level?: number | null;
           has_pets?: boolean | null;
           smokes?: boolean | null;
           works_from_home?: boolean | null;
-          guests_frequency?: string | null;
-          looking_for?: string | null;
+          guests_frequency?: "nunca" | "a veces" | "frecuente" | null;
+          looking_for?: "room" | "flat" | "both" | null;
           budget_min?: number | null;
           budget_max?: number | null;
           move_in_date?: string | null;
           preferred_cities?: string[] | null;
-        };
-      };
-      connections: {
-        Row: {
-          id: string;
-          requester_id: string;
-          addressee_id: string;
-          status: Database["public"]["Enums"]["connection_status"];
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          requester_id: string;
-          addressee_id: string;
-          status?: Database["public"]["Enums"]["connection_status"];
-          created_at?: string;
+          flatmate_prefs?: Json | null;
         };
         Update: {
-          id?: string;
-          requester_id?: string;
-          addressee_id?: string;
-          status?: Database["public"]["Enums"]["connection_status"];
-          created_at?: string;
+          username?: string | null;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          bio?: string | null;
+          phone?: string | null;
+          city?: string | null;
+          verified_at?: string | null;
+          push_token?: string | null;
+          notif_messages?: boolean;
+          notif_requests?: boolean;
+          notif_friendz?: boolean;
+          birth_year?: number | null;
+          occupation?: string | null;
+          languages?: string[] | null;
+          photos?: string[] | null;
+          schedule?: "madrugador" | "nocturno" | "flexible" | null;
+          cleanliness?: number | null;
+          noise_level?: number | null;
+          has_pets?: boolean | null;
+          smokes?: boolean | null;
+          works_from_home?: boolean | null;
+          guests_frequency?: "nunca" | "a veces" | "frecuente" | null;
+          looking_for?: "room" | "flat" | "both" | null;
+          budget_min?: number | null;
+          budget_max?: number | null;
+          move_in_date?: string | null;
+          preferred_cities?: string[] | null;
+          flatmate_prefs?: Json | null;
         };
+        Relationships: [];
       };
-      room_listings: {
+      properties: {
         Row: {
           id: string;
-          publisher_id: string;
-          title: string;
-          description: string | null;
-          price: number;
-          size_m2: number | null;
-          bed_type: Database["public"]["Enums"]["bed_type"] | null;
-          has_private_bath: boolean;
-          has_wardrobe: boolean;
-          has_desk: boolean;
-          is_furnished: boolean;
-          city_id: string;
+          owner_id: string;
+          name: string | null;
+          address: string;
+          street_number: string | null;
+          city_id: string | null;
           place_id: string | null;
-          address_approx: string | null;
-          address_full: string | null;
           lat: number | null;
           lng: number | null;
           postal_code: string | null;
-          owner_lives_here: boolean;
-          flatmates_count: number | null;
-          total_rooms: number | null;
-          total_m2: number | null;
           floor: string | null;
           has_elevator: boolean;
+          total_m2: number | null;
+          total_rooms: number | null;
+          images: Json; // common area photos
+          bills_config: Json; // { agua, luz, gas, internet, limpieza, comunidad, calefaccion }
+          house_rules: string[] | null;
+          owner_lives_here: boolean;
           allows_pets: boolean;
           allows_smoking: boolean;
           has_quiet_hours: boolean;
           no_parties: boolean;
-          bills_config: Json;
-          available_from: string | null;
-          min_stay_months: number | null;
-          contract_type: Database["public"]["Enums"]["contract_type"];
-          status: Database["public"]["Enums"]["listing_status"];
-          search_vector: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          publisher_id: string;
-          title: string;
-          description?: string | null;
-          price: number;
-          size_m2?: number | null;
-          bed_type?: Database["public"]["Enums"]["bed_type"] | null;
-          has_private_bath?: boolean;
-          has_wardrobe?: boolean;
-          has_desk?: boolean;
-          is_furnished?: boolean;
-          city_id: string;
-          place_id?: string | null;
-          address_approx?: string | null;
-          address_full?: string | null;
-          lat?: number | null;
-          lng?: number | null;
-          postal_code?: string | null;
-          owner_lives_here?: boolean;
-          flatmates_count?: number | null;
-          total_rooms?: number | null;
-          total_m2?: number | null;
-          floor?: string | null;
-          has_elevator?: boolean;
-          allows_pets?: boolean;
-          allows_smoking?: boolean;
-          has_quiet_hours?: boolean;
-          no_parties?: boolean;
-          bills_config?: Json;
-          available_from?: string | null;
-          min_stay_months?: number | null;
-          contract_type?: Database["public"]["Enums"]["contract_type"];
-          status?: Database["public"]["Enums"]["listing_status"];
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          publisher_id?: string;
-          title?: string;
-          description?: string | null;
-          price?: number;
-          size_m2?: number | null;
-          bed_type?: Database["public"]["Enums"]["bed_type"] | null;
-          has_private_bath?: boolean;
-          has_wardrobe?: boolean;
-          has_desk?: boolean;
-          is_furnished?: boolean;
-          city_id?: string;
-          place_id?: string | null;
-          address_approx?: string | null;
-          address_full?: string | null;
-          lat?: number | null;
-          lng?: number | null;
-          postal_code?: string | null;
-          owner_lives_here?: boolean;
-          flatmates_count?: number | null;
-          total_rooms?: number | null;
-          total_m2?: number | null;
-          floor?: string | null;
-          has_elevator?: boolean;
-          allows_pets?: boolean;
-          allows_smoking?: boolean;
-          has_quiet_hours?: boolean;
-          no_parties?: boolean;
-          bills_config?: Json;
-          available_from?: string | null;
-          min_stay_months?: number | null;
-          contract_type?: Database["public"]["Enums"]["contract_type"];
-          status?: Database["public"]["Enums"]["listing_status"];
-          updated_at?: string;
-        };
-      };
-      listing_media: {
-        Row: {
-          id: string;
-          publisher_id: string;
-          listing_id: string | null;
-          url: string;
-          zone: Database["public"]["Enums"]["media_zone"];
-          address_hash: string | null;
-          sort_order: number;
           created_at: string;
         };
         Insert: {
           id?: string;
-          publisher_id: string;
-          listing_id?: string | null;
-          url: string;
-          zone: Database["public"]["Enums"]["media_zone"];
-          address_hash?: string | null;
-          sort_order?: number;
+          owner_id: string;
+          name?: string | null;
+          address: string;
+          street_number?: string | null;
+          city_id?: string | null;
+          place_id?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          postal_code?: string | null;
+          floor?: string | null;
+          has_elevator?: boolean;
+          total_m2?: number | null;
+          total_rooms?: number | null;
+          images?: Json;
+          bills_config?: Json;
+          house_rules?: string[] | null;
+          owner_lives_here?: boolean;
+          allows_pets?: boolean;
+          allows_smoking?: boolean;
+          has_quiet_hours?: boolean;
+          no_parties?: boolean;
+        };
+        Update: {
+          name?: string | null;
+          address?: string;
+          street_number?: string | null;
+          postal_code?: string | null;
+          floor?: string | null;
+          has_elevator?: boolean;
+          total_m2?: number | null;
+          total_rooms?: number | null;
+          images?: Json;
+          bills_config?: Json;
+          house_rules?: string[] | null;
+          owner_lives_here?: boolean;
+          allows_pets?: boolean;
+          allows_smoking?: boolean;
+          has_quiet_hours?: boolean;
+          no_parties?: boolean;
+        };
+        Relationships: [];
+      };
+      rooms: {
+        Row: {
+          id: string;
+          property_id: string;
+          name: string | null;
+          size_m2: number | null;
+          bed_type: BedType | null;
+          has_private_bath: boolean;
+          has_wardrobe: boolean;
+          has_desk: boolean;
+          photos: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          name?: string | null;
+          size_m2?: number | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean;
+          has_wardrobe?: boolean;
+          has_desk?: boolean;
+          photos?: Json;
           created_at?: string;
         };
         Update: {
-          id?: string;
-          publisher_id?: string;
-          listing_id?: string | null;
-          url?: string;
-          zone?: Database["public"]["Enums"]["media_zone"];
-          address_hash?: string | null;
-          sort_order?: number;
+          property_id?: string;
+          name?: string | null;
+          size_m2?: number | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean;
+          has_wardrobe?: boolean;
+          has_desk?: boolean;
+          photos?: Json;
+          created_at?: string;
         };
+        Relationships: [];
       };
-      seeker_listings: {
+      common_areas: {
         Row: {
           id: string;
-          user_id: string;
+          property_id: string;
+          type: CommonAreaType;
+          photos: Json;
+          description: string | null;
+          amenities: string[];
+          is_shared_bath: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          property_id: string;
+          type: CommonAreaType;
+          photos?: Json;
+          description?: string | null;
+          amenities?: string[];
+          is_shared_bath?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          property_id?: string;
+          type?: CommonAreaType;
+          photos?: Json;
+          description?: string | null;
+          amenities?: string[];
+          is_shared_bath?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      listings: {
+        Row: {
+          id: string;
+          owner_id: string;
+          property_id: string | null; // new - links to properties table
+          room_id: string | null;
+          type: ListingType;
           title: string;
           description: string | null;
-          budget_min: number | null;
-          budget_max: number | null;
+          city: string;
+          city_id: string | null;
+          district: string | null;
+          place_id: string | null;
+          street: string | null;
+          street_number: string | null;
+          postal_code: string | null;
+          price: number;
+          size_m2: number | null; // m2 of the room
+          rooms: number | null;   // number of roommates
           available_from: string | null;
-          min_stay_months: number | null;
-          city_ids: string[];
-          place_ids: string[];
-          has_pets: boolean | null;
-          smokes: boolean | null;
-          looking_for_flatmate: boolean;
-          status: Database["public"]["Enums"]["seeker_status"];
-          search_vector: string;
+          is_furnished: boolean;
+          pets_allowed: boolean;
+          smokers_allowed: boolean;
+          lat: number | null;
+          lng: number | null;
+          status: ListingStatus;
+          images: string[];
           created_at: string;
           updated_at: string;
+          // New fields
+          min_stay_months: number | null;
+          contract_type: ContractType | null;
+          bed_type: BedType | null;
+          has_private_bath: boolean | null;
+          has_wardrobe: boolean | null;
+          has_desk: boolean | null;
         };
         Insert: {
           id?: string;
-          user_id: string;
+          owner_id: string;
+          property_id?: string | null;
+          room_id?: string | null;
+          type?: ListingType;
           title: string;
           description?: string | null;
-          budget_min?: number | null;
-          budget_max?: number | null;
+          city: string;
+          city_id?: string | null;
+          district?: string | null;
+          place_id?: string | null;
+          street?: string | null;
+          street_number?: string | null;
+          postal_code?: string | null;
+          price: number;
+          size_m2?: number | null;
+          rooms?: number | null;
           available_from?: string | null;
+          is_furnished?: boolean;
+          pets_allowed?: boolean;
+          smokers_allowed?: boolean;
+          lat?: number | null;
+          lng?: number | null;
+          status?: ListingStatus;
+          images?: string[];
           min_stay_months?: number | null;
-          city_ids: string[];
-          place_ids?: string[];
-          has_pets?: boolean | null;
-          smokes?: boolean | null;
-          looking_for_flatmate?: boolean;
-          status?: Database["public"]["Enums"]["seeker_status"];
-          created_at?: string;
-          updated_at?: string;
+          contract_type?: ContractType | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean | null;
+          has_wardrobe?: boolean | null;
+          has_desk?: boolean | null;
         };
         Update: {
-          id?: string;
-          user_id?: string;
+          property_id?: string | null;
+          room_id?: string | null;
+          type?: ListingType;
           title?: string;
           description?: string | null;
-          budget_min?: number | null;
-          budget_max?: number | null;
+          city?: string;
+          city_id?: string | null;
+          district?: string | null;
+          place_id?: string | null;
+          street?: string | null;
+          street_number?: string | null;
+          postal_code?: string | null;
+          price?: number;
+          size_m2?: number | null;
+          rooms?: number | null;
           available_from?: string | null;
+          is_furnished?: boolean;
+          pets_allowed?: boolean;
+          smokers_allowed?: boolean;
+          lat?: number | null;
+          lng?: number | null;
+          status?: ListingStatus;
+          images?: string[];
           min_stay_months?: number | null;
-          city_ids?: string[];
-          place_ids?: string[];
-          has_pets?: boolean | null;
-          smokes?: boolean | null;
-          looking_for_flatmate?: boolean;
-          status?: Database["public"]["Enums"]["seeker_status"];
-          updated_at?: string;
+          contract_type?: ContractType | null;
+          bed_type?: BedType | null;
+          has_private_bath?: boolean | null;
+          has_wardrobe?: boolean | null;
+          has_desk?: boolean | null;
         };
+        Relationships: [];
       };
       requests: {
         Row: {
           id: string;
+          listing_id: string;
           requester_id: string;
           owner_id: string;
-          target_type: Database["public"]["Enums"]["request_target"];
-          room_listing_id: string | null;
-          seeker_listing_id: string | null;
-          status: Database["public"]["Enums"]["request_status"];
+          status: RequestStatus;
           message: string | null;
-          presentation_message: string | null;
-          is_boosted: boolean;
+          presentation_message: string | null; // new - shown in candidates view
+          is_boosted: boolean;                  // new - true if Superfriendz active at send time
           offered_at: string | null;
           offer_terms: Json | null;
           requester_confirmed_at: string | null;
@@ -349,12 +371,10 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          listing_id: string;
           requester_id: string;
           owner_id: string;
-          target_type: Database["public"]["Enums"]["request_target"];
-          room_listing_id?: string | null;
-          seeker_listing_id?: string | null;
-          status?: Database["public"]["Enums"]["request_status"];
+          status?: RequestStatus;
           message?: string | null;
           presentation_message?: string | null;
           is_boosted?: boolean;
@@ -362,28 +382,21 @@ export type Database = {
           offer_terms?: Json | null;
           requester_confirmed_at?: string | null;
           owner_confirmed_at?: string | null;
-          created_at?: string;
         };
         Update: {
-          id?: string;
-          requester_id?: string;
-          owner_id?: string;
-          target_type?: Database["public"]["Enums"]["request_target"];
-          room_listing_id?: string | null;
-          seeker_listing_id?: string | null;
-          status?: Database["public"]["Enums"]["request_status"];
-          message?: string | null;
+          status?: RequestStatus;
           presentation_message?: string | null;
-          is_boosted?: boolean;
           offered_at?: string | null;
           offer_terms?: Json | null;
           requester_confirmed_at?: string | null;
           owner_confirmed_at?: string | null;
         };
+        Relationships: [];
       };
       conversations: {
         Row: {
           id: string;
+          listing_id: string | null;
           request_id: string | null;
           participant_a: string;
           participant_b: string;
@@ -393,21 +406,52 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          listing_id?: string | null;
           request_id?: string | null;
           participant_a: string;
           participant_b: string;
-          last_message_at?: string | null;
-          last_message_preview?: string | null;
-          created_at?: string;
         };
         Update: {
-          id?: string;
-          request_id?: string | null;
-          participant_a?: string;
-          participant_b?: string;
           last_message_at?: string | null;
           last_message_preview?: string | null;
         };
+        Relationships: [];
+      };
+      push_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          platform: "ios" | "android";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          platform: "ios" | "android";
+        };
+        Update: never;
+        Relationships: [];
+      };
+      connections: {
+        Row: {
+          id: string;
+          requester_id: string;
+          addressee_id: string;
+          status: ConnectionStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          addressee_id: string;
+          status?: ConnectionStatus;
+        };
+        Update: {
+          status?: ConnectionStatus;
+        };
+        Relationships: [];
       };
       messages: {
         Row: {
@@ -425,77 +469,58 @@ export type Database = {
           sender_id: string;
           content: string;
           is_system?: boolean;
-          read_at?: string | null;
-          created_at?: string;
         };
         Update: {
-          id?: string;
-          conversation_id?: string;
-          sender_id?: string;
-          content?: string;
-          is_system?: boolean;
           read_at?: string | null;
+          is_system?: boolean;
         };
+        Relationships: [];
       };
       households: {
         Row: {
           id: string;
+          listing_id: string | null;
+          property_id: string | null;
           name: string;
           created_by: string | null;
           invite_code: string;
-          room_listing_id: string | null;
-          address: string | null;
-          city_id: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
+          listing_id?: string | null;
+          property_id?: string | null;
           name: string;
           created_by?: string | null;
-          invite_code: string;
-          room_listing_id?: string | null;
-          address?: string | null;
-          city_id?: string | null;
+          invite_code?: string;
           created_at?: string;
         };
-        Update: {
-          id?: string;
-          name?: string;
-          created_by?: string | null;
-          invite_code?: string;
-          room_listing_id?: string | null;
-          address?: string | null;
-          city_id?: string | null;
-        };
+        Update: { name?: string; listing_id?: string | null; property_id?: string | null };
+        Relationships: [];
       };
       household_members: {
         Row: {
           id: string;
           household_id: string;
           user_id: string;
-          role: string;
+          role: "admin" | "member";
           joined_at: string;
           leaving_date: string | null;
-          leaving_reason: string | null;
+          leaving_reason: "contract_end" | "manual" | null;
         };
         Insert: {
-          id?: string;
           household_id: string;
           user_id: string;
-          role?: string;
-          joined_at?: string;
+          role?: "admin" | "member";
           leaving_date?: string | null;
-          leaving_reason?: string | null;
+          leaving_reason?: "contract_end" | "manual" | null;
         };
         Update: {
-          id?: string;
-          household_id?: string;
-          user_id?: string;
-          role?: string;
-          joined_at?: string;
+          role?: "admin" | "member";
           leaving_date?: string | null;
-          leaving_reason?: string | null;
+          leaving_reason?: "contract_end" | "manual" | null;
         };
+        Relationships: [];
       };
       expenses: {
         Row: {
@@ -503,36 +528,28 @@ export type Database = {
           household_id: string;
           paid_by: string;
           amount: number;
-          category: string;
+          category: "luz" | "agua" | "gas" | "internet" | "comida" | "limpieza" | "otros";
           description: string | null;
           receipt_url: string | null;
           date: string;
-          split_type: string;
+          split_type: "equal" | "custom";
           created_at: string;
         };
         Insert: {
-          id?: string;
           household_id: string;
           paid_by: string;
           amount: number;
-          category: string;
-          description?: string | null;
-          receipt_url?: string | null;
-          date: string;
-          split_type?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          household_id?: string;
-          paid_by?: string;
-          amount?: number;
-          category?: string;
+          category?: "luz" | "agua" | "gas" | "internet" | "comida" | "limpieza" | "otros";
           description?: string | null;
           receipt_url?: string | null;
           date?: string;
-          split_type?: string;
+          split_type?: "equal" | "custom";
         };
+        Update: {
+          description?: string | null;
+          receipt_url?: string | null;
+        };
+        Relationships: [];
       };
       expense_splits: {
         Row: {
@@ -545,7 +562,6 @@ export type Database = {
           settled_by: string | null;
         };
         Insert: {
-          id?: string;
           expense_id: string;
           user_id: string;
           amount: number;
@@ -554,67 +570,11 @@ export type Database = {
           settled_by?: string | null;
         };
         Update: {
-          id?: string;
-          expense_id?: string;
-          user_id?: string;
-          amount?: number;
           is_settled?: boolean;
           settled_at?: string | null;
           settled_by?: string | null;
         };
-      };
-      push_tokens: {
-        Row: {
-          id: string;
-          user_id: string;
-          token: string;
-          platform: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          token: string;
-          platform: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          token?: string;
-          platform?: string;
-        };
-      };
-      subscriptions: {
-        Row: {
-          id: string;
-          user_id: string;
-          tier: Database["public"]["Enums"]["subscription_tier"];
-          status: Database["public"]["Enums"]["subscription_status"];
-          product_id: string | null;
-          expires_at: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          tier: Database["public"]["Enums"]["subscription_tier"];
-          status: Database["public"]["Enums"]["subscription_status"];
-          product_id?: string | null;
-          expires_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          tier?: Database["public"]["Enums"]["subscription_tier"];
-          status?: Database["public"]["Enums"]["subscription_status"];
-          product_id?: string | null;
-          expires_at?: string | null;
-          updated_at?: string;
-        };
+        Relationships: [];
       };
     };
     Views: {
@@ -624,105 +584,155 @@ export type Database = {
           active_count: number;
         };
       };
-      cities_with_counts: {
+      listings_with_property: {
         Row: {
           id: string;
-          name: string;
-          centroid: string | null;
-          bbox: string | null;
-          search_count: number;
-        };
-      };
-      household_balances: {
-        Row: {
-          expense_id: string;
-          household_id: string;
-          user_id: string;
-          amount: number;
-          is_settled: boolean;
-          paid_by: string;
-          net_contribution: number;
+          owner_id: string;
+          room_id: string | null;
+          type: ListingType;
+          title: string;
+          description: string | null;
+          price: number;
+          available_from: string | null;
+          min_stay_months: number | null;
+          contract_type: ContractType | null;
+          status: ListingStatus;
+          created_at: string;
+          updated_at: string;
+          search_vector: unknown | null;
+          property_id: string | null;
+          city_id: string | null;
+          place_id: string | null;
+          lat: number | null;
+          lng: number | null;
+          postal_code: string | null;
+          address: string | null;
+          city_name: string | null;
+          district_name: string | null;
+          city: string;
+          district: string | null;
+          street: string | null;
+          street_number: string | null;
+          rooms: number | null;
+          is_furnished: boolean;
+          pets_allowed: boolean;
+          smokers_allowed: boolean;
+          size_m2: number | null;
+          images: string[];
+          bed_type: BedType | null;
+          has_private_bath: boolean | null;
+          has_wardrobe: boolean | null;
+          has_desk: boolean | null;
+          property_name: string | null;
+          property_address: string | null;
+          property_street_number: string | null;
+          property_floor: string | null;
+          property_postal_code: string | null;
+          property_city_id: string | null;
+          property_place_id: string | null;
+          property_lat: number | null;
+          property_lng: number | null;
+          property_has_elevator: boolean;
+          property_total_m2: number | null;
+          property_total_rooms: number | null;
+          property_bills_config: Json;
+          property_house_rules: string[] | null;
+          property_images: Json;
+          property_household_id: string | null;
+          owner_lives_here: boolean;
+          allows_pets: boolean;
+          allows_smoking: boolean;
+          has_quiet_hours: boolean;
+          no_parties: boolean;
+          bills_config: Json | null;
+          property_photos: Json | null;
+          room_name: string | null;
+          room_photos: Json | null;
+          common_area_types: CommonAreaType[] | null;
         };
       };
     };
     Functions: {
-      search_room_listings: {
-        Args: {
-          p_query?: string;
-          p_city_id?: string;
-          p_place_id?: string;
-          p_price_min?: number;
-          p_price_max?: number;
-          p_size_min?: number;
-          p_allows_pets?: boolean;
-          p_allows_smoking?: boolean;
-          p_available_from?: string;
-          p_lat?: number;
-          p_lng?: number;
-          p_radius_km?: number;
-          p_limit?: number;
-          p_offset?: number;
-        };
-        Returns: Database["public"]["Tables"]["room_listings"]["Row"][];
-      };
-      search_users: {
-        Args: {
-          p_query: string;
-          p_limit?: number;
-        };
-        Returns: {
-          id: string;
-          full_name: string | null;
-          avatar_url: string | null;
-          username: string | null;
-          verified_at: string | null;
-          city: string | null;
-        }[];
-      };
       get_mutual_friends: {
-        Args: {
-          p_user_a: string;
-          p_user_b: string;
-        };
-        Returns: {
-          id: string;
-          full_name: string | null;
-          avatar_url: string | null;
-          username: string | null;
-          verified_at: string | null;
-        }[];
+        Args: { p_user_a: string; p_user_b: string };
+        Returns: { id: string; full_name: string | null; avatar_url: string | null; username: string | null; verified_at: string | null }[];
       };
       get_connection_degree: {
-        Args: {
-          p_viewer: string;
-          p_target: string;
-        };
+        Args: { p_viewer: string; p_target: string };
         Returns: number | null;
       };
+      search_users: {
+        Args: { p_query: string; p_limit?: number };
+        Returns: { id: string; full_name: string | null; avatar_url: string | null; username: string | null; verified_at: string | null; city: string | null }[];
+      };
       join_household_by_code: {
-        Args: {
-          p_code: string;
-        };
+        Args: { p_code: string };
         Returns: string;
       };
-      increment_city_count: {
+      create_household: {
+        Args: { p_name: string; p_listing_id?: string | null; p_property_id?: string | null };
+        Returns: string;
+      };
+      my_household: {
+        Args: Record<string, never>;
+        Returns: { id: string; name: string; invite_code: string; listing_id: string | null; property_id: string | null; created_by: string; created_at: string; member_role: string }[];
+      };
+      send_offer: {
+        Args: { p_request_id: string; p_offer_terms?: Json };
+        Returns: string;
+      };
+      accept_offer: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      accept_request_chat: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      rollback_offer_to_invited: {
+        Args: { p_request_id: string; p_actor_id?: string | null };
+        Returns: string;
+      };
+      deny_request: {
+        Args: { p_request_id: string };
+        Returns: undefined;
+      };
+      withdraw_request: {
+        Args: { p_request_id: string };
+        Returns: string;
+      };
+      confirm_assignment: {
+        Args: { p_request_id: string };
+        Returns: { conversation_id: string; household_id: string | null; assignment_completed: boolean }[];
+      };
+      search_listings: {
         Args: {
-          p_city_id: string;
+          p_query?: string | null;
+          p_city?: string | null;
+          p_city_id?: string | null;
+          p_place_id?: string | null;
+          p_type?: "offer" | "search" | null;
+          p_price_min?: number | null;
+          p_price_max?: number | null;
+          p_size_min?: number | null;
+          p_pets?: boolean | null;
+          p_smokers?: boolean | null;
+          p_allows_pets?: boolean | null;
+          p_allows_smoking?: boolean | null;
+          p_common_areas?: CommonAreaType[] | null;
+          p_available_from?: string | null;
+          p_lat?: number | null;
+          p_lng?: number | null;
+          p_radius_km?: number | null;
+          p_cursor?: string | null;
+          p_offset?: number | null;
+          p_limit?: number | null;
         };
-        Returns: void;
+        Returns: Database["public"]["Views"]["listings_with_property"]["Row"][];
       };
     };
-    Enums: {
-      listing_status: "draft" | "active" | "paused" | "rented";
-      seeker_status: "active" | "paused" | "found";
-      request_status: "pending" | "invited" | "offered" | "accepted" | "assigned" | "denied";
-      request_target: "room_listing" | "seeker_listing";
-      connection_status: "pending" | "accepted";
-      subscription_tier: "superfriendz";
-      subscription_status: "active" | "expired" | "cancelled";
-      bed_type: "individual" | "doble" | "litera";
-      media_zone: "habitacion" | "cocina" | "bano" | "salon" | "terraza" | "lavadero" | "garaje" | "entrada" | "otro";
-      contract_type: "long_term" | "temporary" | "flexible";
-    };
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 };
+
